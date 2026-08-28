@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Large generated CAD output — regenerate from macros/*.py
+# Track small exports (<5MB) by adding them explicitly with git add -f
+projects/BrokeFeet/*.stl
+projects/BrokeFeet/*.step
+projects/BrokeFeetV1/*.stl
+projects/BrokeFeetV1/*.step
+projects/BrokeFeetV1/cad/
+
+# Raw CT reference panes (146+15 MB); de-identified versions are tracked
+references/brokenfeet/axiales/
+references/brokenfeet/sagitales/
+references/brokenfeet/axial/
+
+# Large intermediate pipeline arrays (283 MB each)
+*.npy
+projects/BrokeFeetV1/work/
+
+# Blender working files and sculpt exports
+*.blend
+*.blend1
+projects/BrokeFeetV1/blender/*.stl
+
+# Renders (regenerable)
+renders/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary / scratchpad
+/tmp/
