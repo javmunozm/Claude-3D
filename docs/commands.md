@@ -7,7 +7,10 @@ Standard commands for working with any project in this index. Examples use
 
 ```
 pip install build123d ocp-vscode
+pip install pymeshfix pyvista pydicom SimpleITK pymeshlab
 ```
+
+See [system.md](system.md) for the full package list and versions.
 
 ## Generate / regenerate CAD output
 
@@ -123,6 +126,125 @@ exist, in the unsafe direction — a PASS verdict below it means nothing until
 the inputs are corrected. This is not hypothetical: BedLifter's check ran for
 some time against a 9.332° design while the geometry built 8.850°, with a
 collar diameter overstated more than 2×, and reported `ALL CHECKS PASS`.
+
+## Import geometry from DXF or SVG
+
+build123d 0.11.1 imports DXF and SVG files directly. For plans, technical
+drawings, and CAD exports, this is the preferred path — the file already
+carries true geometry with no scale inference needed.
+
+```python
+from build123d import import_dxf, import_svg, extrude
+
+# DXF — technical drawing → extruded solid
+sketch = import_dxf("drawing.dxf")
+part = extrude(sketch, amount=10)
+
+# SVG — vector graphic → sketch
+sketch = import_svg("outline.svg")
+```
+
+For scanned plans or hand sketches, vectorize with potrace or Inkscape's
+trace bitmap, export as SVG or DXF, then import.
+
+## Repair non-manifold meshes
+
+pymeshfix repairs singularities, self-intersections, and degenerate elements
+while leaving clean regions untouched.
+
+```python
+import pymeshfix
+import pyvista as pv
+
+mesh = pv.read("projects/VitaGrip/VitaGrip.stl")
+fixer = pymeshfix.MeshFix(mesh)
+fixer.repair(verbose=True)
+fixer.mesh.save("projects/VitaGrip/VitaGrip_repaired.stl")
+```
+
+Use this for meshes that fail the watertight gate due to non-manifold edges
+or pinch points (e.g. VitaGrip's 2 bad edges out of 225,000). For meshes
+with actual holes, use `trimesh.repair.fill_holes()` or `manifold3d` instead.
+
+pymeshlab offers heavier filters when pymeshfix is not enough:
+
+```python
+import pymeshlab
+ms = pymeshlab.MeshSet()
+ms.load_new_mesh("input.stl")
+ms.meshing_repair_non_manifold_edges()
+ms.meshing_repair_non_manifold_vertices()
+ms.save_current_mesh("output.stl")
+```
+
+## Render with Blender (headless)
+
+Blender 5.2 produces renders with correct occlusion, directional lighting,
+and depth — unlike the matplotlib fallback in `render_check.py`.
+
+```
+blender --background --factory-startup --python render_script.py -- input.stl output.png
+```
+
+See [system.md](system.md#rendering-blender-vs-matplotlib) for the Blender 5.2
+specifics (engine name, STL import API, camera/lighting setup).
+
+## Inspect meshes with pyvista
+
+pyvista provides interactive 3D inspection and offscreen rendering. Useful
+for debugging mesh issues before running the full verification gate.
+
+```python
+import pyvista as pv
+
+mesh = pv.read("projects/VitaGrip/VitaGrip.stl")
+print(f"Points: {mesh.n_points}, Faces: {mesh.n_faces}")
+print(f"Bounds: {mesh.bounds}")
+print(f"Volume: {mesh.volume:.2f} mm³")
+
+# Non-manifold edge check
+edges = mesh.extract_feature_edges(
+    boundary_edges=True, non_manifold_edges=True,
+    feature_edges=False, manifold_edges=False
+)
+print(f"Boundary edges: {edges.n_cells}")
+
+# Interactive plot (if display available)
+mesh.plot()
+
+# Offscreen render
+plotter = pv.Plotter(off_screen=True)
+plotter.add_mesh(mesh, color="lightblue")
+plotter.screenshot("output.png")
+```
+
+## Read DICOM studies (BrokeFeet project)
+
+pydicom and SimpleITK replace the 8-bit brightness thresholds with real
+Hounsfield units (~200–300 HU for bone) and recover true voxel spacing
+from DICOM headers.
+
+```python
+import pydicom
+import SimpleITK as sitk
+
+# Read a DICOM series from a directory
+reader = sitk.ImageSeriesReader()
+dicom_names = reader.GetGDCMSeriesFileNames("path/to/dicom/")
+reader.SetFileNames(dicom_names)
+image = reader.Execute()
+
+# Voxel spacing from headers (no on-screen ruler needed)
+spacing = image.GetSpacing()  # (x, y, z) in mm
+print(f"Voxel spacing: {spacing}")
+
+# Threshold on Hounsfield units
+bone = sitk.BinaryThreshold(image, lowerThreshold=200, upperThreshold=3000)
+```
+
+This directly addresses BrokeFeet's hardest problem: the void/joint
+separation whose best brightness threshold scored Youden J = 0.002. HU is a
+physical quantity; screen grey is not.
 
 ## Adding a new command to a project
 

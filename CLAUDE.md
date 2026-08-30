@@ -23,7 +23,7 @@ user's decisions behind conditions of your own.
 Claude-Projects/
 ├── CLAUDE.md          ← this file (project index and conventions)
 ├── docs/              ← index-wide documentation (see below)
-├── tools/             ← shared verification tooling (render_check, reconcile)
+├── tools/             ← shared tooling (render_check, reconcile, read_3mf)
 ├── references/        ← reference images/specs per subject, with SOURCES.md
 ├── projects/          ← all CAD projects live here
 │   ├── <ProjectName>/
@@ -42,14 +42,19 @@ geometry change run `python tools\render_check.py projects\<Project>\<Part>.stl
 verdict, read its `tools/reconcile.py` block. See
 [docs/commands.md](docs/commands.md).
 
+For mesh repair and inspection, see the pymeshfix, pymeshlab, and pyvista
+commands in [docs/commands.md](docs/commands.md). For the full toolchain
+and package versions, see [docs/system.md](docs/system.md).
+
 ## Documentation
 
 | Doc | Covers |
 |-----|--------|
 | [docs/architecture.md](docs/architecture.md) | How a project's geometry code, exported files, verification, and viewer fit together |
-| [docs/system.md](docs/system.md) | Toolchain, dependencies, file types, units/coordinate conventions, directory layout |
-| [docs/commands.md](docs/commands.md) | Standard commands to generate, view, and structurally check a project |
+| [docs/system.md](docs/system.md) | Full toolchain — all packages with versions, Blender setup, import capabilities, rendering options, disk constraints, known issues |
+| [docs/commands.md](docs/commands.md) | Standard commands: generate, view, verify, DXF/SVG import, mesh repair, Blender rendering, pyvista inspection, DICOM reading |
 | [docs/projects.md](docs/projects.md) | Index of all projects with description and status |
+| [docs/versioning.md](docs/versioning.md) | Adding a version to a project without cluttering `projects/` — nesting rule, move procedure, the path constants it breaks |
 
 ## Agents
 
@@ -76,7 +81,7 @@ rejected — see BrokeFeet's README — or it will re-walk them.
 When a mesh needs hand-sculpting in Blender, `blender-handoff` sits between
 `bone-morphologist` (or `cad-designer`) and the human sculptor: it prepares
 the mesh, writes the `.blend` file, and gates what comes back. See
-BrokeFeetV1's `blender/` directory for the established workflow.
+BrokeFeet's `v2/blender/` directory for the established workflow.
 
 **Brief agents to report negative results.** In this repo the most useful
 agent output has been a measured "this does not work, and here is why", plus
@@ -99,6 +104,33 @@ Project-level skills in `.claude/skills/`, invocable as slash commands:
 - Geometry is authored as Python scripts under `projects/<ProjectName>/macros/` using build123d, and run to regenerate `.step` / `.stl` output — there are no `.FCStd` files.
 - Viewing/inspection uses `ocp-vscode` (`python -m ocp_vscode`), not the FreeCAD GUI.
 - `references/` and `tools/` stay at the repo root, shared across all projects — not nested under `projects/`.
+
+### One project = one physical object
+
+**A version is never a sibling folder.** `BrokeFeet/` and `BrokeFeetV1/` were
+one clubfoot model split across two top-level folders; the result was a
+duplicated 46 MB of byte-identical STLs, two READMEs each claiming to be ready,
+and no single place saying which file to slice.
+
+When a project gains a second generation, nest it:
+
+```
+projects/<Project>/
+├── README.md     ← which version ships, what each holds, shared clinical scope
+├── v0/           ← README.md, macros/, its own exports
+└── v2/           ← README.md, macros/, its own exports
+```
+
+The root `README.md` is a **navigation layer**, not a summary: which version
+ships and which file to slice, what each version owns, and which versions still
+depend on each other. Version folders are named for what they ship, and gaps are
+fine (`v0` + `v2` with no `v1` is correct when the v1 work shipped as v2).
+
+See [docs/versioning.md](docs/versioning.md) for the full procedure — including
+the path constants that nesting breaks and how to verify the move.
+
+**Never delete an old version as "the old one" without checking imports.** v2
+here imports directly from `v0/macros/` and does not run without it.
 
 ## Projects
 

@@ -5,13 +5,21 @@ How a CAD project in this index is put together, from geometry code to printable
 ## Layer overview
 
 ```
+references/            Reference images, specs, DXF/SVG drawings
+      │
+      │  (DXF/SVG: import_dxf / import_svg — true geometry, no scale needed)
+      │  (photos:  measure → anchor → trace — scale from known dimension)
+      ▼
 macros/*.py            Python source — parametric geometry, built with build123d
       │  run with `python`
       ▼
 *.step / *.stl          Generated CAD output, written to the project's root folder
       │
-      ├─► ocp-vscode      interactive 3D viewer (browser or VS Code panel)
-      └─► slicer          STL → G-code for 3D printing
+      ├─► render_check.py   topology + shaded renders (matplotlib or Blender)
+      ├─► pymeshfix         mesh repair if topology gate fails
+      ├─► pyvista           interactive inspection / offscreen renders
+      ├─► ocp-vscode        interactive 3D viewer (browser or VS Code panel)
+      └─► slicer            STL → G-code for 3D printing (OrcaSlicer)
 ```
 
 Nothing in a project folder is hand-edited CAD data. The `.step` and `.stl`
@@ -76,6 +84,23 @@ shaded renders from standard cameras. It exists because dimensional
 correctness does not imply shape correctness — see
 [commands.md](commands.md) for the failures that motivated it and the
 workflow that catches them.
+
+## Mesh repair layer
+
+When a mesh fails the topology gate (non-manifold edges, non-watertight),
+two repair tools are available before re-running the gate:
+
+- **pymeshfix** — targeted repair that fixes singularities and
+  self-intersections without modifying clean regions. Preferred for meshes
+  with isolated defects (e.g. VitaGrip's 2 non-manifold edges out of
+  225,000).
+- **pymeshlab** — heavier filter suite (Screened Poisson, quadric
+  decimation, curvature-aware smoothing) for meshes needing more
+  intervention.
+- **manifold3d** — re-booleans a mesh into a guaranteed-manifold solid.
+  Already used in BrokeFeet for STEP export.
+
+See [commands.md](commands.md#repair-non-manifold-meshes) for usage.
 
 ## Viewer layer
 
