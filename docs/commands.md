@@ -144,8 +144,69 @@ part = extrude(sketch, amount=10)
 sketch = import_svg("outline.svg")
 ```
 
-For scanned plans or hand sketches, vectorize with potrace or Inkscape's
-trace bitmap, export as SVG or DXF, then import.
+For scanned plans or hand sketches, use the vectorization pipeline below.
+
+## Vectorize a reference image
+
+Turn a raster reference image into SVG/DXF geometry suitable for build123d
+import. Two approaches available:
+
+### vtracer (preferred for clean images)
+
+```python
+import vtracer
+
+vtracer.convert_image_to_svg_py(
+    "references/subject/photo.jpg",
+    "references/subject/svg/photo.svg",
+    colormode="binary",       # "binary" for silhouettes, "color" for photos
+    filter_speckle=4,         # remove noise (pixels)
+    corner_threshold=60,      # preserve sharp corners
+    mode="spline",            # cubic Bezier output
+    path_precision=3,
+)
+```
+
+### cv2 + scipy (for noisy images or when vtracer picks up too much)
+
+```python
+import cv2
+import numpy as np
+from scipy.interpolate import splprep, splev
+
+img = cv2.imread("photo.jpg", cv2.IMREAD_GRAYSCALE)
+mask = (img < 228).astype(np.uint8) * 255
+kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kern)  # remove watermarks
+
+contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+body = max(contours, key=cv2.contourArea)
+
+# Smooth with B-spline
+pts = body.reshape(-1, 2).astype(float)
+tck, u = splprep([pts[:, 0], pts[:, 1]], s=cv2.arcLength(body, True) * 0.8, per=True, k=3)
+x, y = splev(np.linspace(0, 1, 400), tck)
+```
+
+### SVG→DXF conversion (no Inkscape needed)
+
+```python
+import svgpathtools
+import ezdxf
+import numpy as np
+
+paths, _ = svgpathtools.svg2paths("outline.svg")
+doc = ezdxf.new()
+msp = doc.modelspace()
+
+for path in paths:
+    points = [(path.point(t).real, path.point(t).imag) for t in np.linspace(0, 1, 200)]
+    msp.add_lwpolyline(points, dxfattribs={"layer": "BODY"})
+
+doc.saveas("outline.dxf")
+```
+
+See the `vector-tracer` and `accuracy-reviewer` agents for the full workflow.
 
 ## Repair non-manifold meshes
 

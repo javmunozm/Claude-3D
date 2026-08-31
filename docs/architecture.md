@@ -8,7 +8,7 @@ How a CAD project in this index is put together, from geometry code to printable
 references/            Reference images, specs, DXF/SVG drawings
       │
       │  (DXF/SVG: import_dxf / import_svg — true geometry, no scale needed)
-      │  (photos:  measure → anchor → trace — scale from known dimension)
+      │  (photos:  vectorize → scale → SVG/DXF — see pipeline below)
       ▼
 macros/*.py            Python source — parametric geometry, built with build123d
       │  run with `python`
@@ -21,6 +21,38 @@ macros/*.py            Python source — parametric geometry, built with build12
       ├─► ocp-vscode        interactive 3D viewer (browser or VS Code panel)
       └─► slicer            STL → G-code for 3D printing (OrcaSlicer)
 ```
+
+## Vectorization pipeline
+
+When a project starts from a reference photograph rather than a DXF/SVG
+drawing, the image must be vectorized before it can enter the CAD pipeline.
+
+```
+reference photo (.jpg/.png/.webp)
+      │
+      ├─► vtracer (Rust-based raster→SVG, good for clean images)
+      │   OR
+      ├─► cv2 + scipy (threshold → contour → spline smooth, better for noisy images)
+      │
+      ▼
+raw SVG (traced outlines in pixel coordinates)
+      │
+      ├─► scale calibration (known dimension → px/mm)
+      ├─► svgpathtools (parse, clean, filter paths)
+      │
+      ▼
+clean SVG (mm units, smooth curves, features labeled)
+      │
+      ├─► svgpathtools + ezdxf (SVG paths → DXF polylines)
+      │
+      ▼
+DXF (importable by build123d via import_dxf)
+```
+
+The `vector-tracer` agent runs this pipeline; the `accuracy-reviewer` agent
+verifies the output against the source image and known dimensions. See
+[commands.md](commands.md#vectorize-a-reference-image) for the specific
+commands.
 
 Nothing in a project folder is hand-edited CAD data. The `.step` and `.stl`
 files are build artifacts — regenerate them by re-running the script that

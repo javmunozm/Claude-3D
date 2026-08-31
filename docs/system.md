@@ -39,12 +39,19 @@ Environment, dependencies, and conventions shared by every project in this index
 | scipy | 1.16.1 | Morphological operations, interpolation, signal processing |
 | scikit-image | 0.26.0 | Segmentation, labeling, connected components (BrokeFeet pipeline) |
 
+### Vectorization
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| [vtracer](https://github.com/nickmccullum/vtracer-py) | 0.6.15 | Rust-based raster→SVG vectorizer with color clustering and spline output |
+
 ### CAD interchange
 
 | Package | Version | Purpose |
 |---------|---------|---------|
 | [ezdxf](https://ezdxf.mozman.at/) | 1.4.4 | DXF read/write — build123d uses this for `import_dxf` and `ExportDXF` |
-| svgpathtools | — | SVG path parsing — build123d uses this for `import_svg` |
+| svgpathtools | 1.7.2 | SVG path parsing — build123d uses this for `import_svg` |
+| svgwrite | 1.4.3 | SVG file creation — programmatic SVG generation |
 | shapely | 2.1.2 | 2D computational geometry (polygon operations, offset curves) |
 
 ### Medical imaging (BrokeFeet project)

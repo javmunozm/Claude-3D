@@ -67,8 +67,11 @@ Project-level subagents in `.claude/agents/`, tailored to this repo's build123d/
 | `print-tolerance-expert` | Fit clearances, structural sizing (stress/buckling/safety factor), print settings |
 | `bone-morphologist` | Repairing CT-derived skeletal meshes — porous or perforated bone that is a segmentation artefact, not anatomy |
 | `blender-handoff` | Preparing meshes for Blender sculpting and importing sculpted results back — prep scripts, sculpt detection, smoothing gates |
+| `vector-tracer` | Generating SVG/DXF vector files from reference images using vtracer/cv2+scipy pipeline |
+| `accuracy-reviewer` | Evaluating accuracy of generated vector files against reference images and known dimensions |
 
 Typical flow for a photo-driven part: `reference-analyst` (measure) →
+`vector-tracer` (vectorize reference views) → `accuracy-reviewer` (verify) →
 `cad-designer` (build + verify) → `print-tolerance-expert` (tolerances,
 structural check). Each hands off explicitly rather than re-deriving the
 previous stage's numbers.
