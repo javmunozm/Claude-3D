@@ -25,8 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-REPO = Path(__file__).resolve().parents[2]
-V0_MACROS = REPO / "BrokeFeet" / "macros"
+REPO = Path(__file__).resolve().parents[4]
+V0_MACROS = REPO / "projects" / "BrokeFeet" / "v0" / "macros"
 CACHE = Path(__file__).resolve().parent.parent / "work" / "stack.npy"
 
 

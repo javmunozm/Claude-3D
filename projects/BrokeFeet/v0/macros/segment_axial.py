@@ -40,7 +40,7 @@ from deidentify_axial import (
     SLICE_STEP_MM,
 )
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 DEID_DIR = REPO / "references" / "brokenfeet_deid_axial"
 PROXIMAL_DIR = REPO / "references" / "brokenfeet_deid_axial_proximal"
 OUT_DIR = Path(__file__).resolve().parent.parent

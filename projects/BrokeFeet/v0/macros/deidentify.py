@@ -28,7 +28,7 @@ from PIL import Image
 
 # --- paths -----------------------------------------------------------------
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 SRC_DIR = REPO / "references" / "brokenfeet"
 OUT_DIR = REPO / "references" / "brokenfeet_deid"
 INDEX_CSV = OUT_DIR / "slice_index.csv"

@@ -50,7 +50,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 SRC_DIR = REPO / "references" / "brokenfeet" / "axial proximal"
 OUT_DIR = REPO / "references" / "brokenfeet_deid_axial_proximal"
 INDEX_CSV = OUT_DIR / "slice_index.csv"

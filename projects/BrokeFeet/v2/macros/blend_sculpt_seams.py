@@ -126,7 +126,7 @@ def main():
 
     import sys
     sys.path.insert(0, str(HERE))
-    sys.path.insert(0, str(ROOT.parent / "BrokeFeet" / "macros"))
+    sys.path.insert(0, str(ROOT.parent / "v0" / "macros"))
     ref_iso = np.load(ROOT / "work" / "iso_patched.npy")
 
     mesh = trimesh.load(args.src)

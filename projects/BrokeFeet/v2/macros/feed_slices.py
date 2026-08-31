@@ -101,7 +101,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 PROJECT = Path(__file__).resolve().parents[1]
 
 SRC_MAIN = REPO / "references" / "brokenfeet" / "axiales"

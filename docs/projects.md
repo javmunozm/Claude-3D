@@ -4,7 +4,6 @@
 | Folder | Description | Status |
 |--------|-------------|--------|
 | BedLifter | 30 cm head-end bed raiser (8.85° incline): HeadLifter + MiddleLifter adapters, 3D print PETG | Macro ready |
-| BrokeFeet | Left clubfoot skeleton reconstructed from a patient CT study, for pre-operative teaching; 24 bones on a contoured base, deformity preserved | Teaching model ready; **not** for surgical planning |
-| BrokeFeetV1 | Crater-corrected BrokeFeet bone mesh, craters hand-sculpted in Blender by the operator, hallux joint pinned for printability (`BrokeFeetV2_pinned.stl`). Automated smoothing is a measured negative — it reopens the hand fills | Print-ready; teaching model dropped as unnecessary |
+| BrokeFeet | Left clubfoot skeleton from a patient CT study, for pre-operative teaching. Two generations nested as `v0/` (original pipeline, still the upstream dependency) and `v2/` (crater-corrected, hand-sculpted, joint-pinned) | **v2 print-ready** — slice `v2/BrokeFeetV2_pinned2.stl`; **not** for surgical planning |
 | NespressoPodDispenser | Forward-facing gravity Nespresso pod cage; solid-wall rebuild of a hex-perforated reference, for faster printing | Print 1 failed (filament ground); base-repair foot ready |
-| VitaGrip | Clip-on hand-grip for PS Vita PCH-2000, two-handle controller-style grip with retention lip | Macro ready, not yet print-tested |
+| VitaGrip | Gamepad-style grip shell for the PS Vita PCH-1000, adapted from a scanned Hori PCH-2000 grip: front half cradles the console, rear half contributes grip lobes, back left open for insertion | **Not printable.** v1 built a sealed cavity (all its gates passed anyway); v2 fixes that but currently has no retention, is not watertight, and is 74.6% symmetric. See README |

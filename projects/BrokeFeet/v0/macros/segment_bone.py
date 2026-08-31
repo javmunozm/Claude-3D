@@ -37,7 +37,7 @@ from slice_positions import (
     sorted_slices,
 )
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 DEID_DIR = REPO / "references" / "brokenfeet_deid"
 OUT_DIR = Path(__file__).resolve().parent.parent
 

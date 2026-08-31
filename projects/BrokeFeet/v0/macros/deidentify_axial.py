@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[4]
 SRC_DIR = REPO / "references" / "brokenfeet" / "axiales"
 OUT_DIR = REPO / "references" / "brokenfeet_deid_axial"
 INDEX_CSV = OUT_DIR / "slice_index.csv"

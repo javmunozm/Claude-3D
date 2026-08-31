@@ -23,7 +23,7 @@ from scipy import ndimage
 HERE = Path(__file__).resolve().parent
 WORK = HERE.parent / "work"
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE.parent.parent / "BrokeFeet" / "macros"))
+sys.path.insert(0, str(HERE.parent.parent / "v0" / "macros"))
 
 import segment_axial as v0  # noqa: E402
 import crater_map as cmap  # noqa: E402
