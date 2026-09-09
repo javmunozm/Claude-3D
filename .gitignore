@@ -10,6 +10,15 @@ projects/BrokeFeet/v0/*.step
 projects/BrokeFeet/v2/*.stl
 projects/BrokeFeet/v2/*.step
 projects/BrokeFeet/v2/cad/
+# VitaGrip adapted Hori shells (110-134 MB each) — regenerate with
+# macros/widen_hori_grip.py from sources/psvitaGrip/grip2000/
+projects/VitaGrip/*.stl
+
+# VitaGripPS5: the built part (13 MB) and every DualSense derivative
+# (10-119 MB). All regenerable — prepare_dualsense.py -> strip_dualsense.py
+# -> build_socket_grip.py — from the scan in sources/VitaGripPs5/.
+projects/VitaGripPS5/*.stl
+projects/VitaGripPS5/derived/*.stl
 
 # Raw CT reference panes (146+15 MB); de-identified versions are tracked
 references/brokenfeet/axiales/
@@ -27,6 +36,11 @@ projects/BrokeFeet/v2/blender/*.stl
 
 # Renders (regenerable)
 renders/
+
+# Rejected attempts — never committed; deleted on explicit user rejection
+# after the lesson is recorded in the project README (see CLAUDE.md)
+projects/*/attempts/
+projects/*/*/attempts/
 
 # OS / editor
 .DS_Store
