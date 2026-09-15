@@ -61,6 +61,9 @@ import sys
 import numpy as np
 import trimesh
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import socket_placement as sp
+
 HERE = pathlib.Path(__file__).resolve().parent
 PROJ = HERE.parent
 DERIVED = PROJ / "derived"
@@ -83,6 +86,11 @@ def main():
     ap.add_argument("--y", type=float, default=None,
                     help="console Y centre in grip coords (default: the "
                          "trigger end, where the grips open)")
+    ap.add_argument("--tilt", type=float, default=None,
+                    help="console tilt about X in degrees (default %.2f)"
+                         % sp.DEFAULT_TILT)
+    ap.add_argument("--no-window", action="store_true",
+                    help="skip the rear touch panel window cut")
     ap.add_argument("--no-write", action="store_true")
     a = ap.parse_args()
 
@@ -90,96 +98,49 @@ def main():
         if not p.exists():
             sys.exit("missing %s" % p)
 
-    g = trimesh.load(str(GRIP_SRC))
-    g.apply_translation(-g.bounds.mean(axis=0))
-    print("stripped grip  %.2f x %.2f x %.2f mm  vol %.1f cm3  wt=%s"
-          % (*g.extents, g.volume / 1000, g.is_watertight))
-
-    f = a.scale if a.scale else REF_GRIP_W / g.extents[0]
-    g.apply_scale(f)
-    print("scale %.4f -> %.2f x %.2f x %.2f mm  vol %.1f cm3"
-          % (f, *g.extents, g.volume / 1000))
-
-    c = trimesh.load(str(CONSOLE))
-    c.apply_translation(-c.bounds.mean(axis=0))
-    print("console raw    %.2f x %.2f x %.2f mm  wt=%s"
-          % (*c.extents, c.is_watertight))
-
-    # ORIENT IT. console_solid.stl is X=width 182.7, Y=DEPTH 19.3, Z=HEIGHT
-    # 84.25 - it stands on edge, screen facing along Y. The grip's frame is
-    # X=width, Y=fore-aft, Z=up, and the Vita lies FLAT across the grips with
-    # its screen facing up: its 84.25 mm height runs fore-aft (Y) and its
-    # 19.3 mm depth runs up (Z).
+    # PLACEMENT COMES FROM socket_placement.py, NOT FROM HERE.
     #
-    # Placed unrotated, the console presents only its 19.3 mm edge to the
-    # grip and the boolean removed 13.0 cm3 - 1.3 % - which is the console
-    # grazing the shell rather than sinking into it. That number is what
-    # caught the error: a socket for a 182 x 84 mm object cannot be 1 % of
-    # the part.
-    c.apply_transform(trimesh.transformations.rotation_matrix(
-        np.pi / 2.0, [1, 0, 0]))
-    print("console placed %.2f x %.2f x %.2f mm  (rotated 90 deg about X)"
-          % tuple(c.extents))
-
-    # Grow the cutter by the fit clearance so the printed socket is not a
-    # press fit. Scaling a solid scales it about its centre, which is what is
-    # wanted: clearance on every face.
-    cw, cd, ch = c.extents
-    c.apply_scale([(cw + 2 * FIT_CLEAR) / cw,
-                   (cd + 2 * FIT_CLEAR) / cd,
-                   (ch + 2 * FIT_CLEAR) / ch])
-
-    # PLACEMENT, AND WHY IT IS NOT AT THE TRIGGER END.
-    #
-    # The first attempt put the console at Y = -31 (30 % up from the trigger
-    # end) and the boolean removed 1.2 %. The reason is in the shell itself:
-    # measured on the scaled grip, the CENTRE of the body does not exist below
-    # about Y = -15 -
-    #
-    #     Y -35   centre: no material     outer (grips): Zmax 19.84
-    #     Y -15   centre Zmax 33.90       outer          Zmax 27.28
-    #     Y +25   centre Zmax 32.24       outer          Zmax 31.42
-    #
-    # - because that is the open span between the two grips, the gap a
-    # DualSense has under the shoulder buttons. A console placed there hangs
-    # in air between the grips and touches almost nothing.
-    #
-    # The console is 84.25 mm deep once laid flat, and solid body runs
-    # Y -15..78, so a centre near +20 puts the whole footprint over material.
-    ytop = g.bounds[1][1]
-    y = a.y if a.y is not None else 20.0
-    # Sink: the console's BOTTOM sits this far below the local top face, so
-    # the socket has a floor instead of cutting clean through.
-    sink = a.sink if a.sink is not None else 10.0
-    band = g.vertices[(np.abs(g.vertices[:, 1] - y) <= c.extents[1] / 2.0)
-                      & (np.abs(g.vertices[:, 0]) < c.extents[0] / 2.0)]
-    if len(band) < 100:
-        sys.exit("ABORT: no grip material under the console footprint at "
-                 "Y=%.1f - the console would hang in the gap between the "
-                 "grips." % y)
-    # The top face is a DOME, not a plane - measured under the footprint it
-    # runs 35.55 at the middle down to 26.0 at the edges. Sinking from the
-    # PEAK therefore only engages the peak, and the cut came out 2.2 %.
-    #
-    # So the reference is the LOWEST top-of-shell across the footprint: the
-    # console has to clear the whole dome, not just its summit. Columns are
-    # binned in X-Y and the minimum column top is taken.
-    bx = np.round(band[:, 0] / 5.0).astype(int)
-    by = np.round(band[:, 1] / 5.0).astype(int)
-    key = bx.astype(np.int64) * 100000 + by
-    order = np.argsort(key)
-    k_s, z_s = key[order], band[order, 2]
-    bounds_i = np.flatnonzero(np.diff(k_s)) + 1
-    tops = [seg.max() for seg in np.split(z_s, bounds_i) if len(seg) >= 3]
-    ztop_local = float(np.percentile(tops, 5)) if tops else float(band[:, 2].max())
-    z = ztop_local - sink + c.extents[2] / 2.0
-    c.apply_translation([0.0, y, z])
-    print("console placed at Y %.2f  Z %.2f  (local top %.2f, sink %.2f mm)"
-          % (y, z, ztop_local, sink))
+    # This block used to recompute the scale factor and the console pose
+    # inline. It is now one call, because a second implementation of a
+    # placement is exactly how this repo shipped a gate that tested a pose
+    # 30 mm off the built one and reported a clean pass (docs/lessons.md,
+    # "the gate must share the datum it tests"). The overlay renderer and the
+    # live viewer import the same function, so what was seen is what is cut.
+    g, c, w, info = sp.pose(scale=a.scale,
+                            y=a.y if a.y is not None else sp.DEFAULT_Y,
+                            sink=a.sink if a.sink is not None else sp.DEFAULT_SINK,
+                            tilt=a.tilt if a.tilt is not None else sp.DEFAULT_TILT,
+                            window=not a.no_window)
+    print("stripped grip  scaled %.4f -> %.2f x %.2f x %.2f mm  vol %.1f cm3"
+          % (info["scale"], *info["grip_extents"], g.volume / 1000))
+    print("console        %.2f x %.2f x %.2f mm  (raw %.2f x %.2f x %.2f)"
+          % (*info["placed_extents"], *info["raw_extents"]))
+    print("placed at      Y %.2f  Z %.2f  tilt %.2f deg"
+          % (info["y"], info["z_centre"], info["tilt"]))
+    print("               local top of shell %.2f mm, sink %.2f mm, clear %.2f"
+          % (info["local_top"], info["sink"], info["clear"]))
 
     part = trimesh.boolean.difference([g, c])
     if part.body_count > 1:
         part = max(part.split(only_watertight=False), key=lambda m: m.volume)
+
+    # THE REAR TOUCH PANEL WINDOW, AS A SECOND CUT.
+    #
+    # Applied after the socket, not unioned into it: the window's datum is the
+    # placed console's own footprint, so it cannot be computed until the socket
+    # cutter exists. Reported separately because a single removal percentage
+    # covering both cuts would hide either one going wrong.
+    if w is not None:
+        seated = part.volume
+        part = trimesh.boolean.difference([part, w])
+        if part.body_count > 1:
+            part = max(part.split(only_watertight=False), key=lambda m: m.volume)
+        wr = seated - part.volume
+        print("window         %.1f x %.1f mm at Y %.2f  removed %.1f cm3 (%.2f %%)"
+              % (info["window_w"], info["window_h"], info["window_y"],
+                 wr / 1000, 100.0 * wr / seated))
+        if wr <= 0:
+            sys.exit("ABORT: the window cut removed nothing.")
 
     print("\nresult         %.2f x %.2f x %.2f mm  vol %.1f cm3"
           % (*part.extents, part.volume / 1000))

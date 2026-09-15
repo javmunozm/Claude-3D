@@ -56,28 +56,92 @@ form that was never verified against a photograph of a real object.
 Match form to it directly — cross-sections against cross-sections — rather
 than reducing it to per-station widths and rebuilding from those.
 
-## Status
+## Status (updated 2026-09-14)
 
-**NO GEOMETRY. Awaiting a DualSense STL from the user.** Nothing in this
-project builds a grip; the swept-tube figure was rejected and deleted (above).
+**Rebuilding from the DualSense scan, in progress.** The grip shell is cut from
+the watertight DualSense mesh (`derived/dualsense_stripped.stl`) by a socket
+cutter derived from `console_solid.stl`, plus a rear touch panel window. All
+placement lives in `macros/socket_placement.py` so the build, the overlay
+render and the live viewer share one `pose()` (see `docs/lessons.md`, "the gate
+must share the datum it tests").
+
+**The working surface is the live pyvista window, not the STL.** Edit
+`socket_placement.py`, and `tools/watch_model.py` repaints within ~1 s. Baking
+an STL is a separate, explicit act that requires the user's approval — see
+*Workflow* below.
+
+**Measured 2026-09-14**, `build_socket_grip.py --no-write` at defaults
+(`DEFAULT_Y=35.0`, `DEFAULT_SINK=17.0`, `DEFAULT_TILT=0.0`):
+
+```
+stripped grip  scaled 1.3779 -> 222.40 x 156.26 x 71.10 mm  vol 984.0 cm3
+console        183.40 x 84.95 x 41.06 mm  (raw 182.70 x 19.30 x 84.25)
+placed at      Y 35.00  Z 25.02  tilt 0.00 deg
+window         99.0 x 41.0 mm at Y 28.60  removed 78.9 cm3 (12.06 %)
+result         222.40 x 156.26 x 71.10 mm  vol 575.3 cm3
+               watertight True  bodies 1  genus 4  faces 215948
+               removed 408.7 cm3 (41.5 % of the grip)
+```
+
+### OPEN DEFECT — the seat wall is twisted
+
+**Unresolved. This is where work stopped.** The seat's outboard wall is not
+flat; the user identified it in the viewer and annotated it
+(`sources/psvitaGrip/Error.png`). The cause is *not* established.
+
+A prismatic cutter was tried and **reverted**: it improved every scalar (wall
+vertical, cutter bottom spread 15.00 → 0.0000 mm, genus 4 → 1, seat floor
+183.40 mm instead of 179.91) and the user reported the result as worse on
+sight. The hull path is what is in the file. Do not re-apply the prism without
+first establishing from a picture what is actually wrong. See `docs/lessons.md`,
+"every scalar improved and the part got worse".
+
+Known and measured, but **not** proven to be the defect the eye is objecting to:
+the hull cutter is a barrel — width 179.91 at the seat floor, 183.40 at
+mid-height, 181.69 above it, then a riser seam. The seat floor is therefore cut
+*narrower than the console it must hold*.
+
+### The rear touch panel window
+
+Cut through the seat floor, opening the Vita's rear touch panel. Verified by
+ray probe: 0 hits at five stations inside the window, 2 hits at four control
+stations outside it (the controls are what make the zeros meaningful).
+
+**Size is 99 x 41 mm ±6 mm — treat the tolerance as real.** The IGN
+infographic (`Fixed_dimensions.webp`) draws a red annotation box around the
+panel, 246 x 101 px. Six attempts to segment the panel tonally all disagreed,
+so that box is the only usable read. Converting it to mm is the weak link: the
+console's own width in that view reads 403–452 px by method, giving a panel
+anywhere in 99–111 x 41–46 mm. **Cut at the low end deliberately** — a window
+inside the true panel still exposes it; one outside it eats structure.
+
+Position came from the FRONT view, whose screen rectangle gives a clean datum
+the BACK view does not: the panel sits ~6 mm toward the console's **top** edge.
+That direction is solid; the magnitude is soft (the same grid read the X centre
+17 px inconsistently).
+
+**Not sourced from `console_solid.stl`** — measured, it is a voxel-remeshed
+envelope with no surface features (10667 mm² of +Y area in a single 1.25 mm
+bin). **Not sourced from `BackDetailedView.jpg`** — that is the AI-generated
+fake blueprint, 173 mm overall width for a 182 mm console.
+
+### Workflow
+
+1. **Launch the viewer**: `python tools\watch_model.py`. Requires a display.
+2. **Edit** `socket_placement.py`. The window repaints automatically.
+3. **`c`** toggles OVERLAY (operands: shell, red socket cutter, green window
+   cage) ↔ CUT (the boolean result). Both are needed — a coherent overlay can
+   still cut almost nothing.
+4. **Restart the viewer after editing `watch_model.py` itself.** It is not on
+   its own watch list, so changes to the *viewer* never trigger a repaint.
+5. **Never write an STL without the user's explicit approval.** Use
+   `--no-write`. The STL is a bake, not the working artefact.
+
+**`VitaGripPS5.stl` on disk is stale** — 570.4 cm³, the hull cut with the
+window centred at Y 35 before the offset was corrected. It does not match the
+current scripts.
 
 What is on disk and trustworthy:
-
-| Asset | State |
-|---|---|
-| `derived/dualsense_watertight.stl` | watertight, 1 body, genus 0, tip span **120.442 mm** — matches the user's caliper to 0.4 % |
-| `derived/dualsense_watertight_200k.stl` | same, decimated; anchor holds to **0.014 mm** |
-| `console_solid.stl` | PCH-1000 solid, for cutting the console pocket |
-| `macros/prepare_dualsense.py` | regenerates both DualSense solids; re-measures the 120 mm anchor after every operation and aborts if it moves |
-| `macros/make_console_cutter.py` | regenerates `console_solid.stl` |
-| `macros/fit_check.py` | console-vs-grip interference; needs a grip STL to run |
-
-Regenerate what remains:
-
-```
-python projects\VitaGripPS5\macros\prepare_dualsense.py
-python projects\VitaGripPS5\macros\make_console_cutter.py
-```
 
 ### Numbers that survive the deletion
 

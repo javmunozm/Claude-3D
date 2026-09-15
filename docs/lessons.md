@@ -272,3 +272,301 @@ remaining profile fault is localised (rows 0–82 track within ~1 mm; rows
 85–105 read 50–56 mm where the reference tapers 35 → 22), and it is the
 circular-cross-section defect the README already lists. Fixing the measurement
 made that defect *legible* rather than hiding inside a 6.5 % global error.
+
+---
+
+## `is_watertight` is not solidity — a cutter passed it with fifty tunnels
+
+`projects/VitaGripPS5/console_solid.stl` is the boolean operand that carves the
+Vita's socket. It reports `is_watertight True`. Measured further:
+
+```
+genus 50  (Euler -98)     1954 boundary edges     bbox fill 57.3 %
+```
+
+A PS Vita is a near-rectangular slab; it should fill 85–90 % of its bounding
+box. 57.3 % is the signature of a body shot through with holes. Every cut ever
+made with this operand inherited them — a boolean dutifully carves each tunnel
+into the socket's walls.
+
+The tunnels came from `make_console_cutter.py`, which voxelises the source
+mesh, fills it, and marching-cubes it back out. That is the failure already
+recorded for BrokeFeet as *voxel remesh closes tunnels*, met again in a
+different project because the remesh lives in a different file.
+
+**The genus was blamed on the wrong mesh for most of a session.** The finished
+part read genus 50, then 53, and it was attributed to the DualSense strip,
+which also voxelises. A two-line bisect settled it:
+
+| mesh | genus | bbox fill |
+|------|-------|-----------|
+| `dualsense_stripped.stl` | **0** | 39.8 % |
+| `console_solid.stl` | **50** | 57.3 % |
+
+The shell was clean the whole time.
+
+The fix, for a *cutter* specifically, is its convex hull: genus 0, watertight,
+86.5 % fill, and the identical 182.70 × 19.30 × 84.25 extents. A cutter defines
+the void an object drops into, so erring convex errs toward clearance. Part
+genus fell **53 → 3**. A hull is wrong for a visible part — it is 50.8 % larger
+in volume, having filled the real console's concavities.
+
+### Why nothing caught it
+
+`is_watertight` answers "does every edge have exactly two faces", which a
+tunnelled solid satisfies perfectly — a torus is watertight. Nothing in the
+pipeline asked for genus, and the bbox-fill ratio that makes the defect obvious
+in one number was not being computed anywhere.
+
+### How to apply
+
+- For any mesh used as a **boolean operand**, gate on `genus == 0` and
+  `body_count == 1`, not on `is_watertight` alone.
+- **Bbox fill is the cheap tell.** A part whose real shape is roughly prismatic
+  should fill 85–90 % of its bounding box; anything near 50 % is hollow,
+  tunnelled, or half-missing. One line, no topology needed.
+- When a defect appears in a boolean's *result*, bisect the *operands* before
+  theorising about the operation. Both inputs here voxelise; only one was
+  guilty.
+
+---
+
+## A boolean union of coplanar tangent faces returns two bodies, not a failure
+
+The Vita socket has to open through the shell's top surface, or the cut leaves a
+sealed internal void — the defect this repo has already recorded twice
+(*sealed cavity passes every gate*, *sealed void invisible to every solid-part
+gate*). The fix is to extrude the cutter upward past the shell's crown so the
+pocket becomes a through-pocket.
+
+Built the obvious way — a riser box starting exactly at the cutter's top face —
+the union reported success and returned **two disjoint solids**:
+
+```
+union result: bodies 2, genus -1
+  piece 1   vol 269.4 cm3   Z  4.50 .. 24.50    (the console hull)
+  piece 2   vol 328.0 cm3   Z 24.50 .. 45.55    (the riser)
+```
+
+They met face-to-face at Z 24.50 and never merged: coplanar tangent faces give
+the engine no overlapping volume to fuse, so it keeps both. Used as a cutter,
+two separate solids **leave a thin wall of shell material standing in the
+seam** — a skin across the pocket that should not exist.
+
+Dropping the riser's base 25 % of its height *inside* the hull makes the
+overlap a real volume, and the union collapses to one body:
+
+| | butted | overlapped |
+|---|---|---|
+| cutter bodies | **2** | **1** |
+| cutter genus | −1 (degenerate) | **0** |
+| rays reaching the seat floor | 6 of 63 | **58 of 63** |
+| rays stalled at the seam | 57 | **0** |
+| removed | 32.8 % | 33.5 % |
+
+`genus -1` is itself impossible for a solid, and was the visible tell that the
+result was degenerate rather than merely unmerged.
+
+**The riser must also carry the subject's outline, not its bounding box.** A
+box riser squares off what the Vita rounds: in plan the console's silhouette is
+14227.6 mm² against a 15392.4 mm² bounding rectangle — 92.4 % — so a box
+overcuts **1164.8 mm²**, all at the four rounded corners, leaving a rectangular
+opening above a Vita-shaped seat. Extruding the hull's own XY silhouette keeps
+the section constant through the opening: 14384.8 mm² at the seat, 14400.8 mm²
+in the riser.
+
+### Why nothing caught it
+
+`is_watertight` was True, the bounding box was right, and the volume removed
+*rose*. `body_count` was the one field that would have said so, and it was
+being checked on the boolean's **result** but never on the cutter that produced
+it. The user saw the wall in the viewer before any gate did.
+
+### How to apply
+
+- **Never butt two solids for a union.** Overlap them by a real volume; a
+  shared plane is a tangency, not an intersection.
+- `raise` on `body_count > 1` for a cutter, at the point of construction. The
+  check now lives in `socket_placement.load_cutter` — a multi-body cutter can
+  no longer reach a boolean silently.
+- To prove a pocket is genuinely open, **cast rays down into it from above the
+  part** and count how many reach the floor. Volume removed cannot distinguish
+  an open pocket from a sealed void of the same shape.
+
+---
+
+## A callback that never fires is indistinguishable from a scene that never changes
+
+`tools/watch_model.py` holds a window open, polls the files a model is built
+from, and repaints when one changes — so an edit made in the shell shows up on
+screen without anyone typing a command.
+
+Its first version armed the refresh with pyvista's timer API. **It never fired
+once.** The window opened, drew the startup pose, and sat there looking
+entirely correct while **nine successive edits** to the placement — two Y
+moves, three Z moves, a tilt and its revert — never reached the screen. Every
+"it should repaint now" said during that stretch was wrong, and the user was
+asked to judge geometry from a frozen display.
+
+Measured directly, once suspected:
+
+```
+pl.add_timer_event(max_steps=100, duration=500, callback=tick)
+    -> ticks fired: 0
+pl.iren.add_observer('TimerEvent', cb)
+  + iren.interactor.CreateRepeatingTimer(400)
+    -> ticks fired: 0        (so it is not the pyvista wrapper)
+```
+
+This VTK build (9.6.2 / pyvista 0.48.4) does not dispatch timer events to the
+interactor at all. What works is driving the loop by hand:
+`show(interactive_update=True, auto_close=False)` returns instead of blocking,
+and each `update()` call processes input and re-renders. Verified: 21
+iterations in 6 s with a live actor swap mid-loop, then end-to-end — edit →
+rebuild #2, revert → rebuild #3.
+
+**A second bug hid inside the same feature.** `importlib.reload` alone reloads
+unreliably, and it fails in the case that matters most — *undoing* an edit.
+Python caches source mtimes at 1-second granularity, so a file changed and
+restored inside the same second reloads to the first version: the window keeps
+showing a change already reverted. Measured: sink 10.0 → 32.0 reloaded
+correctly, 32.0 → 10.0 kept reporting 32.0. `importlib.invalidate_caches()`
+before the reload fixes it.
+
+### Why nothing caught it
+
+Nothing was watching the watcher. The window rendered successfully, the process
+stayed alive, the shell printed no error — and a stale, correct-looking render
+is the most convincing possible failure. Two further launches then crashed on
+callback signatures (`add_key_event` rejects any callback with a parameter
+lacking a default, including `*args`), each caught only after the window died.
+
+### How to apply
+
+- **Prove the refresh mechanism fires before trusting anything drawn through
+  it.** A three-line test — arm the callback, print a counter, assert it is
+  non-zero — would have caught this before the first edit.
+- Test a callback's *registration* where it is written, not after a window
+  fails to open.
+- When a viewer and a number disagree, suspect the viewer is stale before
+  re-deriving the geometry.
+- A live viewer must show its own liveness: this one now prints a **rebuild
+  counter and timestamp** in the readout, so a frozen window is visibly frozen.
+
+---
+
+## The percentage rose while the pocket fell apart
+
+Placement for the Vita socket was tuned across seven moves with no picture,
+using the percentage of shell volume the cut removed as the signal — the only
+one available before the overlay renderer existed. The percentage endorsed
+poses that were visibly wrong:
+
+| pose | removed | verts engaged | what the render showed |
+|------|---------|---------------|------------------------|
+| Y 20, sink 10, tilt 0 | 13.4 % | **16.9 %** | one solid slab |
+| Y 35, sink 21, tilt −9.15 | **17.67 %** | 3.7 % | scattered disconnected patches |
+| Y 35, sink 21, tilt 0 | — | 2.5 % | socket nearly gone |
+
+The best-reading percentage in that table belongs to the worst pose. A volume
+fraction **sums disconnected scraps exactly as happily as it sums one coherent
+pocket**, so it cannot tell a socket from debris of the same total size.
+
+The tilt that produced it was itself correctly measured — the shell's top face
+falls dZ/dY = −0.1611, i.e. 9.15°, from 33.90 mm at the front to 20.26 mm at
+the rear. Applied as a rigid rotation it still made the part worse, because the
+shell's top is a dome falling in **both** directions, not an inclined plane:
+across X it is a symmetric double hump, −80/0/+80 all reading 29.76 and ±40
+both 33.07. A rigid body has one orientation; that surface needs a different
+one at every point. The parallelism check said so before the render did — gap
+spread 5.25 mm along Y at the best available rotation.
+
+### Why nothing caught it
+
+The gate was a scalar, and scalars were the only instrument.
+`MIN_PLAUSIBLE_REMOVAL_PCT = 5.0` was written into the placement module during
+this same session on the strength of those numbers, and it passes every pose in
+the table including the two whose sockets do not exist.
+
+Worse, the threshold was calibrated against comments that no longer reproduce:
+`build_socket_grip.py` documents Y = −31 as removing **1.2 %**, and the same
+pose now measures **8.8 %**. Treat that constant as provisional.
+
+### How to apply
+
+- **Look at the render before reporting a verdict.** Not after, and not instead
+  of measuring — the numbers and the picture answer different questions, and a
+  percentage cannot see topology.
+- For "is this one pocket or several", measure **connectivity**, not volume:
+  split the intersection and count bodies, or count vertices engaged.
+- A correctly measured number applied to the wrong model is still wrong. The
+  9.15° slope was right; a rigid rotation was the wrong thing to do with it.
+
+---
+
+## Every scalar improved and the part got worse
+
+The Vita socket's seat wall showed as visibly twisted in the live viewer — the
+user circled it in a screenshot. The cutter was a convex hull of
+`console_solid.stl`, and measuring it explained the twist exactly:
+
+```
+Z  4.50  width 179.91  depth 81.71   <- seat floor, NARROWEST
+Z 10.50  width 183.40  depth 84.95   <- widest, mid-height
+Z 16.50  width 181.69  depth 83.99   <- pinching back in
+Z 18.50  width 183.40  depth 84.95   <- riser seam, steps out again
+```
+
+A hull of a rounded slab is a **barrel**. The opening bulges 3.5 mm between the
+floor and mid-height, pinches, then breaks at the riser seam, so the wall leans
+and curves in plan. Worse, the seat floor came out **179.91 mm against a
+182.70 mm console** — the cutter was narrowest exactly where the console is
+widest, so the Vita could not have seated at all.
+
+Replacing the hull with a straight extrusion of the console's plan silhouette
+fixed every one of those numbers:
+
+| | hull | prism |
+|---|---|---|
+| wall profile | 179.91 → 183.40 → 181.69 | one Z band, vertical |
+| cutter bottom Z spread | 15.00 mm | **0.0000 mm** |
+| part genus | 4 | **1** |
+| seat floor in the twisted band | `19.50` (no hit) at X −90 | **4.50 flat** |
+| seat floor width | 179.91 mm | **183.40 mm** |
+
+**The user looked at it and said it was worse.** Not marginally — "somehow it
+got worse", on sight, and work stopped.
+
+### Why nothing caught it
+
+Nothing was *wrong* with the measurements. The barrel was real, the prism did
+remove it, and every gate that fired was accurate. The failure is upstream of
+the gates: **the defect was identified by theorising from a picture, then
+verified against the theory rather than against the picture.**
+
+The twist was visible. Instead of establishing what the eye was actually
+objecting to, the session measured the cutter, found a defect that could
+plausibly produce a twist, fixed that defect, and confirmed the fix with probes
+aimed at the same theory. Six ray-grids and a Z-sweep all agreed — with each
+other, and with the hypothesis that generated them.
+
+That is confirmation, not verification. A probe designed from a theory can only
+report on that theory. The one instrument that had already proved decisive —
+looking — was used to *start* the investigation and then never again until the
+user reopened the viewer.
+
+### How to apply
+
+- **When a defect is found by eye, the fix is verified by eye.** A scalar may
+  support the verdict; it may not replace it. This repo's own record is that
+  looking found the tilt failure, the swept-tube rejection, and this twist —
+  each time after numbers had endorsed the bad geometry.
+- **A measurement derived from a hypothesis cannot test that hypothesis.** Ask
+  what result would *falsify* the theory before running the probe. Six grids
+  that can only confirm are worth less than one render that could refute.
+- Improving every number in a table is not evidence of improvement. It is
+  evidence that the table describes what was changed.
+- **Ask what the user is pointing at before rebuilding what you think they
+  mean.** "The surface is inclined and extends in Y" described the region; it
+  was read as a cause. A single clarifying question, or a request for the
+  annotated screenshot that eventually arrived, would have cost one turn.

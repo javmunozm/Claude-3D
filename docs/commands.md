@@ -53,10 +53,10 @@ wireframe views missed all three; a **shaded** render caught them.
 
 ```
 # Topology gate only (fast, no rendering)
-python tools\render_check.py projects\VitaGrip\VitaGrip.stl
+python tools\render_check.py projects\BedLifter\MiddleLifter.stl
 
 # Topology gate + shaded renders from standard cameras
-python tools\render_check.py projects\VitaGrip\VitaGrip.stl --views front back
+python tools\render_check.py projects\BedLifter\MiddleLifter.stl --views front back
 ```
 
 `body_count == 1` and `is_watertight` are hard gates — failing either means
@@ -70,8 +70,8 @@ render wireframe — it hides exactly the bugs this catches.
 ### Compare against a reference photo (required when a reference exists)
 
 ```
-python tools\render_check.py projects\VitaGrip\VitaGrip.stl --views front ^
-    --reference references\psvitaGrip\054-1.webp
+python tools\render_check.py projects\BedLifter\MiddleLifter.stl --views front ^
+    --reference sources\psvitaGrip\054-1.webp
 ```
 
 This writes `<Part>_vs_reference.png` — the render beside the photo. **Open it
@@ -157,8 +157,8 @@ import. Two approaches available:
 import vtracer
 
 vtracer.convert_image_to_svg_py(
-    "references/subject/photo.jpg",
-    "references/subject/svg/photo.svg",
+    "sources/subject/photo.jpg",
+    "sources/subject/svg/photo.svg",
     colormode="binary",       # "binary" for silhouettes, "color" for photos
     filter_speckle=4,         # remove noise (pixels)
     corner_threshold=60,      # preserve sharp corners
@@ -217,10 +217,10 @@ while leaving clean regions untouched.
 import pymeshfix
 import pyvista as pv
 
-mesh = pv.read("projects/VitaGrip/VitaGrip.stl")
+mesh = pv.read("projects/BedLifter/MiddleLifter.stl")
 fixer = pymeshfix.MeshFix(mesh)
 fixer.repair(verbose=True)
-fixer.mesh.save("projects/VitaGrip/VitaGrip_repaired.stl")
+fixer.mesh.save("projects/BedLifter/MiddleLifter_repaired.stl")
 ```
 
 Use this for meshes that fail the watertight gate due to non-manifold edges
@@ -258,7 +258,7 @@ for debugging mesh issues before running the full verification gate.
 ```python
 import pyvista as pv
 
-mesh = pv.read("projects/VitaGrip/VitaGrip.stl")
+mesh = pv.read("projects/BedLifter/MiddleLifter.stl")
 print(f"Points: {mesh.n_points}, Faces: {mesh.n_faces}")
 print(f"Bounds: {mesh.bounds}")
 print(f"Volume: {mesh.volume:.2f} mm³")
@@ -278,6 +278,52 @@ plotter = pv.Plotter(off_screen=True)
 plotter.add_mesh(mesh, color="lightblue")
 plotter.screenshot("output.png")
 ```
+
+## Live-watch a model while editing it (VitaGripPS5)
+
+`tools/watch_model.py` holds a pyvista window open, polls the placement
+module and its input meshes for changes, and rebuilds + repaints
+automatically — no manual re-run between edits. It is specific to
+VitaGripPS5's socket cut: it imports `socket_placement.pose()` /
+`load_cutter()` directly, so what is on screen is guaranteed to be the same
+geometry the builder would produce, not a second implementation that can
+drift from it (see [docs/lessons.md](lessons.md), "the gate must share the
+datum it tests").
+
+```
+python tools\watch_model.py                       # opens on the boolean CUT result
+python tools\watch_model.py --mode overlay         # shows operands: body + cutter + intersection
+python tools\watch_model.py --y -31 --sink 30      # start from a specific pose
+python tools\watch_model.py --interval 0.5         # poll faster
+```
+
+Requires a display (headless: use `render_overlay.py` for a static PNG
+instead). Press `c` to toggle overlay/cut, `r` to force a rebuild, close the
+window to quit. It never writes an STL — baking the result to a file is a
+separate, explicit step (`build_socket_grip.py`), and on VitaGripPS5 it needs
+the user's approval each time.
+
+**It does not watch itself.** `WATCH` lists `socket_placement.py`,
+`build_socket_grip.py`, `strip_dualsense.py` and the two input meshes — not
+`watch_model.py`. Editing the *viewer* (colours, what it draws, the readout)
+changes nothing on screen until the process is restarted, and the window keeps
+rendering the old code while looking perfectly alive. Kill and relaunch after
+touching it.
+
+In OVERLAY mode the VitaGripPS5 scene draws three things: the shell opaque, the
+socket cutter translucent red with an edge cage, and the rear touch panel
+window as a **green cage** (a buried translucent solid is invisible — VTK
+resolves transparency by depth order and submerged geometry loses). CUT mode
+applies both differences in the builder's own order.
+
+The heads-up text reports percentage of grip volume removed, whether the
+socket has a floor, and the live placement numbers — because a coherent-
+looking overlay can still cut almost nothing, and only the `cut` mode shows
+that. Its refresh is a manual `pl.update()` loop, not a pyvista timer
+callback: an earlier version armed `add_timer_event` and it silently never
+fired, leaving the window frozen on the startup pose through nine
+successive edits (see [docs/lessons.md](lessons.md), "a callback that never
+fires is indistinguishable from a scene that never changes").
 
 ## Read DICOM studies (BrokeFeet project)
 
