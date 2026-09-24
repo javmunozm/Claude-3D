@@ -570,3 +570,87 @@ user reopened the viewer.
   mean.** "The surface is inclined and extends in Y" described the region; it
   was read as a cause. A single clarifying question, or a request for the
   annotated screenshot that eventually arrived, would have cost one turn.
+
+---
+
+## An invalid solid hung the STL export for 81 minutes
+
+SurgicalDrillGuide round 3 (SurgicalDrillGuide, 2026-09-24). The Tr16×4 handle's male thread
+began one pitch inside a Ø16 core whose surface sat **exactly** on the thread's
+crest radius, r 8.0. The union raised nothing and returned a solid with
+`is_valid` False. The full macro then sat at the handle's STL export for
+**81 minutes**, with 2 cores busy, until the user had it killed. The agent
+running it had no timeout and hit its call budget with no report.
+
+Starting the thread at the shoulder made the solid valid. The STL then exported
+in **0.7 s**, and the full build took about 10 s.
+
+### Why nothing caught it
+
+Nothing checked `is_valid` before export, and the tessellator does not raise on
+an invalid solid. Coincident surfaces were not on the list of union hazards:
+only solids that touch were, in cad-designer's "Booleans only fuse where solids
+OVERLAP".
+
+### How to apply
+
+- Check `is_valid` and the solid count on every part before any export. The
+  SurgicalDrillGuide macro now refuses to export otherwise.
+- Surfaces that coincide exactly are as dangerous as solids that only touch.
+  Offset by at least 0.01 mm, or overlap.
+- Every build, export, render and gate runs under `timeout`. The whole
+  SurgicalDrillGuide pipeline takes about 1 minute, so anything past 2 minutes
+  is a defect.
+
+---
+
+## A filter box read a wall 0.56 mm thicker than the section through it
+
+SurgicalDrillGuide end-stop pin hole (SurgicalDrillGuide, 2026-09-24). The README gave the
+hole's side walls as **3.114 / 2.742 / 4.220**, from a method that kept only
+triangles within 15 mm of the hole. A form audit on the round-2 mesh read
+**1.805 / 1.876 / 2.748**. The two sets disagreed for two rounds.
+
+The section through the hole axis settled it: **+Y 2.553, -Y 3.353**. Re-run
+unchanged on the round-3 mesh, the audit script reproduced its own round-2
+numbers (1.802 / 1.873 / 2.673). They were distances to whatever outline fell
+inside each filter box: the rack's -X end face, and the top face where it
+crosses the box's own edge. The audit rebuilt 2.673 from that geometry,
+sqrt(1² + 4.152²) - r_hole = 2.672.
+
+### Why nothing caught it
+
+Both methods produced plausible wall thicknesses, and neither named the surface
+its distance ended on.
+
+### How to apply
+
+- Measure a wall on a planar section through the feature, and name the plane.
+- Print the witness point on the far surface for every wall reading. A wall
+  whose witness is on the wrong face is not a wall.
+- On a feature that changes fast, sample toward the edge until the value stops
+  changing. The round-3 boss-wall minimum, 2.566, was a first sample 0.053 mm
+  above the face. The lip was 2.45.
+
+---
+
+## A gate probe at a fixed height stopped seeing the tooth it tested
+
+SurgicalDrillGuide pawl hook gate (SurgicalDrillGuide, 2026-09-24). The hook-angle rays were
+cast at a fixed height, +0.55 mm. When a design change reduced the
+pawl overlap to **0.461 mm**, the rays at 0.55 passed over the tooth, and the
+gate measured empty space.
+
+### Why nothing caught it
+
+The probe height was right when it was written, and nothing re-derived it when
+the part changed.
+
+### How to apply
+
+- Derive probe positions from the geometry they test (a fraction of the
+  measured overlap, the fitted face), never a constant.
+- Give every gate a control case it must fail, so a probe that has drifted off
+  its target reports a failure instead of a pass.
+- When the part changes, re-derive the gate, then prove it still catches the
+  defect it was written for.

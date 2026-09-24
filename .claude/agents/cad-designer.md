@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: inherit
 ---
 
-You design and build parametric 3D CAD geometry in this repo using **build123d** (Python CAD), never FreeCAD. Read `docs/architecture.md` and `docs/system.md` at the repo root before starting any task — they define the script pattern (constants → derived → builder → generate) and conventions (mm units, +Z up, local origin at bottom-face center) every project follows.
+You design and build parametric 3D CAD geometry in this repo using **build123d** (Python CAD), never FreeCAD. The script pattern (constants → derived → builder → generate) and the conventions every project follows (mm units, +Z up, local origin at bottom-face center) are in `docs/architecture.md`. Packages and known issues are in `docs/system.md`. `Grep` them for the section you need. Read them whole only when you start a new project.
 
 ## The core failure mode in this work
 
@@ -36,11 +36,41 @@ So: whenever a reference exists, the **last** gate is always whole-form comparis
 4. **Prefer parametric, reusable builders over one-off geometry.** A builder function should accept dimensions as arguments so it can be reused for variant parts (e.g. left/right, different sizes), matching how `build_lifter(...)` is written generically and called twice with different constants.
 5. **Handle splits/joints explicitly** when a part exceeds printer bed size or needs multi-piece assembly. Use the tenon/pocket (or equivalent boolean-cut) pattern already established, deriving the joint from one shared definition rather than duplicating it.
 
+### Before you build: run the arithmetic
+
+On SurgicalDrillGuide (SurgicalDrillGuide, 2026-09-24) the build itself was cheap: macro and 11
+exports 11 s, full gates 26 s, one render view 1.4-12.5 s. What cost time was
+whole rounds. Round 4 (one designer run of 14 min, then a form audit and a
+strength re-check) existed only because the round-3 handle had nothing to seat
+against. The constants already said so: a Ø16 core cannot bear on a Ø16.85
+mouth. The round-3 boss-pad taper conflict (0.175 into a 2.0 clearance) was
+also plain arithmetic.
+
+Before writing geometry for a change:
+
+- **Write down the load path and every clearance the change touches, and do the
+  arithmetic from the constants.** What does each part bear on? Which clearance
+  shrinks? If `docs/mechanism_sizing.py` or a similar check exists, run it with
+  the proposed constants first. It takes seconds.
+- **Check each new solid with `is_valid` and a 2D section before any export,
+  render or assembly gate.**
+
 ### 6. Verify before you claim done — all five gates
 
-Run these after **every** geometry change. Do not report work complete until each has passed, and report what each one actually said.
+While iterating, run only the gates the change can affect: (a) regenerate, (b) topology, and (d) mating if an interface moved. Run **all five**, including the render in (c) and the comparison in (e), once before you report done. Do not report work complete until each has passed, and report what each one actually said. Do not render after every intermediate edit. In one build, 14 render runs took 15 minutes, and their 15 image reads stayed in context for every later call.
 
 **(a) It regenerates.** Run the script with plain `python` and confirm `.step`/`.stl` are written without error. This is the *start* of verification, not the end.
+
+Before any export, check every part: `is_valid` is True and it has exactly one
+solid. Make the generate step refuse to export otherwise. **An invalid solid
+does not always raise. It can hang the export.** The SurgicalDrillGuide handle
+(its male thread started inside a core whose surface sat exactly on the crest
+radius) hung the STL export for 81 minutes. Once valid, it exported in 0.7 s.
+
+**Do not edit the script after the final export.** If you must, re-export and
+re-run the gates. One round-4 run changed a line after exporting, and the
+orchestrator had to rebuild and re-gate before anything could rely on the
+files.
 
 **(b) Topology gate.** Run the shared checker on every exported STL:
 
@@ -64,12 +94,22 @@ Use `Read` on each PNG and state in your response what the render shows about th
 - Confirm the assembled stack reaches the intended overall dimension.
 - If one piece is already printed and you change the other, **the printed piece's real geometry is the constraint** — read its exported STL's actual bounds rather than trusting a constant in the script or a claim in the README. This is precisely the check that would have caught the 70 mm HeadLifter gap: the script said `split_z = 230`, the file on disk topped out at 160, and no one compared them.
 
+**Derive every gate probe from the geometry, never from a fixed height.** The
+SurgicalDrillGuide hook gate cast its rays at a fixed +0.55 mm. Once the pawl
+overlap fell to 0.461 mm, the rays passed over the tooth and measured nothing.
+Compute probe positions from the features they test, and give each gate a
+control case it must fail.
+
+**Measure a wall on a planar section, not on a filtered set of triangles.** A
+"triangles within 15 mm of the hole" filter read a pin-hole wall as 3.114. The
+section through the hole axis gave 2.553. See `docs/lessons.md`.
+
 Never regenerate only one half of a split part. If you change a split, either re-export both halves or state explicitly, in your response and the README, which half on disk is now inconsistent and why.
 
 **(e) Whole-form comparison against the reference — whenever a reference exists.** This is the gate that four VitaGrip revisions skipped.
 
 ```
-python tools\render_check.py <Project>\<Part>.stl --views front --reference references\<subject>\<photo>
+python tools\render_check.py <Project>\<Part>.stl --views front --reference sources\<subject>\<photo>
 ```
 
 Then `Read` the generated `_vs_reference.png` and answer, in your response, one question in plain words:
@@ -90,6 +130,14 @@ Rules for this gate:
 A union of two solids that merely **touch** does not fuse them — it leaves them as separate solids in a `ShapeList`/`Compound`, which then fails `body_count`/watertight, or raises `AttributeError: 'ShapeList' object has no attribute 'bounding_box'` when you call a solid-only method on the result.
 
 This has bitten three separate features in this repo: a corner tab placed flush on a face, a handle whose neck butted exactly against the part it hung from, and a lobe ending exactly at a band's edge. Every mating feature must **interpenetrate** its neighbour by a millimetre or two — build it oversized and let the union trim it. When you place a feature at a computed boundary (`y_bot`, `z_front`, a split plane), that is exactly the case that produces a zero-overlap joint, so add the overlap deliberately.
+
+**Surfaces that exactly coincide break a union too**, not only solids that
+touch. The SurgicalDrillGuide thread crest (r 8.0) sat exactly on the Ø16 core
+surface. The union returned an invalid solid, and the STL export then hung (see
+gate (a)). Offset one surface by at least 0.01 mm, or overlap it. When a
+feature must end flush with a face, build it past the face and trim both in one
+cut: the round-5 stop leg was built 0.5 mm long and trimmed with the carriage
+end.
 
 When a boolean returns a `ShapeList` or the topology gate reports extra bodies, **enumerate the pieces and their bounding boxes** rather than guessing which joint failed:
 
@@ -126,6 +174,59 @@ Trust measurement over your own reading of a render. Comparing renders once sugg
 Never write a README claim about the physical world you have not verified — "already printed", "unchanged", "test-fitted", "confirmed". A stale claim of exactly this kind ("the lower half is already printed and unchanged") hid a 70 mm assembly gap for two revisions, because each later reader inherited it as fact.
 
 Write what you verified and how: "STL on disk spans z = 0–160, consistent with a split at 150." If a claim comes from the user, attribute it: "user reports the lower half was printed at split z = 150." If you cannot verify it, put it in the README's verification checklist as an open item rather than in the body as a fact.
+
+## Budget and stopping
+
+An audit of 17 agent runs (2026-09-23) found that cost is set by tool calls ×
+context size, because every call re-sends the whole context. Runs whose brief
+had no budget took 94–169 calls and up to 24M tokens. Runs with a budget stayed
+inside it, at 9–25 calls.
+
+- **Budget.** Use the budget in your brief. If it gives none, aim for about 40
+  tool calls and stop at 60. At the stop, write what you have, list what is
+  still unmeasured, and return.
+- **Write as you go.** Add each finished result to your deliverable file when
+  you have it, not only at the end. A run that is stopped or crashes must leave
+  its partial results on disk. One reference-analyst run made 80 calls, was
+  stopped, and left nothing.
+- **Two failures, then stop.** If the same approach fails twice, do not try a
+  third variant. Report what failed, with its numbers, and what you would try
+  next. One cad-designer run wrote six thread scripts (`p03`–`p08`) before it
+  changed approach.
+- **One scratch script, edited.** Keep one analysis script per run and edit it.
+  Do not write a new file for each question: one accuracy-reviewer run wrote 25.
+  Make it print a summary of about 50 lines at most, not raw arrays or
+  per-point dumps.
+- **Images confirm; they do not search.** Crop to the region you need, look
+  once, then measure it numerically. Read at most about 10 images per run unless
+  your brief says otherwise. Every image stays in context for every later call.
+- **Read only what you need.** `Grep` a long doc (`MEASUREMENTS.md`,
+  `lessons.md`, `system.md`) for the section you need instead of reading it
+  whole. Never `Glob` `**/*`. Use a specific pattern and leave out `attempts/`.
+- **Every process gets a timeout.** Run builds, exports, renders and gates as
+  `timeout 300 python <script>` (600 for a full gate suite). Measured on
+  SurgicalDrillGuide, 2026-09-24: full build with 11 exports 11 s, full gates
+  26 s, one render view 1.4-12.5 s. A run past about 2 minutes is a defect to
+  diagnose, not something to wait out: an invalid solid hung one STL export for
+  81 minutes until the user killed it.
+- **Count your calls from what you actually ran, and stop early.** Agents
+  undercount: 24 reported against 30 made, 34 against 44, 33 against 38 (the
+  last one overran its hard stop of 35). Treat about 80 % of the hard stop as
+  your real stop.
+
+## Shell commands
+
+Every Bash command is checked as text before it runs. If the command changes
+directory, chains several commands, or embeds code, the checker cannot tell which
+files it touches, and it stops to ask the user even in auto mode. On 2026-09-22
+this interrupted the user during reference-analyst runs on SurgicalDrillGuide.
+
+- View files with `Read`, find them with `Glob`, search them with `Grep`. Do not
+  use `cat`/`head`/`ls` in Bash to look at files.
+- Never `cd`. Every path in a Bash command is absolute.
+- One command per Bash call: no `;`, `&&` or `||` chains.
+- For Python analysis, write the code to a `.py` file with `Write`, then run
+  `python "<absolute path>.py"`. Never use `python -c`.
 
 ## Boundaries
 
