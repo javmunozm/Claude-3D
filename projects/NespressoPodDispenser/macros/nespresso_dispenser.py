@@ -1,6 +1,6 @@
 """Nespresso pod dispenser cage - solid-wall version (no hex perforations).
 
-Rebuilt from `references/nespressoDispenser/nespresso-cage-forward-facing.3mf`,
+Rebuilt from `sources/nespressoDispenser/nespresso-cage-forward-facing.3mf`,
 which is a forward-facing gravity cage: pods stack in a vertical chute and roll
 down a rear-to-front ramp to a dispensing mouth at the bottom front.
 
@@ -169,8 +169,10 @@ def main() -> None:
     part = build_dispenser()
 
     out_dir = Path(__file__).resolve().parent.parent
-    step_path = out_dir / "NespressoPodDispenser.step"
-    stl_path = out_dir / "NespressoPodDispenser.stl"
+    step_path = out_dir / "step" / "NespressoPodDispenser.step"
+    stl_path = out_dir / "stl" / "NespressoPodDispenser.stl"
+    step_path.parent.mkdir(exist_ok=True)
+    stl_path.parent.mkdir(exist_ok=True)
 
     export_step(part, str(step_path))
     export_stl(part, str(stl_path))

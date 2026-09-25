@@ -7,7 +7,7 @@ vertical chute and roll down a rear-to-front ramp to a dispensing mouth at
 the bottom front.
 
 This is a **solid-wall rebuild** of the reference model
-`references/nespressoDispenser/nespresso-cage-forward-facing.3mf`. The
+`sources/nespressoDispenser/nespresso-cage-forward-facing.3mf`. The
 reference's walls are pierced by a dense honeycomb pattern; every hex is a
 separate perimeter the slicer has to trace, which is what makes that model
 slow to print. This version keeps the **same envelope, same wall

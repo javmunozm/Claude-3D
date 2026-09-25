@@ -11,7 +11,7 @@ side by side in this folder.
 
 ## Which file to slice
 
-**`v2/BrokeFeetV2_pinned2.stl`** — the current best foot. The operator's Blender
+**`v2/stl/BrokeFeetV2_pinned2.stl`** — the current best foot. The operator's Blender
 sculpt plus the hallux and 2nd MTP joint pins, in pipeline millimetres, loads
 into OrcaSlicer with no dialog.
 
@@ -67,9 +67,9 @@ run and quantified.
 BrokeFeet/
 ├── README.md     ← this file: which version ships, what each holds
 ├── v0/           ← original pipeline (upstream dependency of v2)
-│   ├── README.md  macros/  holes/  renders/  *.stl *.step
+│   ├── README.md  macros/  holes/  renders/  stl/  step/
 └── v2/           ← current generation, ships the printable foot
-    ├── README.md  macros/  blender/  cad/  work/  renders/  *.stl *.3mf
+    ├── README.md  macros/  blender/  work/  renders/  stl/  step/
 ```
 
 Paths are relative to the version folder. Version macros resolve the repo root

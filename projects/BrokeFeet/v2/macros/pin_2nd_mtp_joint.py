@@ -88,7 +88,7 @@ from scipy.spatial import cKDTree
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SRC = ROOT / "BrokeFeetV2_pinned.stl"   # sculpt + hallux pin already applied
+SRC = ROOT / "stl" / "BrokeFeetV2_pinned.stl"   # sculpt + hallux pin already applied
 
 FOREFOOT_Y = -85.0     # isolates the toe rays from the midfoot, as in pin_hallux_joint.py
 RAY_INDEX = 1          # 0=hallux, 1=2nd toe, 2=3rd, 3=4th, 4=5th (by component face count)

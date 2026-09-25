@@ -53,7 +53,7 @@ from scipy.spatial import cKDTree
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 
-SRC = ROOT / "BrokeFeetV2_sculpted.stl"
+SRC = ROOT / "stl" / "BrokeFeetV2_sculpted.stl"
 PRE = ROOT / "blender" / "BrokeFeetV1_sculpt.stl"     # handed to Blender
 POST = ROOT / "blender" / "BrokeFeetV2_sculpt.stl"    # returned from Blender
 TJ = ROOT / "blender" / "TRANSFORM.json"

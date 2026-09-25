@@ -51,8 +51,8 @@ from PIL import Image
 from scipy import ndimage
 
 REPO = Path(__file__).resolve().parents[4]
-SRC_DIR = REPO / "references" / "brokenfeet" / "axial proximal"
-OUT_DIR = REPO / "references" / "brokenfeet_deid_axial_proximal"
+SRC_DIR = REPO / "sources" / "brokenfeet" / "axial proximal"
+OUT_DIR = REPO / "sources" / "brokenfeet_deid_axial_proximal"
 INDEX_CSV = OUT_DIR / "slice_index.csv"
 
 # Same full-screen viewer grabs as the main series.

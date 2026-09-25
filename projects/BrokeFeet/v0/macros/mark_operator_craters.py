@@ -12,7 +12,7 @@ import numpy as np
 import trimesh
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(PROJECT, "sculpt")
+OUT = os.path.join(PROJECT, "stl")
 os.makedirs(OUT, exist_ok=True)
 
 # Craters located by the operator in MeshLab. (x, y, z, approx radius mm)

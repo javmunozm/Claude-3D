@@ -26,7 +26,7 @@ import trimesh
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-GRIP = HERE.parent / "VitaGripPS5.stl"
+GRIP = HERE.parent / "stl" / "VitaGripPS5.stl"
 MESH = (ROOT / "sources" / "psvitaGrip" / "Vita 1000"
         / "psvitaManualJoin_decimated.stl")
 

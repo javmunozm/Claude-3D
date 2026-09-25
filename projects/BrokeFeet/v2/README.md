@@ -92,7 +92,7 @@ alone will not catch it.
 
 ## Source images
 
-`references/brokenfeet/` — one folder per project, shared with BrokeFeet.
+`sources/brokenfeet/` — one folder per project, shared with BrokeFeet.
 Do not create additional folders there.
 
 | Series | Count |
@@ -200,7 +200,7 @@ renders were also read rather than trusted — `renders/cmp_before` vs
 unchanged, and `renders/mort_before` vs `mort_after` show the mortise joint line
 surviving intact, the one failure mode that would invalidate the result.
 
-## Solid model for FreeCAD: `cad/BrokeFeetV1_bone_solid.step`
+## Solid model for FreeCAD: `step/BrokeFeetV1_bone_solid.step`
 
 BrokeFeet's README states that a CT reconstruction cannot become an editable
 solid and that no export format fixes it. **The format half of that claim was
@@ -250,7 +250,7 @@ one.
 Crater repair: **complete and passing every gate**
 (`BrokeFeetV1_craters_final.stl`), independently re-verified.
 
-Solid export: **complete** (`cad/BrokeFeetV1_bone_solid.step`), built from the
+Solid export: **complete** (`step/BrokeFeetV1_bone_solid.step`), built from the
 corrected mesh.
 
 **Scope decision (2026-08-12): the bone mesh is the deliverable.** The operator

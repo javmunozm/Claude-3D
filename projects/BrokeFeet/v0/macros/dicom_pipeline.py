@@ -188,12 +188,12 @@ def main() -> None:
               if abs(b.volume) >= MIN_BONE_MM3]
     print(f"  {len(bodies)} bones, {sum(abs(b.volume) for b in bodies) / 1000:.1f} cm3")
 
-    out_dir = PROJECT / "bones_dicom"
-    out_dir.mkdir(exist_ok=True)
+    out_dir = PROJECT / "stl" / "bones_dicom"
+    out_dir.mkdir(parents=True, exist_ok=True)
     for i, body in enumerate(sorted(bodies, key=lambda b: -abs(b.volume))):
         body.export(out_dir / f"bone_{i:02d}.stl")
 
-    combined = PROJECT / "BrokeFeet_dicom_raw.stl"
+    combined = PROJECT / "stl" / "BrokeFeet_dicom_raw.stl"
     trimesh.util.concatenate(bodies).export(combined)
 
     print(f"\nwrote {len(bodies)} bones to {out_dir}")

@@ -24,8 +24,8 @@ import numpy as np
 import trimesh
 
 PROJECT = Path(__file__).resolve().parent.parent
-AXIAL_STL = PROJECT / "BrokeFeet_axial_raw.stl"
-SAGITTAL_STL = PROJECT / "BrokeFeet_bone_raw.stl"
+AXIAL_STL = PROJECT / "stl" / "BrokeFeet_axial_raw.stl"
+SAGITTAL_STL = PROJECT / "stl" / "BrokeFeet_bone_raw.stl"
 
 # Bodies smaller than this are mesh debris, not bones worth comparing.
 MIN_BONE_MM3 = 150.0

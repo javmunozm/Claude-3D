@@ -10,10 +10,10 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
 
-PROJECT = r"D:\CAD\Claude-Projects\BrokeFeet"
-OUT = os.path.join(PROJECT, "locate")
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(PROJECT, "renders", "locate")
 os.makedirs(OUT, exist_ok=True)
-SRC = os.path.join(PROJECT, "BrokeFeet_axial_raw.stl")
+SRC = os.path.join(PROJECT, "stl", "BrokeFeet_axial_raw.stl")
 
 mesh = trimesh.load(SRC)
 V = mesh.vertices

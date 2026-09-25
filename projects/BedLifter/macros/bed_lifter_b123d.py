@@ -218,8 +218,10 @@ def make_lifter_split(
 
 
 def save_part(name: str, shape) -> None:
-    step_path = SAVE_DIR / f"{name}.step"
-    stl_path  = SAVE_DIR / f"{name}.stl"
+    step_path = SAVE_DIR / "step" / f"{name}.step"
+    stl_path  = SAVE_DIR / "stl" / f"{name}.stl"
+    step_path.parent.mkdir(exist_ok=True)
+    stl_path.parent.mkdir(exist_ok=True)
     export_step(shape, str(step_path))
     export_stl(shape, str(stl_path))
     print(f"  Saved: {step_path}")

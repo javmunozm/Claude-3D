@@ -82,7 +82,7 @@ Two CT series of the same left foot, captured as screenshots.
 
 | | Sagittal | **Axial (primary)** |
 |---|---|---|
-| Folder | `references/brokenfeet/sagitales/` | `references/brokenfeet/axiales/` |
+| Folder | `sources/brokenfeet/sagitales/` | `sources/brokenfeet/axiales/` |
 | Captures | 48 | 183 (182 usable) + **38 proximal** |
 | Slice thickness | 2.21 mm | **0.63 mm** |
 | Slice spacing | 2.0 mm | **0.625 mm** |
@@ -100,7 +100,7 @@ VOL OSEO kernel, same 0.63 mm thickness and 0.625 mm spacing. They end 1.25 mm
 contiguous rather than overlapping. Combined span: **+17.75 → −118.50 mm**.
 
 Ingested by `macros/deidentify_axial_proximal.py` into
-`references/brokenfeet_deid_axial_proximal/`. Two things differ from the main
+`sources/brokenfeet_deid_axial_proximal/`. Two things differ from the main
 series, and both would corrupt the stack if ignored:
 
 | | Main series | Proximal |

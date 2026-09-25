@@ -68,8 +68,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 PROJ = HERE.parent
 DERIVED = PROJ / "derived"
 GRIP_SRC = DERIVED / "dualsense_stripped.stl"
-CONSOLE = PROJ / "console_solid.stl"
-OUT = PROJ / "VitaGripPS5.stl"
+CONSOLE = PROJ / "stl" / "console_solid.stl"
+OUT = PROJ / "stl" / "VitaGripPS5.stl"
 
 REF_GRIP_W = 222.4      # 054-1.webp at the corrected 0.246279 mm/px anchor
 FIT_CLEAR = 0.35        # per side, on the console before it is used as a cutter
@@ -154,6 +154,7 @@ def main():
                  "intersecting the grip. Check --y and --sink.")
 
     if not a.no_write:
+        OUT.parent.mkdir(exist_ok=True)
         part.export(str(OUT))
         print("\nwrote %s" % OUT)
     return 0

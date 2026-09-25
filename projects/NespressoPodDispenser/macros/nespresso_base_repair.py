@@ -235,8 +235,10 @@ def main() -> None:
     part = build_repair()
 
     out_dir = Path(__file__).resolve().parent.parent
-    step_path = out_dir / "NespressoPodDispenser_BaseRepair.step"
-    stl_path = out_dir / "NespressoPodDispenser_BaseRepair.stl"
+    step_path = out_dir / "step" / "NespressoPodDispenser_BaseRepair.step"
+    stl_path = out_dir / "stl" / "NespressoPodDispenser_BaseRepair.stl"
+    step_path.parent.mkdir(exist_ok=True)
+    stl_path.parent.mkdir(exist_ok=True)
 
     export_step(part, str(step_path))
     export_stl(part, str(stl_path))

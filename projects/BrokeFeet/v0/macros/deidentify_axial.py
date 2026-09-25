@@ -28,8 +28,8 @@ import numpy as np
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[4]
-SRC_DIR = REPO / "references" / "brokenfeet" / "axiales"
-OUT_DIR = REPO / "references" / "brokenfeet_deid_axial"
+SRC_DIR = REPO / "sources" / "brokenfeet" / "axiales"
+OUT_DIR = REPO / "sources" / "brokenfeet_deid_axial"
 INDEX_CSV = OUT_DIR / "slice_index.csv"
 
 # Captures at this size are the full-screen viewer grabs. One stray capture in

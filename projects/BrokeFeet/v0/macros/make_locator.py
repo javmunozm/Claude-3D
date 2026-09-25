@@ -15,9 +15,9 @@ import os
 import numpy as np
 import trimesh
 
-PROJECT = r"D:\CAD\Claude-Projects\BrokeFeet"
-SRC = os.path.join(PROJECT, "BrokeFeet_axial_raw.stl")
-OUT = os.path.join(PROJECT, "locate")
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(PROJECT, "stl", "BrokeFeet_axial_raw.stl")
+OUT = os.path.join(PROJECT, "stl")
 os.makedirs(OUT, exist_ok=True)
 
 mesh = trimesh.load(SRC)

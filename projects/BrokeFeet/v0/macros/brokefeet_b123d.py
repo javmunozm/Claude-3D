@@ -51,7 +51,7 @@ from build123d import (
 )
 
 PROJECT = Path(__file__).resolve().parent.parent
-BONE_STL = PROJECT / "BrokeFeet_bone_raw.stl"
+BONE_STL = PROJECT / "stl" / "BrokeFeet_bone_raw.stl"
 
 # --- constants: real-world measurements, mm --------------------------------
 
@@ -309,11 +309,13 @@ def main() -> None:
     print(f"  assembly: {len(assembly.faces):,} faces, "
           f"{assembly.volume / 1000:.1f} cm3, watertight={assembly.is_watertight}")
 
-    stl_path = PROJECT / "BrokeFeet_teaching.stl"
+    stl_path = PROJECT / "stl" / "BrokeFeet_teaching.stl"
+    stl_path.parent.mkdir(exist_ok=True)
     assembly.export(stl_path)
     print(f"\nwrote {stl_path}")
 
-    step_path = PROJECT / "BrokeFeet_base.step"
+    step_path = PROJECT / "step" / "BrokeFeet_base.step"
+    step_path.parent.mkdir(exist_ok=True)
     export_step(base.part, str(step_path))
     print(f"wrote {step_path} (base only -- bone stays a mesh)")
 

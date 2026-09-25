@@ -47,7 +47,7 @@ not exist for scan-derived geometry in ANY tool -- the geometry never had
 sketches, extrusions or features to recover. Expect a slow first open.
 
 Usage:
-    python macros/export_solid_step.py                      # corrected mesh -> cad/
+    python macros/export_solid_step.py                      # corrected mesh -> step/
     python macros/export_solid_step.py <in.stl> <out.step>
 """
 from __future__ import annotations
@@ -60,8 +60,10 @@ import numpy as np
 import trimesh
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_SRC = os.path.join(PROJECT, "BrokeFeetV1_craters_final.stl")
-DEFAULT_OUT = os.path.join(PROJECT, "cad", "BrokeFeetV1_bone_solid.step")
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(PROJECT)))   # -> tools.mesh_to_step
+sys.path.insert(0, REPO)
+DEFAULT_SRC = os.path.join(PROJECT, "stl", "BrokeFeetV1_craters_final.stl")
+DEFAULT_OUT = os.path.join(PROJECT, "step", "BrokeFeetV1_bone_solid.step")
 
 # The only value that keeps the mesh watertight. See the module docstring --
 # this is a cliff. Raising it does not shrink the file, it breaks the solid.
@@ -98,59 +100,28 @@ def simplify_manifold(mesh: trimesh.Trimesh, tol: float = SIMPLIFY_TOL):
 
 
 def to_step(verts: np.ndarray, faces: np.ndarray, path: str) -> tuple[bool, bool]:
-    """Sew triangles into a shell and write STEP. Returns (is_solid, wrote_ok).
+    """Build a shell from the mesh topology and write STEP. Returns (is_solid, wrote_ok).
 
     Every triangle becomes one ADVANCED_FACE. Nothing recovers a feature tree,
     because the geometry never had one -- what this buys is a body CAD tools
     will boolean and section rather than a surface model they can only display.
+
+    tools/mesh_to_step.py shares edges through a vertex-index dict instead of
+    sewing (27x faster at 82k faces) and falls back to sewing if the mesh is
+    not a closed 2-manifold. If the shell is not closed the file degrades to
+    SHELL_BASED_SURFACE_MODEL -- the documented failure this script exists to
+    avoid, so it is reported rather than swallowed.
     """
-    from OCP.BRepBuilderAPI import (
-        BRepBuilderAPI_MakeFace,
-        BRepBuilderAPI_MakePolygon,
-        BRepBuilderAPI_MakeSolid,
-        BRepBuilderAPI_Sewing,
-    )
-    from OCP.gp import gp_Pnt
-    from OCP.IFSelect import IFSelect_RetDone
-    from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
-    from OCP.TopoDS import TopoDS
+    from tools.mesh_to_step import triangles_to_shape, write_step
 
-    sew = BRepBuilderAPI_Sewing(SEW_TOL)
     t0 = time.time()
-    for i, f in enumerate(faces):
-        p = [gp_Pnt(*verts[k]) for k in f]
-        poly = BRepBuilderAPI_MakePolygon(p[0], p[1], p[2], True)
-        if not poly.IsDone():
-            continue
-        face = BRepBuilderAPI_MakeFace(poly.Wire())
-        if face.IsDone():
-            sew.Add(face.Face())
-        if i and i % 25000 == 0:
-            print(f"      {i:,}/{len(faces):,} ({time.time() - t0:.0f}s)",
-                  flush=True)
-    sew.Perform()
-    shape = sew.SewedShape()
-    print(f"      sewed in {time.time() - t0:.0f}s", flush=True)
-
-    # A single CLOSED shell is the precondition for a solid. If the mesh was
-    # not watertight this raises Standard_TypeMismatch and the file degrades to
-    # SHELL_BASED_SURFACE_MODEL -- the documented failure this script exists to
-    # avoid, so it is reported rather than swallowed.
-    is_solid = False
-    try:
-        shell = TopoDS.Shell_s(shape)
-        mk = BRepBuilderAPI_MakeSolid(shell)
-        if mk.IsDone():
-            shape = mk.Solid()
-            is_solid = True
-    except Exception as exc:
-        print(f"      NOT A SOLID ({type(exc).__name__}) -- writing surface "
-              f"model; check the input is watertight")
+    shape, is_solid, method = triangles_to_shape(verts, faces, SEW_TOL)
+    print(f"      built by {method} in {time.time() - t0:.0f}s", flush=True)
+    if not is_solid:
+        print("      writing surface model")
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    writer = STEPControl_Writer()
-    writer.Transfer(shape, STEPControl_AsIs)
-    return is_solid, writer.Write(path) == IFSelect_RetDone
+    return is_solid, write_step(shape, path)
 
 
 def main() -> None:

@@ -38,7 +38,7 @@ from slice_positions import (
 )
 
 REPO = Path(__file__).resolve().parents[4]
-DEID_DIR = REPO / "references" / "brokenfeet_deid"
+DEID_DIR = REPO / "sources" / "brokenfeet_deid"
 OUT_DIR = Path(__file__).resolve().parent.parent
 
 # --- segmentation parameters ----------------------------------------------
@@ -253,7 +253,8 @@ def main() -> None:
     print(f"  extents: {extents[0]:.1f} x {extents[1]:.1f} x {extents[2]:.1f} mm")
     print(f"  volume: {mesh.volume / 1000:.1f} cm3, watertight={mesh.is_watertight}")
 
-    out = OUT_DIR / "BrokeFeet_bone_raw.stl"
+    out = OUT_DIR / "stl" / "BrokeFeet_bone_raw.stl"
+    out.parent.mkdir(exist_ok=True)
     mesh.export(out)
     print(f"\nwrote {out}")
 

@@ -83,8 +83,8 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-ROOT = Path(r"D:\CAD\Claude-Projects\BrokeFeetV1")
-SRC = ROOT / "BrokeFeetV1_smoothed.stl"
+ROOT = Path(r"D:\CAD\Claude-Projects\projects\BrokeFeet\v2")
+SRC = ROOT / "stl" / "BrokeFeetV1_smoothed.stl"
 OUTDIR = ROOT / "blender"
 
 DYNTOPO_MM = 0.4               # local refinement under the brush, not a remesh

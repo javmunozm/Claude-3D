@@ -41,8 +41,8 @@ from deidentify_axial import (
 )
 
 REPO = Path(__file__).resolve().parents[4]
-DEID_DIR = REPO / "references" / "brokenfeet_deid_axial"
-PROXIMAL_DIR = REPO / "references" / "brokenfeet_deid_axial_proximal"
+DEID_DIR = REPO / "sources" / "brokenfeet_deid_axial"
+PROXIMAL_DIR = REPO / "sources" / "brokenfeet_deid_axial_proximal"
 OUT_DIR = Path(__file__).resolve().parent.parent
 
 # --- segmentation parameters ----------------------------------------------
@@ -902,19 +902,29 @@ def _bridge_bodies(bodies: list) -> "trimesh.Trimesh":
     attached, pending = [ordered[0]], list(ordered[1:])
     plugs = []
 
+    # A body pair's closest approach never changes between rounds, so each
+    # tree is built once and each (candidate, anchor) gap queried once, keyed
+    # by object identity. Same order and ties as recomputing every round.
+    trees: dict[int, cKDTree] = {}
+    closest: dict[tuple[int, int], tuple] = {}
+
     while pending:
         best = None
         for index, candidate in enumerate(pending):
-            tree = cKDTree(candidate.vertices)
             for anchor_index, anchor in enumerate(attached):
                 if PIN_TO_MAIN_BODY_ONLY and anchor_index != 0:
                     continue
-                distances, indices = tree.query(anchor.vertices)
-                k = int(np.argmin(distances))
-                gap = float(distances[k])
+                key = (id(candidate), id(anchor))
+                if key not in closest:
+                    if id(candidate) not in trees:
+                        trees[id(candidate)] = cKDTree(candidate.vertices)
+                    distances, indices = trees[id(candidate)].query(anchor.vertices)
+                    k = int(np.argmin(distances))
+                    closest[key] = (float(distances[k]), anchor.vertices[k],
+                                    candidate.vertices[indices[k]])
+                gap, near_a, near_b = closest[key]
                 if best is None or gap < best[0]:
-                    best = (gap, index, anchor.vertices[k],
-                            candidate.vertices[indices[k]], anchor_index)
+                    best = (gap, index, near_a, near_b, anchor_index)
 
         gap, index, point_a, point_b, _ = best
 
@@ -1636,7 +1646,8 @@ def main() -> None:
     print(f"  extents: {extents[0]:.1f} x {extents[1]:.1f} x {extents[2]:.1f} mm")
     print(f"  volume: {mesh.volume / 1000:.1f} cm3, watertight={mesh.is_watertight}")
 
-    out = OUT_DIR / "BrokeFeet_axial_raw.stl"
+    out = OUT_DIR / "stl" / "BrokeFeet_axial_raw.stl"
+    out.parent.mkdir(exist_ok=True)
     mesh.export(out)
     print(f"\nwrote {out}")
 

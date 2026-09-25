@@ -104,13 +104,13 @@ from scipy import ndimage
 REPO = Path(__file__).resolve().parents[4]
 PROJECT = Path(__file__).resolve().parents[1]
 
-SRC_MAIN = REPO / "references" / "brokenfeet" / "axiales"
-SRC_PROX = REPO / "references" / "brokenfeet" / "axial proximal"
-SRC_SAG = REPO / "references" / "brokenfeet" / "sagitales"
+SRC_MAIN = REPO / "sources" / "brokenfeet" / "axiales"
+SRC_PROX = REPO / "sources" / "brokenfeet" / "axial proximal"
+SRC_SAG = REPO / "sources" / "brokenfeet" / "sagitales"
 
-OUT_MAIN = REPO / "references" / "brokenfeet_deid_axial"
-OUT_PROX = REPO / "references" / "brokenfeet_deid_axial_proximal"
-OUT_SAG = REPO / "references" / "brokenfeet_deid_sagittal"
+OUT_MAIN = REPO / "sources" / "brokenfeet_deid_axial"
+OUT_PROX = REPO / "sources" / "brokenfeet_deid_axial_proximal"
+OUT_SAG = REPO / "sources" / "brokenfeet_deid_sagittal"
 
 MANIFEST_CSV = PROJECT / "slice_manifest.csv"
 MANIFEST_JSON = PROJECT / "slice_manifest.json"

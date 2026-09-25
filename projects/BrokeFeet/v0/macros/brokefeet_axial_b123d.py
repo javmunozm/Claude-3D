@@ -51,7 +51,7 @@ from build123d import (
 )
 
 PROJECT = Path(__file__).resolve().parent.parent
-BONE_STL = PROJECT / "BrokeFeet_axial_raw.stl"
+BONE_STL = PROJECT / "stl" / "BrokeFeet_axial_raw.stl"
 
 # --- constants: mm ---------------------------------------------------------
 
@@ -221,17 +221,27 @@ def fuse_bones(bodies: list[trimesh.Trimesh]) -> trimesh.Trimesh:
     pending = list(bodies[1:])
     plugs: list[trimesh.Trimesh] = []
 
+    # A body pair's closest approach never changes between rounds, so each
+    # tree is built once and each (candidate, anchor) gap queried once, keyed
+    # by object identity. Same order and ties as recomputing every round.
+    trees: dict[int, cKDTree] = {}
+    closest: dict[tuple[int, int], tuple] = {}
+
     while pending:
         best = None
         for index, candidate in enumerate(pending):
-            tree = cKDTree(candidate.vertices)
             for anchor in attached:
-                distances, indices = tree.query(anchor.vertices)
-                k = int(np.argmin(distances))
-                gap = float(distances[k])
+                key = (id(candidate), id(anchor))
+                if key not in closest:
+                    if id(candidate) not in trees:
+                        trees[id(candidate)] = cKDTree(candidate.vertices)
+                    distances, indices = trees[id(candidate)].query(anchor.vertices)
+                    k = int(np.argmin(distances))
+                    closest[key] = (float(distances[k]), anchor.vertices[k],
+                                    candidate.vertices[indices[k]])
+                gap, near_a, near_b = closest[key]
                 if best is None or gap < best[0]:
-                    best = (gap, index, anchor.vertices[k],
-                            candidate.vertices[indices[k]])
+                    best = (gap, index, near_a, near_b)
 
         gap, index, point_a, point_b = best
         candidate = pending.pop(index)
@@ -509,7 +519,8 @@ def main() -> None:
     contact = (block.vertices[:, 2] <= BASE_THICKNESS + BONE_SINK + 1.0).sum()
     print(f"  seating: {contact} bone vertices within the cradle")
 
-    out = PROJECT / "BrokeFeet_teaching_axial.stl"
+    out = PROJECT / "stl" / "BrokeFeet_teaching_axial.stl"
+    out.parent.mkdir(exist_ok=True)
     assembly.export(out)
     print(f"\nwrote {out}")
 

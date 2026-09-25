@@ -24,7 +24,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 WORK = HERE.parent / "work"
-OUT = HERE.parent
+OUT = HERE.parent / "stl"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent.parent / "v0" / "macros"))
 
@@ -52,6 +52,7 @@ def main():
     print(f"  mesh vol {mesh.volume / 1000:.2f} cm3 watertight="
           f"{mesh.is_watertight} bodies={mesh.body_count} genus={g} "
           f"area/volume={mesh.area / mesh.volume:.3f}")
+    OUT.mkdir(exist_ok=True)
     p = OUT / name
     mesh.export(p)
     print(f"wrote {p}")

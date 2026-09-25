@@ -8,13 +8,13 @@ para apilar más cápsulas.
 
 | Pieza | Función |
 |---|---|
-| **A_base** | Se **inserta** en la boca del holder. Su exterior está atado a esa boca, así que no se puede ensanchar. |
-| **B_acople** | Se **acopla** encima de A. No entra en ningún hueco, así que es libre por fuera. Lleva un **zócalo local** en su extremo inferior que recibe el extremo de A. |
+| **A_base** | **Escalonada.** Los primeros 38 mm (perfil slim 39,50 × 37,00) se insertan en el holder. El cuerpo ensancha a 42,20 × 39,70 (= B). Los últimos 12 mm vuelven al perfil slim para enchufar en el zócalo de B. |
+| **B_acople** | Se **acopla** encima de A. No entra en ningún hueco, así que es libre por fuera. Lleva un **zócalo** en su extremo inferior que recibe el extremo de A. |
 
 Las cápsulas bajan **de lado** (acostadas), no de plano.
 
 Cada pieza lleva un **corte de inspección** de 20 mm de ancho en una de sus
-caras de 39,5 mm (las normales al eje Y), para ver cuántas cápsulas quedan.
+caras de 37 mm (las normales al eje X), para ver cuántas cápsulas quedan.
 
 ## Estado
 
@@ -43,13 +43,14 @@ Todo en mm. Medido sobre los STL exportados, no sobre el código.
 
 | | A_base | B_acople |
 |---|---|---|
-| Exterior | 39,50 × 37,00 | 40,70 × 37,00 |
-| Zócalo | — | 42,40 × 39,90, de z=0 a z=12 |
+| Exterior (cuerpo) | 42,20 × 39,70 | 42,20 × 39,70 |
+| Exterior (inserciones) | 39,50 × 37,00 (z 0–38 y z 138–150) | — |
 | Chute interior | 37,10 × 33,40 | 37,10 × 33,40 |
-| Pared, caras de 39,5 | 1,80 (3 × 0,6) | 1,80 (3 × 0,6) |
-| Pared, caras de 37,0 | 1,20 (2 × 0,6) | 1,80 (3 × 0,6) |
+| Zócalo (z=0–12) | — | bolsillo 39,80 × 37,30, pared 1,20 |
+| Pared (cuerpo ancho) | 2,55 / 3,15 | 2,55 / 3,15 |
+| Pared (inserción slim) | 1,20 / 1,80 | — |
 | Altura | 150,00 | 150,00 |
-| Volumen | 28,4 cm³ | 35,1 cm³ |
+| Volumen | 48,9 cm³ | 56,7 cm³ |
 
 El chute interior es **idéntico en ambas**, para que no haya escalón donde una
 cápsula pueda trabarse en la junta.
@@ -95,18 +96,21 @@ Lo que libera es a B, que por eso conserva 1,8 mm en las cuatro caras.
 De plano necesitaría 37,10 en **ambos** ejes, y el eje Y solo da 33,40. La
 geometría obliga físicamente a que bajen de lado, que es lo que se quiere.
 
-### El zócalo va en B, y es local
+### El zócalo va en B
 
-B es la más ancha, así que la hembra va ahí. El ensanchamiento ocupa solo los
-12 mm del extremo inferior; por encima B vuelve a 40,70 × 37,00.
+B es la más ancha, así que la hembra va ahí. El cuerpo de B mide 42,40 × 39,90
+para que la pared alrededor del bolsillo del zócalo (40,00 × 37,50) quede en
+1,20 mm — el mínimo imprimible con boquilla 0,6 (2 pasadas). Sin ese margen
+el bolsillo se comería la pared del cuerpo y el zócalo quedaría suelto al
+rebanar.
 
 | | |
 |---|---|
-| Hueco del zócalo | 40,00 × 37,50 |
+| Hueco del zócalo | 39,80 × 37,30 |
 | Pared de A que entra | 39,50 × 37,00 |
-| Holgura | 0,25 por cara |
+| Holgura | 0,15 por cara |
 | Profundidad | 12,0 |
-| Mordaza exterior | 1,2 |
+| Pared alrededor del bolsillo | 1,20 (2 × 0,6) |
 
 ### Los cortes no tienen ningún tramo horizontal
 
@@ -129,20 +133,21 @@ contra un modelo de pico es 0,60 frente a 60,07 contra uno de arco.
 ## Verificación
 
 ```
-python tools\render_check.py projects\nespressoDispenserExtension\nespressoDispenserExtension_A_base.stl --views iso
-python tools\render_check.py projects\nespressoDispenserExtension\nespressoDispenserExtension_B_acople.stl --views iso
+python tools\render_check.py projects\nespressoDispenserExtension\stl\nespressoDispenserExtension_A_base.stl --views iso
+python tools\render_check.py projects\nespressoDispenserExtension\stl\nespressoDispenserExtension_B_acople.stl --views iso
 ```
 
 Ambas: `body_count = 1`, watertight, winding consistente.
 
 Más allá de los gates, medido punto por punto sobre los STL:
 
-- **Espesor real de pared**: 1,78 mm donde se declara 1,8.
-- **El zócalo es local**: termina exactamente en z=12,000; por encima el
-  cuerpo mide 40,70 × 37,00.
-- **El encaje no interfiere**: 17 732 puntos de A muestreados en la zona de
-  solape, **0** dentro del material de B.
-- **El corte está en la cara correcta**: hueco en +Y, material en −Y, +X y −X.
+- **Espesor real de pared**: A: 1,20 / 1,80 mm. B: 2,65 / 3,25 mm (cuerpo),
+  1,20 mm (zona del zócalo).
+- **El zócalo es interno**: bolsillo de 40,00 × 37,50 de z=0 a z=12; la pared
+  alrededor mide 1,20 mm (printable).
+- **El encaje no interfiere**: holgura de 0,15 mm por cara (total 0,30 mm),
+  verificada contra los STL exportados.
+- **El corte está en la cara correcta**: hueco en +X, material en −X, +Y y −Y.
 - **A está abierta arriba**: hueco a z=149,5, sin barra cruzando.
 - **El remate de B es un pico**, no un arco (ver arriba).
 

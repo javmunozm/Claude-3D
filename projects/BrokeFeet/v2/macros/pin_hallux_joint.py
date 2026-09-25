@@ -45,7 +45,7 @@ from scipy.spatial import cKDTree
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SRC = ROOT / "BrokeFeetV2_sculpted.stl"
+SRC = ROOT / "stl" / "BrokeFeetV2_sculpted.stl"
 
 # Split plane between 1st metatarsal head and proximal phalanx, from the
 # vertex-density waist along the ray (minimum at Y = -54.9).

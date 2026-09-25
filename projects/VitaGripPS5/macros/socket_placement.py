@@ -56,7 +56,7 @@ PROJ = HERE.parent
 DERIVED = PROJ / "derived"
 
 GRIP_SRC = DERIVED / "dualsense_stripped.stl"
-CONSOLE = PROJ / "console_solid.stl"
+CONSOLE = PROJ / "stl" / "console_solid.stl"
 
 REF_GRIP_W = 222.4      # 054-1.webp at the corrected 0.246279 mm/px anchor
 FIT_CLEAR = 0.35        # per side, on the console before it is used as a cutter

@@ -5,25 +5,47 @@ __pycache__/
 
 # Large generated CAD output — regenerate from macros/*.py
 # Track small exports (<5MB) by adding them explicitly with git add -f
-projects/BrokeFeet/v0/*.stl
-projects/BrokeFeet/v0/*.step
-projects/BrokeFeet/v2/*.stl
-projects/BrokeFeet/v2/*.step
-projects/BrokeFeet/v2/cad/
+# Each project keeps its models in stl/ and step/ and its PNGs in renders/.
+projects/BrokeFeet/v0/stl/
+projects/BrokeFeet/v0/step/
+projects/BrokeFeet/v2/stl/
+projects/BrokeFeet/v2/step/
 # VitaGrip adapted Hori shells (110-134 MB each) — regenerate with
 # macros/widen_hori_grip.py from sources/psvitaGrip/grip2000/
-projects/VitaGrip/*.stl
+projects/VitaGrip-hori/stl/
+# VitaGrip1000 v2 exports over the 5 MB threshold above (7.9 MB STEP, 5.8 MB STL) — regenerate with
+# v2/macros/vita_grip.py
+projects/VitaGrip1000/v2/stl/VitaGrip1000.stl
+projects/VitaGrip1000/v2/step/VitaGrip1000.step
 
 # VitaGripPS5: the built part (13 MB) and every DualSense derivative
 # (10-119 MB). All regenerable — prepare_dualsense.py -> strip_dualsense.py
 # -> build_socket_grip.py — from the scan in sources/VitaGripPs5/.
-projects/VitaGripPS5/*.stl
+projects/VitaGripPS5/stl/
 projects/VitaGripPS5/derived/*.stl
 
-# Raw CT reference panes (146+15 MB); de-identified versions are tracked
+# Raw CT reference panes (146+15 MB); de-identified versions are tracked.
+# references/ became sources/: the old references/ paths stay so an old checkout is still covered.
+sources/brokenfeet/axiales/
+sources/brokenfeet/sagitales/
+sources/brokenfeet/axial/
 references/brokenfeet/axiales/
 references/brokenfeet/sagitales/
 references/brokenfeet/axial/
+# Raw proximal-axial screenshots (the de-identified copies in brokenfeet_deid_axial_proximal/ are tracked).
+# Untracked 2026-09-25 (user decision); they remain in the initial commit's history.
+sources/brokenfeet/axial proximal/
+
+# Downloaded third-party meshes and archives (4.2 GB, eleven files over GitHub's 100 MB limit).
+# Kept on disk only; photos, SVG and notes in these folders are tracked.
+sources/psvitaGrip/**/*.stl
+sources/psvitaGrip/**/*.obj
+sources/psvitaGrip/**/*.3mf
+sources/psvitaGrip/**/*.rar
+sources/VitaGripPs5/**/*.stl
+sources/VitaGripPs5/**/*.obj
+sources/VitaGripPs5/**/*.3mf
+sources/VitaGripPs5/**/*.rar
 
 # Large intermediate pipeline arrays (283 MB each)
 *.npy

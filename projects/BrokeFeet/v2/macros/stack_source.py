@@ -10,7 +10,7 @@ Two sources are supported:
   FEED     -- BrokeFeetV1/macros/feed_slices.py + its manifest (preferred once
               it exists; it carries per-slice LOC and geometry explicitly)
   LEGACY   -- BrokeFeet/macros/segment_axial.load_stack(), the V0 assembly of
-              references/brokenfeet_deid_axial{,_proximal}
+              sources/brokenfeet_deid_axial{,_proximal}
 
 The legacy path is the development fallback and is byte-identical to what the
 V0 reconstruction consumed, so any V1-vs-V0 measurement compares the same
@@ -113,7 +113,7 @@ def load_volume(use_cache: bool = True, source: str = "auto"):
     if use_cache:
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         # Never silently replace a cache of a DIFFERENT shape. The de-identify
-        # output under references/ is shared and is being rewritten by the
+        # output under sources/ is shared and is being rewritten by the
         # feeder stage in parallel; a rebuild here once turned a 222x1108x1209
         # stack into 221x1160x1240 while saved masks from the earlier stack were
         # still on disk, which would have made a V1-vs-V0 comparison meaningless
@@ -123,7 +123,7 @@ def load_volume(use_cache: bool = True, source: str = "auto"):
             if old.shape != volume.shape:
                 raise SystemExit(
                     f"stack cache shape changed {old.shape} -> {volume.shape}. "
-                    "The de-identified panes under references/ have been "
+                    "The de-identified panes under sources/ have been "
                     "regenerated. Delete BrokeFeetV1/work/*.npy and re-run every "
                     "stage, or the saved masks describe a different volume."
                 )

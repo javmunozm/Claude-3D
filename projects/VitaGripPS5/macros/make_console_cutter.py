@@ -49,7 +49,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SRC = (ROOT / "sources" / "psvitaGrip" / "Vita 1000"
        / "psvitaManualJoin_decimated.stl")
-OUT = HERE.parent / "console_solid.stl"
+OUT = HERE.parent / "stl" / "console_solid.stl"
 
 CONSOLE_W, CONSOLE_D, CONSOLE_H = 182.0, 18.6, 83.55
 PITCH = 0.6                 # voxel size for the first pass, mm
@@ -214,6 +214,7 @@ def main():
         print("  %-38s |X| %.1f..%.1f  (top edge band)"
               % ("top edge    (shoulder buttons)", xs.min(), xs.max()))
 
+    OUT.parent.mkdir(exist_ok=True)
     sol.export(str(OUT))
     print("\nwrote %s" % OUT)
     return 0

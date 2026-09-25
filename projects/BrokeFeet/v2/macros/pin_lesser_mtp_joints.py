@@ -72,7 +72,7 @@ from scipy.spatial import ConvexHull, cKDTree
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SRC = ROOT / "BrokeFeetV2_pinned2.stl"   # sculpt + hallux pin + ray1 (2nd MTP) pin
+SRC = ROOT / "stl" / "BrokeFeetV2_pinned2.stl"   # sculpt + hallux pin + ray1 (2nd MTP) pin
 
 FOREFOOT_Y = -85.0     # isolates the toe rays from the midfoot
 RAY_NAMES = {1: "2nd (index)", 2: "3rd (middle)", 3: "4th (ring)", 4: "5th (little)"}

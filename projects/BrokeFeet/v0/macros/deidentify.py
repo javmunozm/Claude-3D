@@ -29,8 +29,8 @@ from PIL import Image
 # --- paths -----------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[4]
-SRC_DIR = REPO / "references" / "brokenfeet"
-OUT_DIR = REPO / "references" / "brokenfeet_deid"
+SRC_DIR = REPO / "sources" / "brokenfeet"
+OUT_DIR = REPO / "sources" / "brokenfeet_deid"
 INDEX_CSV = OUT_DIR / "slice_index.csv"
 
 # --- pane detection --------------------------------------------------------

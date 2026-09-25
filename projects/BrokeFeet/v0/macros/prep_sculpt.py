@@ -18,8 +18,8 @@ import trimesh
 from scipy import ndimage
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(PROJECT, "BrokeFeet_axial_raw.stl")
-OUT = os.path.join(PROJECT, "sculpt")
+SRC = os.path.join(PROJECT, "stl", "BrokeFeet_axial_raw.stl")
+OUT = os.path.join(PROJECT, "stl")
 PITCH = 0.5
 MIN_VOX = 8
 

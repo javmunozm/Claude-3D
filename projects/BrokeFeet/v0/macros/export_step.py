@@ -21,9 +21,12 @@ import numpy as np
 import trimesh
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(PROJECT, "BrokeFeet_axial_raw.stl")
-OUT = os.path.join(PROJECT, "cad")
-os.makedirs(OUT, exist_ok=True)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(PROJECT))))  # -> tools
+SRC = os.path.join(PROJECT, "stl", "BrokeFeet_axial_raw.stl")
+OUT_STL = os.path.join(PROJECT, "stl")     # .stl and .3mf (meshes)
+OUT_STEP = os.path.join(PROJECT, "step")
+os.makedirs(OUT_STL, exist_ok=True)
+os.makedirs(OUT_STEP, exist_ok=True)
 
 # Face budgets. The low ones exist because a 461k-face STEP is unusable in most
 # CAD tools; the high one is there if the tool can take it.
@@ -37,47 +40,19 @@ print(f"source: {len(mesh.faces):,} faces, {mesh.volume/1000:.2f} cm3, "
 
 
 def to_step(tri: trimesh.Trimesh, path: str) -> bool:
-    """Build an OCC shell from triangles and write STEP."""
-    from OCP.BRep import BRep_Builder
-    from OCP.BRepBuilderAPI import (BRepBuilderAPI_MakeFace,
-                                    BRepBuilderAPI_MakePolygon,
-                                    BRepBuilderAPI_Sewing)
-    from OCP.gp import gp_Pnt
-    from OCP.TopoDS import TopoDS_Compound, TopoDS_Shell, TopoDS
-    from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
-    from OCP.IFSelect import IFSelect_RetDone
+    """Build an OCC shell from triangles and write STEP.
 
-    verts = tri.vertices
-    sew = BRepBuilderAPI_Sewing(1e-6)
-    t0 = time.time()
-    for i, f in enumerate(tri.faces):
-        p = [gp_Pnt(*verts[k]) for k in f]
-        poly = BRepBuilderAPI_MakePolygon(p[0], p[1], p[2], True)
-        if not poly.IsDone():
-            continue
-        face = BRepBuilderAPI_MakeFace(poly.Wire())
-        if face.IsDone():
-            sew.Add(face.Face())
-        if i and i % 20000 == 0:
-            print(f"      {i:,}/{len(tri.faces):,} faces "
-                  f"({time.time()-t0:.0f}s)")
-    sew.Perform()
-    shape = sew.SewedShape()
+    tools/mesh_to_step.py shares edges from the mesh topology when the mesh is
+    a closed 2-manifold, and sews otherwise -- which the decimated levels here
+    are not (broken faces, see below), so they still sew. A shape that is not
+    a closed shell stays a shell; still importable.
+    """
+    from tools.mesh_to_step import triangles_to_shape, write_step
 
-    # try to make it a solid so CAD tools treat it as a body
-    try:
-        shell = TopoDS.Shell_s(shape)
-        mk = BRepBuilderAPI_MakeSolid(shell)
-        if mk.IsDone():
-            shape = mk.Solid()
-    except Exception:
-        pass  # stays a shell; still importable
-
-    w = STEPControl_Writer()
-    w.Transfer(shape, STEPControl_AsIs)
-    status = w.Write(path)
-    return status == IFSelect_RetDone
+    shape, _, method = triangles_to_shape(tri.vertices, tri.faces, 1e-6,
+                                          progress=20000)
+    print(f"      built by {method}")
+    return write_step(shape, path)
 
 
 for target in LEVELS:
@@ -112,17 +87,17 @@ for target in LEVELS:
     print(f"      deviation from original: mean {dev.mean():.3f} mm, "
           f"p95 {np.percentile(dev,95):.3f} mm, max {dev.max():.3f} mm")
 
-    stl_path = os.path.join(OUT, f"BrokeFeet_bone_{tag}.stl")
+    stl_path = os.path.join(OUT_STL, f"BrokeFeet_bone_{tag}.stl")
     m.export(stl_path)
 
     # 3MF too -- a real solid-model container most CAD tools read, and far
     # smaller than STEP for the same geometry
     try:
-        m.export(os.path.join(OUT, f"BrokeFeet_bone_{tag}.3mf"))
+        m.export(os.path.join(OUT_STL, f"BrokeFeet_bone_{tag}.3mf"))
     except Exception as exc:
         print(f"      3mf failed: {exc}")
 
-    step_path = os.path.join(OUT, f"BrokeFeet_bone_{tag}.step")
+    step_path = os.path.join(OUT_STEP, f"BrokeFeet_bone_{tag}.step")
     t0 = time.time()
     try:
         ok = to_step(m, step_path)
@@ -132,4 +107,4 @@ for target in LEVELS:
     except Exception as exc:
         print(f"      STEP failed: {type(exc).__name__}: {exc}")
 
-print(f"\nfiles in {OUT}")
+print(f"\nfiles in {OUT_STL} and {OUT_STEP}")
