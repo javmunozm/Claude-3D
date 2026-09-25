@@ -159,12 +159,21 @@ a package named for the project, with relative imports.
   (layout), c59ba7f (system/docs), 650b29a (SDG split), 168e936 (renders
   kept tracked), 9ed9d4d (BoxTest). The memory entry for SurgicalDrillGuide
   was corrected the same day (it pointed at the deleted `RESUME_HERE.md`).
-- **Push blocker.** Local commit 096994d (2026-08-30, not on `origin/main`)
-  added the downloaded Vita meshes as full blobs, up to 1.46 GB each, and
-  GitHub rejects anything over 100 MB. They are untracked now but still in
-  that commit, so this branch cannot be pushed until they are removed from
-  its history. Rewriting history is the user's call.
-- **Raw CT screenshots on GitHub.** The 38 raw `axial proximal` screenshots
-  are in the initial commit 2ed6ea7, which is on `origin/main`. They are
-  untracked from d1abd60 on, but still in the pushed history. Whether to
-  purge them is the user's call.
+- **History rewritten 2026-09-25 (user decision): the repo tracks the system,
+  not the data.** Every branch was filtered with git-filter-repo down to
+  `.claude/`, `docs/`, `tools/`, `CLAUDE.md`, `.gitignore`, this file, and each
+  project's `README.md` and `macros/**/*.py`. The history went from 2.9 GB to
+  622 KB; the largest file is now 77 kB. Two commits became empty and were
+  dropped. Commit hashes above are from before the rewrite.
+- **Patient identifiers redacted.** The BrokeFeet v0 README and
+  `deidentify_axial_proximal.py` quoted the patient's national ID and the
+  study accession number, in every commit including the one on GitHub. Both
+  are now `[REDACTED-PATIENT-ID]` / `[REDACTED-ACCESSION]` in all history and
+  on disk; zero hits in any commit or object.
+- **GitHub `main` force-pushed** from 2ed6ea7 to the rewritten 5ff833a. That
+  removes the raw CT screenshots, the meshes and the identifiers from the
+  published branch. GitHub may still serve cached views of the old commits
+  until its support purges them.
+- **Local backups** `backup/pre-rewrite/{main,nespresso-dispenser-extension,
+  surgical-drill-guide}` keep the old, unredacted history on this machine
+  only. Delete them only on the user's say-so.
