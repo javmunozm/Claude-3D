@@ -155,6 +155,16 @@ a package named for the project, with relative imports.
 - **Fixed but not run.** `locate_views.py`, `make_locator.py` and
   `prep_for_blender.py` pointed at folders that no longer existed. Their paths
   are fixed, but none of them has been run.
-- **Not committed yet.** As of 2026-09-25, none of the above is committed.
-  The memory entry for SurgicalDrillGuide was corrected on 2026-09-25: it
-  pointed at `RESUME_HERE.md`, which had been deleted.
+- **Committed 2026-09-25** on `surgical-drill-guide`, not pushed: d1abd60
+  (layout), c59ba7f (system/docs), 650b29a (SDG split), 168e936 (renders
+  kept tracked), 9ed9d4d (BoxTest). The memory entry for SurgicalDrillGuide
+  was corrected the same day (it pointed at the deleted `RESUME_HERE.md`).
+- **Push blocker.** Local commit 096994d (2026-08-30, not on `origin/main`)
+  added the downloaded Vita meshes as full blobs, up to 1.46 GB each, and
+  GitHub rejects anything over 100 MB. They are untracked now but still in
+  that commit, so this branch cannot be pushed until they are removed from
+  its history. Rewriting history is the user's call.
+- **Raw CT screenshots on GitHub.** The 38 raw `axial proximal` screenshots
+  are in the initial commit 2ed6ea7, which is on `origin/main`. They are
+  untracked from d1abd60 on, but still in the pushed history. Whether to
+  purge them is the user's call.
