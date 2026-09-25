@@ -9,8 +9,8 @@ lesson worth keeping. Separate them.
 `projects/<Project>/attempts/<slug>/`** — superseded exports, probe scripts,
 parameter sweeps, a geometry approach under evaluation. Never the project root.
 
-`attempts/` is gitignored (`.gitignore` covers both `projects/*/attempts/` and
-the nested `projects/*/*/attempts/`); nothing in it is committed.
+`attempts/` is gitignored at any depth (`/projects/**/attempts/`, which also
+overrides the allowlist for `macros/**/*.py`); nothing in it is committed.
 
 ## Never delete on your own judgment
 

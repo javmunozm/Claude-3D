@@ -75,9 +75,9 @@ grep <Project> .gitignore
 
 Also read `.gitattributes` if it exists (LFS?).
 
-Large exports are usually gitignored here, so moving them is a plain filesystem
-operation with no history cost. If they *are* tracked, use `git mv` so history
-follows.
+Only each project's `README.md` and `macros/**/*.py` are tracked (see
+architecture.md, "What the repo tracks"); everything else in a project is a
+plain filesystem move. Use `git mv` for the tracked files so history follows.
 
 ### 3. Move
 
@@ -182,8 +182,9 @@ find projects/<Project> -name __pycache__ -type d -exec rm -rf {} +
 grep -rln "<OldFolderName>" --include=*.md --include=*.py --include=*.json .
 ```
 
-- `.gitignore` — every ignore path gains the version level, or large exports
-  start getting committed.
+- `.gitignore` — the `projects/` allowlist uses `**`, so it needs no edit for a
+  new version level. Check with `git status` that nothing outside
+  `README.md` / `macros/**/*.py` shows up.
 - `docs/projects.md` — collapse the version rows into **one project row**.
 - `CLAUDE.md` and `.claude/agents/*.md` — fix *path* references. Leave
   historical narrative alone: "the first BrokeFeetV1 handoff scaled to metres"

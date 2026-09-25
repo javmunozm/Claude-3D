@@ -211,6 +211,24 @@ geometry script (so the viewer never has stale geometry) and push shapes
 to a running `ocp-vscode` server over its `show()` API. The server and the
 script that sends geometry are separate processes — see [commands.md](commands.md).
 
+## What the repo tracks
+
+The repo preserves the **system**, not the data (user decision 2026-09-25).
+The system is the agents and skills that capture sketches, photos and scans
+and turn them into parts, together with the tools, the docs and the project
+conventions.
+
+| Tracked | Not tracked (stays on disk) |
+|---|---|
+| `.claude/` (agents, skills), `tools/`, `docs/`, `CLAUDE.md`, `.gitignore`, `revamp_suggestions.md` | `sources/`, including raw CT panes and multi-GB downloaded meshes |
+| each project's `README.md` (any depth) | `stl/`, `step/`, `renders/`, `vectors/`, `derived/`, `work/`, `blender/`, `docs/` data |
+| each project's `macros/**/*.py`, as the skeleton and reference layout | `attempts/`, `__pycache__/`, `*.npy`, `*.blend` |
+
+`.gitignore` enforces this with an allowlist for `projects/`. Never
+`git add -f` a source, an output or a render. A fresh clone holds the
+system and the project skeletons only. A macro that reads `sources/` or its
+project's `vectors/` runs only on a machine that still has those folders.
+
 ## Project conventions
 
 - Each project lives in its own named subfolder under `projects/`.
@@ -218,9 +236,9 @@ script that sends geometry are separate processes — see [commands.md](commands
   current status, and the location of the generated `.step` / `.stl` files.
 - Generated files never sit in the project (or version) root: meshes go to
   `stl/`, STEP to `step/`, PNGs to `renders/`. Macros create the folder before
-  writing, because `.gitignore` excludes some `stl/` and `step/` folders and a
-  fresh clone does not have them. Workflow folders keep their own contents
-  (`blender/`, `derived/`, `holes/`, `work/`, `vectors/`).
+  writing, because none of these folders is tracked and a fresh clone does
+  not have them. Workflow folders keep their own contents (`blender/`,
+  `derived/`, `holes/`, `work/`, `vectors/`).
 - **BrokeFeet is exempt.** It is one of the earliest projects, it is
   finished, and it keeps its own structure: for example
   `v2/BrokeFeetV2_pinned2.3mf` sits at the version root. Do not restructure

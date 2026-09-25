@@ -1,68 +1,30 @@
+# This repo preserves the SYSTEM: agents and skills (.claude/), tools/, docs/, CLAUDE.md, and a skeleton of
+# each project (its README.md and macros/**/*.py). Sources (photos, CT scans, sketches, downloaded meshes),
+# generated output (stl/, step/, renders/), vectors and working data stay on disk only (user decision
+# 2026-09-25). See docs/architecture.md, "What the repo tracks".
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 
-# Large generated CAD output — regenerate from macros/*.py
-# Track small exports (<5MB) by adding them explicitly with git add -f
-# Each project keeps its models in stl/ and step/ and its PNGs in renders/.
-projects/BrokeFeet/v0/stl/
-projects/BrokeFeet/v0/step/
-projects/BrokeFeet/v2/stl/
-projects/BrokeFeet/v2/step/
-# VitaGrip adapted Hori shells (110-134 MB each) — regenerate with
-# macros/widen_hori_grip.py from sources/psvitaGrip/grip2000/
-projects/VitaGrip-hori/stl/
-# VitaGrip1000 v2 exports over the 5 MB threshold above (7.9 MB STEP, 5.8 MB STL) — regenerate with
-# v2/macros/vita_grip.py
-projects/VitaGrip1000/v2/stl/VitaGrip1000.stl
-projects/VitaGrip1000/v2/step/VitaGrip1000.step
+# Inputs: never committed (includes raw, not de-identified CT panes and multi-GB downloaded meshes)
+/sources/
+/references/
 
-# VitaGripPS5: the built part (13 MB) and every DualSense derivative
-# (10-119 MB). All regenerable — prepare_dualsense.py -> strip_dualsense.py
-# -> build_socket_grip.py — from the scan in sources/VitaGripPs5/.
-projects/VitaGripPS5/stl/
-projects/VitaGripPS5/derived/*.stl
+# Projects: allowlist. Everything is ignored except each README.md and the macros' Python code.
+/projects/**
+!/projects/**/
+!/projects/**/README.md
+!/projects/**/macros/**/*.py
+# ...but never rejected attempts (deleted on explicit user rejection, lesson recorded in the README;
+# see docs/attempts.md)
+/projects/**/attempts/
 
-# Raw CT reference panes (146+15 MB); de-identified versions are tracked.
-# references/ became sources/: the old references/ paths stay so an old checkout is still covered.
-sources/brokenfeet/axiales/
-sources/brokenfeet/sagitales/
-sources/brokenfeet/axial/
-references/brokenfeet/axiales/
-references/brokenfeet/sagitales/
-references/brokenfeet/axial/
-# Raw proximal-axial screenshots (the de-identified copies in brokenfeet_deid_axial_proximal/ are tracked).
-# Untracked 2026-09-25 (user decision); they remain in the initial commit's history.
-sources/brokenfeet/axial proximal/
-
-# Downloaded third-party meshes and archives (4.2 GB, eleven files over GitHub's 100 MB limit).
-# Kept on disk only; photos, SVG and notes in these folders are tracked.
-sources/psvitaGrip/**/*.stl
-sources/psvitaGrip/**/*.obj
-sources/psvitaGrip/**/*.3mf
-sources/psvitaGrip/**/*.rar
-sources/VitaGripPs5/**/*.stl
-sources/VitaGripPs5/**/*.obj
-sources/VitaGripPs5/**/*.3mf
-sources/VitaGripPs5/**/*.rar
-
-# Large intermediate pipeline arrays (283 MB each)
+# Large working files, anywhere
 *.npy
-projects/BrokeFeet/v2/work/
-
-# Blender working files and sculpt exports
 *.blend
 *.blend1
-projects/BrokeFeet/v2/blender/*.stl
-
-# Renders (regenerable)
-renders/
-
-# Rejected attempts — never committed; deleted on explicit user rejection
-# after the lesson is recorded in the project README (see CLAUDE.md)
-projects/*/attempts/
-projects/*/*/attempts/
 
 # OS / editor
 .DS_Store
