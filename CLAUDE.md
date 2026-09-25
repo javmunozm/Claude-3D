@@ -9,8 +9,12 @@ object, with its own README.
 1. **Do what you are told.** Execute the task as given. Do not re-scope it, do not substitute a
    different task, do not refuse it because you predict it will find nothing. If it finds
    nothing, run it and report nothing.
-2. **No changes without permission.** Propose first; edit only after the user approves. This
-   covers production code, docs, and memory.
+2. **No changes without permission — except inside an approved build.** Propose first; edit
+   only after the user approves. This covers production code, docs, and memory.
+   Once the user approves a build or rebuild, its stages run without further prompts:
+   measurements, vectors, macros, exports, renders, and that project's own docs.
+   Still ask before: starting a new build, changing repo-wide files (`CLAUDE.md`, `docs/`,
+   `.claude/agents/`, skills, memory), deleting anything, or committing.
 3. **No claims without testing.** Do not assert a result, a mechanism, or a null from reasoning
    alone. Measure it, or say you have not measured it.
 4. **Do not fabricate tests to support a claim.** No test built to reach a conclusion already
@@ -23,7 +27,7 @@ user's decisions behind conditions of your own.
 
 Geometry that runs and exports without error can still be physically wrong —
 every defect found in this repo so far passed both of those tests. After any
-geometry change run `python tools\render_check.py projects\<Project>\<Part>.stl
+geometry change run `python tools\render_check.py projects\<Project>\stl\<Part>.stl
 --views front` and **look at the render**; before trusting any structural
 verdict, read its `tools/reconcile.py` block.
 

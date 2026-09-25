@@ -146,7 +146,10 @@ From the 2026-09-23 audit of 17 runs:
 
 ## Skills
 
-Invocable as slash commands:
+Invocable as slash commands. Each skill is a folder,
+`.claude/skills/<name>/SKILL.md`. A bare `.claude/skills/<name>.md` file is
+not loaded: `/verify` sat at `.claude/skills/verify.md` and never appeared in
+the skill list until it was moved (2026-09-24).
 
 | Skill | Use for |
 |-------|---------|

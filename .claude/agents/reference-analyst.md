@@ -139,7 +139,7 @@ cad-designer consumes your table directly and should not re-measure. In your han
 After cad-designer builds geometry, close the loop:
 
 ```
-python tools\render_check.py <Project>\<Part>.stl --views front --reference sources\<subject>\<photo>
+python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front --reference sources\<subject>\<photo>
 ```
 
 `Read` the resulting `_vs_reference.png` and describe the difference in plain words. Judge **form**, not dimensions: overall proportion, whether the part reads as solid or skeletal, where mass sits, and whether features swell or taper in the same direction as the reference.

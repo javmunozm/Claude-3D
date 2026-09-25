@@ -11,9 +11,12 @@ are subfolders inside it. A version is never a sibling of the project.
 ```
 projects/<Project>/
 ├── README.md     ← navigation: which version ships, which file to slice
-├── v0/           ← README.md, macros/, its own .stl/.step
-└── v2/           ← README.md, macros/, its own .stl/.step
+├── v0/           ← README.md, macros/, its own stl/, step/, renders/
+└── v2/           ← README.md, macros/, its own stl/, step/, renders/
 ```
+
+(BrokeFeet, the first nested project, predates the `stl/`/`step/`/`renders/`
+convention and is finished. It is exempt: see architecture.md.)
 
 ### Why
 
@@ -29,6 +32,15 @@ folders. That cost:
 - **An invisible dependency** — the V1 scripts import from `BrokeFeet/macros/`,
   so "delete the old folder" would have broken the shipping model.
 
+### Retiring a version
+
+**Never delete an old version as "the old one" without checking imports.**
+BrokeFeet's `v2/` imports directly from `v0/macros/` and does not run without
+it. Run the dependency check in step 1 below before removing anything.
+
+For discarding a single attempt rather than a whole version, see
+[attempts.md](attempts.md).
+
 ### Naming
 
 Version folders are named for **what they ship**, not when they started. Gaps
@@ -43,9 +55,13 @@ and the V2 sculpt/pin work happened in one folder and ship as V2. Inventing a
 Before moving anything, find out whether the versions are independent.
 
 ```
-grep -rn "sys.path\|parents\[\|Path(__file__)" projects/<Project>*/macros/*.py
-grep -rn "<OtherVersion>" projects/<Project>*/macros/*.py
+grep -rn --include=*.py "sys.path\|parents\[\|Path(__file__)" projects/<Project>*/macros/
+grep -rn --include=*.py "<OtherVersion>" projects/<Project>*/macros/
 ```
+
+`-r` on the folder, not `macros/*.py`: a split project keeps its stages in
+`macros/<pkg>/` (architecture.md, "Parametric model pattern"), and a
+`macros/*.py` glob misses them.
 
 If one version imports from the other, it is an **upstream dependency**, not
 dead weight. Record that in the root README so nobody deletes it.
@@ -54,9 +70,10 @@ dead weight. Record that in the root README so nobody deletes it.
 
 ```
 git ls-files projects/<Project>/ | wc -l
-cat .gitattributes 2>/dev/null   # LFS?
 grep <Project> .gitignore
 ```
+
+Also read `.gitattributes` if it exists (LFS?).
 
 Large exports are usually gitignored here, so moving them is a plain filesystem
 operation with no history cost. If they *are* tracked, use `git mv` so history
@@ -89,29 +106,64 @@ Remove-Item projects\<Project>_new
 This is the step that silently breaks everything, because the scripts still run
 — they just read from the wrong directory or fail to import.
 
-**a. Repo-root depth gains one level.** A macro at
-`projects/<P>/<vN>/macros/x.py` reaches the repo root at `parents[4]`, not
-`parents[2]`:
+**a. Repo-root anchors gain one level; project anchors do not.** Nesting
+inserts `<vN>/` between the project and `macros/`, so every `parents[N]`
+that reaches the **repo root** needs N + 1. An anchor that reaches the file's
+own project folder (`parents[1]` from `macros/x.py`, `parents[2]` from
+`macros/<pkg>/x.py`) now reaches the version folder, which is right, because
+outputs belong to the version. Leave those alone.
 
-```
-sed -i 's|parents\[2\]|parents[4]|' projects/<Project>/v*/macros/*.py
+| File | Repo root, flat project | Repo root, nested (`<vN>/`) |
+|---|---|---|
+| `macros/x.py` | `parents[3]` | `parents[4]` |
+| `macros/<pkg>/x.py` | `parents[4]` | `parents[5]` |
+| `macros/<pkg>/parts/x.py` | `parents[5]` | `parents[6]` |
+
+Do **not** use a blanket `sed` on `parents[...]`. The same number means the
+repo root in one file and the project folder in another (e.g.
+`SurgicalDrillGuide/macros/sdg_model/constants.py` uses `parents[2]` for the
+project folder). Anchors also come in other forms (`HERE.parents[2]` with
+`HERE` = the macros folder, `.parent.parent`, nested `os.path.dirname`), and
+they live outside `macros/` too (e.g. `SurgicalDrillGuide/docs/mechanism_sizing.py`).
+Edit each repo-root anchor by hand. Then list every anchor in the project:
+save this as a `.py` in the scratchpad and run it with
+`python "<abs path>" "<abs path to projects/<Project>>"`:
+
+```python
+import re, sys
+from pathlib import Path
+
+proj = Path(sys.argv[1]).resolve()
+anchor = re.compile(r"parents\[\d+\]|\.parent\.parent|os\.path\.dirname\(")
+direct = re.compile(r"Path\(__file__\)\.resolve\(\)\.parents\[(\d+)\]")
+n = 0
+for f in sorted(proj.rglob("*.py")):
+    if "attempts" in f.parts or "__pycache__" in f.parts:
+        continue
+    for i, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+        if not anchor.search(line):
+            continue
+        n += 1
+        m = direct.search(line)
+        if m:
+            d = f.resolve().parents[int(m.group(1))]
+            kind = ("repo root" if (d / "sources").is_dir() and (d / "projects").is_dir()
+                    else "project/version" if (d / "macros").is_dir() else "NEITHER")
+        else:
+            kind = "CHECK BY HAND"
+        print(f"{kind:16s} {f.relative_to(proj)}:{i}  {line.strip()[:90]}")
+print(f"{n} anchor line(s) under {proj}" if n else f"NO anchor lines found under {proj}: wrong path?")
 ```
 
-Verify against a real directory rather than trusting the arithmetic:
-
-```
-python -c "
-from pathlib import Path; import re
-for f in sorted(Path('projects/<Project>').rglob('macros/*.py')):
-    m = re.search(r'parents\[(\d+)\]', f.read_text(encoding='utf-8', errors='ignore'))
-    if m:
-        root = f.resolve().parents[int(m.group(1))]
-        print(('OK  ' if (root/'references').is_dir() else 'FAIL'), f, '->', root)
-"
-```
-
-Run that from the **repo root** — a relative `rglob` from inside the project
-matches nothing and prints a vacuous pass.
+The script resolves only the unambiguous form,
+`Path(__file__).resolve().parents[N]`. That line must read `repo root` or
+`project/version`, and be the folder the variable's name says it is;
+`NEITHER` is broken. Every other form prints as `CHECK BY HAND`: trace it
+yourself, and don't treat it as a pass. Many are harmless (a script adding
+its own folder to `sys.path`). The last line always gives the count. "NO
+anchor lines found" means the path argument is wrong, not that the project
+is clean. Tested 2026-09-25 on VitaGripPS5, BedLifter, SurgicalDrillGuide
+and VitaGrip-hori: every anchor form in them was listed.
 
 **b. Sibling references become nested ones.** `HERE.parent.parent / "BrokeFeet"
 / "macros"` must become `HERE.parent.parent / "v0" / "macros"`. Catch every
@@ -141,17 +193,18 @@ grep -rln "<OldFolderName>" --include=*.md --include=*.py --include=*.json .
 
 ### 6. Verify by running, not by reading
 
-The move is proven when a cross-version import actually resolves:
+The move is proven when a cross-version import actually resolves. Save this as
+a `.py` in the scratchpad (never `python -c`) and run it:
 
-```
-python -c "
-import sys; from pathlib import Path
-HERE = Path('projects/<Project>/v2/macros').resolve()
-sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent.parent/'v0'/'macros'))
+```python
+import sys
+from pathlib import Path
+HERE = Path(r"<abs path to projects/<Project>/v2/macros>")
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent.parent / "v0" / "macros"))
 import <upstream_module> as m
-print('imported from:', m.__file__)
-print('refs dir exists:', m.<SOME_DIR>.is_dir())
-"
+print("imported from:", m.__file__)
+print("refs dir exists:", m.<SOME_DIR>.is_dir())
 ```
 
 Then confirm ignores still bite (`git status --porcelain --ignored | grep -c '^!!'`)

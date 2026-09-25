@@ -74,6 +74,48 @@ stated error bar; **<0.85** shape reference only, never a dimension source.
 This test is only valid if the subject is genuinely symmetric. Say so when it
 isn't, and fall back to the checks below.
 
+**Sweep the threshold and use the lowest score.** A single threshold of 235
+can put a photo in the wrong band. Measured 2026-09-24:
+
+| Photo | 225 | 235 | 245 | Otsu |
+|-------|-----|-----|-----|------|
+| `054-1.webp` | 0.943 | 0.967 | 0.962 | 0.989 |
+| `020-1.webp` | 0.468 | 0.562 | 0.706 | 0.326 |
+
+At 225, `054-1` falls from "on-axis" to "measurable with error bar". Report
+every value and band on the lowest one. A spread wider than about 0.05 means
+the mask, not the camera, is setting the verdict. Crop or clean the background
+before you trust it.
+
+**The bands assume the object scores near 1.0 when on-axis. Check that
+first.** Render the model on-axis and run the same test on the render.
+`VitaGrip1000.stl` scores **0.911** with the camera exactly on-axis, so it can
+never reach the 0.95 band. When the model's own score is under 0.95, do not use
+the bands. Get the yaw verdict from the outline match in step 5.
+
+The mirror axis was measured and needs no search. Searching ±20 px of offset
+and ±6° of roll on both photos above found the best axis within 1 px of the
+bounding-box centre, with no roll, and did not raise the score.
+
+### 2b. Mirror-IoU cannot see pitch
+
+Left-right mirror symmetry responds to **yaw** (the camera swinging sideways).
+It does not respond to **pitch** (the camera rising or falling), because a
+symmetric object tilted toward or away from the camera stays left-right
+symmetric. `VitaGrip1000.stl` was rotated and projected orthographically:
+
+| yaw° / pitch° | 0/0 | 5/0 | 10/0 | 30/0 | 0/5 | 0/10 | 0/20 | 0/30 |
+|---|---|---|---|---|---|---|---|---|
+| mirror-IoU | 0.911 | 0.737 | 0.647 | 0.498 | 0.913 | 0.923 | 0.928 | 0.906 |
+| outline IoU vs on-axis render | 1.000 | 0.889 | 0.817 | 0.399 | 0.799 | 0.758 | 0.731 | 0.661 |
+| bbox height, % of on-axis | 100.0 | 100.0 | 100.0 | 100.0 | 100.1 | 100.4 | 99.9 | 96.3 |
+
+A photo taken 30° from above passes the mirror test at the same score as a
+straight-on one. The bounding box does not catch it either: height moves under
+0.5 % up to 20° of pitch. Only the whole-outline comparison responds to pitch,
+so a high mirror-IoU never clears pitch on its own. Clear it with step 5, or
+mark the vertical in-plane axis **"pitch not established"**.
+
 ### 3. Look for perspective evidence directly
 
 - **Converging parallels.** Edges parallel in reality converge in a perspective
@@ -117,6 +159,31 @@ changed silhouette aspect by only 0.2–0.4%. Projection type is a real but smal
 effect — **the viewing angle dominates**. A wrong view invalidates a comparison
 that a correct projection cannot rescue.
 
+**Find the view by matching outlines.** Rotate the model through a grid of yaw
+and pitch values, project it orthographically, and score each outline against
+the photo's mask. Centre both masks on their centroids and compare at the same
+scale. The best-scoring (yaw, pitch) is the photo's camera direction, and that
+score is the ceiling on how well the two can ever agree. The table in 2b shows
+the sensitivity on VitaGrip1000: 5° of yaw or pitch lowers the outline IoU to
+0.89 or 0.80. Projecting with numpy and filling with `cv2.fillPoly` is fast:
+11 poses of `VitaGrip1000.stl` took 4.0 s in total, including Python startup and
+the STL load. That is fast enough for a 5° grid over ±30° (169 poses). Pyvista
+rendering at 1.4–12.5 s per view is not.
+
+```python
+R = trimesh.transformations.euler_matrix(np.radians(pitch), np.radians(yaw), 0, "sxyz")[:3, :3]
+xy = ((m.vertices - m.centroid) @ R.T)[:, :2]            # orthographic, view along -Z
+pts = np.rint((xy - off) * scale).astype(np.int32); pts[:, 1] = H - 1 - pts[:, 1]
+img = np.zeros((H, W), np.uint8); cv2.fillPoly(img, list(pts[m.faces]), 255)
+```
+
+The photo must show the same object as the model. A photo of the grip mounted
+on its console is compared against a render of the grip and console together,
+or it is not compared by outline at all. Grid pose search against a real photo
+has **not yet been run** in this repo. Before you trust it, test it on
+`054-1.webp`, which should come out near `front`, and on `020-1.webp`, which
+should come out three-quarter. Report the result either way.
+
 ## Reporting format
 
 ```
@@ -127,7 +194,9 @@ that a correct projection cannot rescue.
 
 | Test | Result | Reading |
 |------|--------|---------|
-| Mirror-IoU | 0.967 | near on-axis |
+| Mirror-IoU (225/235/245/Otsu, lowest used) | 0.943–0.989 | near on-axis in yaw; pitch not established |
+| Model's own on-axis mirror-IoU | <value> | bands usable / not usable |
+| Best outline match (yaw, pitch) | <°, °, IoU> | <view name> |
 | Converging parallels | none detected | low perspective |
 | Visible faces | front only | on-axis |
 

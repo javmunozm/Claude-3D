@@ -49,7 +49,7 @@ Never assume X is width. Derive it from a known dimension:
 
 ```python
 import trimesh, numpy as np
-m = trimesh.load("projects/<Project>/<Part>.stl")
+m = trimesh.load("projects/<Project>/stl/<Part>.stl")
 b = m.bounds
 print("extent:", np.round(b[1] - b[0], 1))
 ```
@@ -117,7 +117,7 @@ Pick the measurement that resolves the specific doubt:
 When you do render, choose deliberately and say why:
 
 ```
-python tools/render_check.py projects/<Project>/<Part>.stl --views right
+python tools/render_check.py projects/<Project>/stl/<Part>.stl --views right
 ```
 
 `render_check.py` is orthographic. Use `right`/`left` for depth (Z), `front`/`back`

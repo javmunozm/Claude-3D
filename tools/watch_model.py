@@ -80,7 +80,7 @@ WATCH = [
     MACROS / "build_socket_grip.py",
     MACROS / "strip_dualsense.py",
     ROOT / "projects" / "VitaGripPS5" / "derived" / "dualsense_stripped.stl",
-    ROOT / "projects" / "VitaGripPS5" / "console_solid.stl",
+    ROOT / "projects" / "VitaGripPS5" / "stl" / "console_solid.stl",
 ]
 
 

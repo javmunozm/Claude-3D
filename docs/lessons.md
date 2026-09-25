@@ -54,8 +54,11 @@ suspect the anchor, not the geometry.
 
 ### Why nothing caught it
 
-`profile_gate.py` exists specifically to catch shape errors a bounding box
-misses, and it is a good gate. But it imports its reference from
+`profile_gate.py` was written specifically to catch shape errors a bounding
+box misses, and it was a good gate. (It is not in the repo as of 2026-09-25
+and never appeared in git history. VitaGripPS5 is due for a redo, so rebuild
+it then. This entry, "A gate can be wrong in the same ways a build can" and
+"Correct dimensions do not make a correct shape" describe it as it was.) But it imports its reference from
 `tools/extract_profile.py`, which is handed `--width 237.9` **on the command
 line**. The gate and the build consume the same unverified anchor, so the gate
 confirms the build agrees with itself.
@@ -277,7 +280,7 @@ made that defect *legible* rather than hiding inside a 6.5 % global error.
 
 ## `is_watertight` is not solidity — a cutter passed it with fifty tunnels
 
-`projects/VitaGripPS5/console_solid.stl` is the boolean operand that carves the
+`projects/VitaGripPS5/stl/console_solid.stl` is the boolean operand that carves the
 Vita's socket. It reports `is_watertight True`. Measured further:
 
 ```

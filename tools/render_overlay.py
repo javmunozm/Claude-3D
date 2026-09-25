@@ -267,7 +267,9 @@ def main():
         for p in (body, cutter):
             if not p.exists():
                 sys.exit("missing %s" % p)
-        outdir = pathlib.Path(a.outdir) if a.outdir else body.parent / "overlay"
+        # Models sit in stl/ or step/; PNGs go to the sibling renders/.
+        base = body.parent.parent if body.parent.name in ("stl", "step") else body.parent
+        outdir = pathlib.Path(a.outdir) if a.outdir else base / "renders" / "overlay"
         prefix = body.stem + "__overlay"
     if a.prefix:
         prefix = a.prefix

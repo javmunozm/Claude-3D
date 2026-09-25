@@ -146,7 +146,7 @@ if __name__ == "__main__":
     from pathlib import Path
 
     p = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
-        "D:/CAD/Claude-Projects/references/psvitaGrip/Vita 1000/psvitaManualJoin.3mf")
+        "D:/CAD/Claude-Projects/sources/psvitaGrip/Vita 1000/psvitaManualJoin.3mf")
     print(f"Reading {p.name} ...")
     pieces = read_3mf(p)
     print(f"\n{len(pieces)} placed mesh(es):")

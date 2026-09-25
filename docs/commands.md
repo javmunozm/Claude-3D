@@ -15,7 +15,7 @@ See [system.md](system.md) for the full package list and versions.
 ## Generate / regenerate CAD output
 
 Run the project's geometry script directly with Python. This (re)writes the
-`.step` and `.stl` files into the project's root folder.
+`.step` and `.stl` files into the project's `step/` and `stl/` folders.
 
 ```
 python "D:\CAD\Claude-Projects\projects\BedLifter\macros\bed_lifter_b123d.py"
@@ -49,28 +49,44 @@ produce a physically wrong part. Every geometry defect found in this repo so
 far passed both of those tests — a solid slab across a span that should have
 been open, an export of two disconnected bodies, and two halves of a split
 part regenerated against different split planes. Bounding-box checks and
-wireframe views missed all three; a **shaded** render caught them.
+wireframe views missed all three; a solid (filled) render caught them.
 
 ```
 # Topology gate only (fast, no rendering)
-python tools\render_check.py projects\BedLifter\MiddleLifter.stl
+python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl
 
-# Topology gate + shaded renders from standard cameras
-python tools\render_check.py projects\BedLifter\MiddleLifter.stl --views front back
+# Topology gate + flat (unlit, single-colour) renders from standard cameras
+python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl --views front back
 ```
 
 `body_count == 1` and `is_watertight` are hard gates — failing either means
 the part is not printable, however correct its dimensions. Pass
 `--expect-bodies N` only for parts that are deliberately multi-piece.
 
-Renders are written next to the STL. **Open them and look.** A render nobody
+Renders are written to the project's `renders/` folder (the sibling of `stl/`;
+override with `--out-dir`). **Open them and look.** A render nobody
 inspects is worse than no render, because it creates false confidence. Never
 render wireframe — it hides exactly the bugs this catches.
+
+`render_check.py` draws every triangle in one flat colour with no light, so
+its images are silhouettes. A 40 mm-deep handle and a 3 mm plate look the
+same. To judge **form** (depth, cross-section, channels), use the lit
+renderer:
+
+```
+python tools\render_views.py projects\VitaGripPS5\stl\VitaGripPS5.stl
+python tools\render_views.py projects\BoxTest\stl\BoxTest.stl --views front back left right
+```
+
+It renders the full turntable by default, one PNG per view plus a
+`_contact_sheet.png`. Output goes to the sibling `renders/` (override with
+`--outdir`; note the spelling differs from `render_check.py`'s
+`--out-dir`). Other options: `--size`, `--no-shadow`, `--prefix`.
 
 ### Compare against a reference photo (required when a reference exists)
 
 ```
-python tools\render_check.py projects\BedLifter\MiddleLifter.stl --views front ^
+python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl --views front ^
     --reference sources\psvitaGrip\054-1.webp
 ```
 
@@ -217,10 +233,10 @@ while leaving clean regions untouched.
 import pymeshfix
 import pyvista as pv
 
-mesh = pv.read("projects/BedLifter/MiddleLifter.stl")
+mesh = pv.read("projects/BedLifter/stl/MiddleLifter.stl")
 fixer = pymeshfix.MeshFix(mesh)
 fixer.repair(verbose=True)
-fixer.mesh.save("projects/BedLifter/MiddleLifter_repaired.stl")
+fixer.mesh.save("projects/BedLifter/stl/MiddleLifter_repaired.stl")
 ```
 
 Use this for meshes that fail the watertight gate due to non-manifold edges
@@ -241,7 +257,8 @@ ms.save_current_mesh("output.stl")
 ## Render with Blender (headless)
 
 Blender 5.2 produces renders with correct occlusion, directional lighting,
-and depth — unlike the matplotlib fallback in `render_check.py`.
+and depth — unlike `render_check.py`, whose only renderer is flat, unlit
+matplotlib.
 
 ```
 blender --background --factory-startup --python render_script.py -- input.stl output.png
@@ -258,7 +275,7 @@ for debugging mesh issues before running the full verification gate.
 ```python
 import pyvista as pv
 
-mesh = pv.read("projects/BedLifter/MiddleLifter.stl")
+mesh = pv.read("projects/BedLifter/stl/MiddleLifter.stl")
 print(f"Points: {mesh.n_points}, Faces: {mesh.n_faces}")
 print(f"Bounds: {mesh.bounds}")
 print(f"Volume: {mesh.volume:.2f} mm³")
@@ -287,8 +304,8 @@ automatically — no manual re-run between edits. It is specific to
 VitaGripPS5's socket cut: it imports `socket_placement.pose()` /
 `load_cutter()` directly, so what is on screen is guaranteed to be the same
 geometry the builder would produce, not a second implementation that can
-drift from it (see [docs/lessons.md](lessons.md), "the gate must share the
-datum it tests").
+drift from it. See [docs/lessons.md](lessons.md), the first entry, "Why nothing
+caught it": a gate must share the build's placement.
 
 ```
 python tools\watch_model.py                       # opens on the boolean CUT result

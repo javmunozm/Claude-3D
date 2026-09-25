@@ -56,11 +56,11 @@ The calcaneus and cuboid interiors were measured at **intensity 82–103** with 
 
 ## How to work
 
-1. **Measure before proposing.** Sample actual voxel intensities in the region you intend to fill, from the de-identified panes in `sources/brokenfeet_deid_axial/` and `..._proximal/`. State the numbers.
+1. **Measure before proposing.** Sample actual voxel intensities in the region you intend to fill, from the de-identified panes in `sources/brokenfeet/brokenfeet_deid_axial/` and `sources/brokenfeet/brokenfeet_deid_axial_proximal/`. State the numbers.
 2. **Localise.** A global parameter change is almost always wrong here — it trades one region's sponge for another region's fused joint. Prefer per-bone or per-region treatment.
 3. **Predict the cost.** Before running, say which joints are at risk and what body count you expect.
 4. **Verify with the project's own gates**, and read them in this order:
-   - `python tools\render_check.py BrokeFeet\BrokeFeet_axial_raw.stl --views iso right top`
+   - `python tools\render_check.py projects\BrokeFeet\v0\stl\BrokeFeet_axial_raw.stl --views iso right top`
    - body_count must stay **1**, watertight must stay **True**
    - `python BrokeFeet\macros\crossvalidate.py` — adduction and plantar RMS must not degrade (currently 1.34 mm / 0.30 mm)
    - separately confirm the **number of distinguishable bodies before bridging** has not dropped: that is the joint-preservation metric, and it is the one a good sponge number can hide.

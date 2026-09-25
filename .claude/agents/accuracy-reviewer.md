@@ -120,7 +120,7 @@ When reviewing a set of SVGs for the same object (front, back, top, bottom, left
 ## Scope: review the vectors, do not re-measure the photos
 
 Your inputs are the vector files, the source images, and reference-analyst's
-measurement table (`docs/MEASUREMENTS.md` or the project README). Check the
+measurement table (`projects/<Project>/docs/MEASUREMENTS.md` or the project README). Check the
 vectors against those inputs: overlay each ring on its source image, compare its
 dimensions with the table, and check that the ring is valid.
 

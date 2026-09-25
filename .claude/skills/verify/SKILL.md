@@ -1,7 +1,7 @@
 ---
 name: verify
-description: Run the five-gate geometry verification for a project part. Usage: /verify <Project>/<Part>.stl [--reference <path>]
-user_invocable: true
+description: Run the five-gate geometry verification for a project part. Usage: /verify <Project>/stl/<Part>.stl [--reference <path>]
+user-invocable: true
 ---
 
 # Five-gate geometry verification
@@ -11,12 +11,13 @@ the part as verified until every applicable gate has passed.
 
 ## Parse the argument
 
-The user passes `<Project>/<Part>.stl` — resolve it relative to `projects/`.
-If the user passes just a project name, glob `projects/<Project>/*.stl` and
-list the available STLs; ask which one to verify.
+The user passes `<Project>/stl/<Part>.stl` — resolve it relative to `projects/`.
+If the user passes just a project name, glob `projects/<Project>/stl/*.stl` (and
+`projects/<Project>/v*/stl/*.stl` for versioned projects) and list the
+available STLs; ask which one to verify. Renders go to the sibling `renders/`.
 
 If `--reference <path>` is passed, use it for gate (e). Otherwise check
-`references/` for a directory matching the project subject and offer any
+`sources/` for a directory matching the project subject and offer any
 images found there.
 
 ## Gate sequence
@@ -36,7 +37,7 @@ import and silently overwrite files.
 ### (b) Topology gate
 
 ```
-python tools/render_check.py projects/<Project>/<Part>.stl
+python tools/render_check.py projects/<Project>/stl/<Part>.stl
 ```
 
 **Hard gates:** `body_count == 1` and `is_watertight`. If either fails, stop
@@ -46,7 +47,7 @@ legitimately multi-piece, the user must pass `--expect-bodies N`.
 ### (c) Shaded render
 
 ```
-python tools/render_check.py projects/<Project>/<Part>.stl --views front back
+python tools/render_check.py projects/<Project>/stl/<Part>.stl --views front back
 ```
 
 After rendering, **read each PNG** with the Read tool and describe in your
@@ -59,6 +60,15 @@ If you cannot read images, hand the render paths to the user and ask them to
 confirm: "Please open `<path>` and confirm the shape matches intent."
 
 Never render wireframe. Never skip reading the render.
+
+**A render answers only about the axes in its image plane.** Renders are
+orthographic, but that does not make every view informative: an `iso` view
+compresses depth so severely that a 40x35 mm volumetric handle read as a flat
+slab during VitaGrip review — a wrong verdict that would have triggered a
+rebuild of correct geometry. Choose the view that contains the axis in doubt
+(`right`/`left` for depth, `front`/`back` for the X-Y silhouette), and when the
+question is dimensional rather than visual, hand it to `form-auditor` for
+cross-sections instead of judging by eye.
 
 ### (d) Mating check (multi-piece or mating parts only)
 
@@ -75,7 +85,7 @@ constraint — not a constant in the script or a claim in the README.
 ### (e) Whole-form comparison (when a reference exists)
 
 ```
-python tools/render_check.py projects/<Project>/<Part>.stl --views front --reference <reference_path>
+python tools/render_check.py projects/<Project>/stl/<Part>.stl --views front --reference <reference_path>
 ```
 
 Read the `_vs_reference.png` and answer one question:
@@ -91,12 +101,20 @@ were obviously different objects. Only the image is evidence.
 
 If no reference exists, say so plainly rather than implying visual confirmation.
 
+**Qualify the reference before comparing to it.** Run `perspective-checker` (or
+its mirror-IoU test) on the photo first. A photo shot down one axis is blind to
+that axis: VitaGrip's `054-1.webp` scores 0.967 (on-axis, usable for X-Y) while
+`020-1.webp` scores 0.562 (three-quarter, shape reference only). A view that
+cannot see a feature is not evidence the feature is correct — record it as
+"blind", never as "matches". Also confirm the photo shows the same object
+variant as the model before treating a difference as a defect.
+
 ## Report format
 
 After all gates, report:
 
 ```
-Verification: projects/<Project>/<Part>.stl
+Verification: projects/<Project>/stl/<Part>.stl
   (a) Regenerate:   PASS / FAIL
   (b) Topology:     PASS / FAIL  [body_count, watertight, volume]
   (c) Shaded render: PASS / FAIL  [what you observed]

@@ -19,7 +19,7 @@ Environment, dependencies, and conventions shared by every project in this index
 | [trimesh](https://trimesh.org/) | 4.12.2 | Mesh loading, topology checks, ray-casting, boolean operations |
 | [manifold3d](https://github.com/elalish/manifold) | 3.5.2 | Guaranteed-manifold boolean operations and simplification |
 | [pymeshfix](https://github.com/pyvista/pymeshfix) | 0.18.1 | Targeted mesh repair — fixes non-manifold edges and singularities without touching clean regions |
-| [pymeshlab](https://pymeshlab.readthedocs.io/) | 2025.7 | Filter suite — Screened Poisson reconstruction, quadric decimation, curvature-aware smoothing (58 plugins) |
+| [pymeshlab](https://pymeshlab.readthedocs.io/) | 2025.7.post1 | Filter suite — Screened Poisson reconstruction, quadric decimation, curvature-aware smoothing (58 plugins) |
 
 ### Rendering and visualization
 
@@ -171,22 +171,33 @@ output — safe to delete and rebuild from the `.py` source at any time.
 Claude-Projects/
 ├── CLAUDE.md              Root index — projects table + links to docs/
 ├── docs/                  Index-wide documentation (this folder)
+│   ├── agents.md          The nine subagents, handoff order, /verify, briefing
 │   ├── architecture.md    How a project's geometry/build pipeline fits together
-│   ├── system.md          This file — environment, deps, conventions
+│   ├── attempts.md        attempts/ folders and the record-then-delete procedure
 │   ├── commands.md        Standard commands for building/viewing/checking
+│   ├── lessons.md         Post-mortems with their numbers
 │   ├── projects.md        Index of all projects with description and status
+│   ├── system.md          This file — environment, deps, conventions
 │   └── versioning.md      Adding a version to a project without cluttering projects/
-├── tools/                 Shared verification tooling
-│   ├── render_check.py    Topology gate + shaded renders + reference comparison
+├── tools/                 Shared tooling
+│   ├── render_check.py    Topology gate + flat (unlit) renders + reference comparison
+│   ├── render_views.py    Lit perimeter views with depth, for judging FORM
+│   ├── render_overlay.py  Draws a boolean's operands in pose, before it runs
+│   ├── place_cutter.py    Pose a boolean's cutter by eye, then print the numbers
+│   ├── watch_model.py     Window that repaints when the model changes
 │   ├── reconcile.py       Detects drift between structural checks and geometry
-│   └── read_3mf.py        Read meshes from 3MF archives
-├── references/            Reference images/specs per subject, with SOURCES.md
+│   ├── validate_envelope.py  Gates a downloaded mesh against a known spec envelope
+│   ├── extract_profile.py Measures a grip's lobe profile from a rear-view photo
+│   ├── mesh_to_step.py    Triangle mesh -> STEP solid from the mesh's own topology
+│   └── read_3mf.py        Streaming reader for large 3MF archives
+├── sources/               Input images/specs/scans per subject, with SOURCES.md
 │   └── <subject>/         One folder per reference subject
 └── projects/              All CAD projects live here
     └── <ProjectName>/
         ├── README.md      Project-specific goal, status, dimensions
-        ├── macros/        build123d Python scripts
-        └── *.step / *.stl Generated output
+        ├── macros/        Main script(s); stage files in a project-named package
+        ├── stl/  step/    Generated meshes / STEP solids
+        └── renders/       Generated PNGs
 ```
 
 ## Disk constraints

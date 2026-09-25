@@ -12,16 +12,18 @@ Catches the two classes of modelling bug that dimension checks miss:
 Both classes really shipped in this repo. VitaGrip revision 2 built a bridge
 across ~97% of the grip's width and revision 3 exported two disconnected
 bodies; neither was visible in a wireframe view or in any bounding-box check.
-Only a SHADED render made them obvious. That is why this script renders
-shaded by default and refuses to render wireframe.
+Only a SOLID (filled) render made them obvious. That is why this script
+renders filled faces and refuses to render wireframe. The faces are one flat
+colour with no light, so the images are silhouettes: use
+tools/render_views.py (lit) to judge depth and cross-section.
 
 Usage
 -----
     # Topology gate only (fast, no display needed)
-    python tools/render_check.py VitaGrip/VitaGrip.stl
+    python tools/render_check.py projects/BedLifter/stl/MiddleLifter.stl
 
-    # Topology gate + shaded renders from standard cameras
-    python tools/render_check.py VitaGrip/VitaGrip.stl --views front back
+    # Topology gate + flat (unlit) renders from standard cameras
+    python tools/render_check.py projects/BedLifter/stl/MiddleLifter.stl --views front back
 
     # Expect a multi-piece file (suppresses the single-body failure)
     python tools/render_check.py part.stl --expect-bodies 2
@@ -84,14 +86,45 @@ def check_topology(mesh, expect_bodies=1):
     """
     results = []
 
-    n_bodies = mesh.body_count
-    ok_bodies = n_bodies == expect_bodies
+    # SEPARATE SOLIDS FROM INTERNAL VOIDS.
+    #
+    # mesh.body_count counts SURFACE COMPONENTS, and a hollow part has one
+    # component per cavity in addition to its outer surface. Those cavity
+    # surfaces face inward, so they carry NEGATIVE signed volume - which is
+    # how they are told apart from genuinely disjoint solids.
+    #
+    # Reporting them as "not printable as one piece" is a false alarm, and a
+    # false alarm on a message that severe is worse than no gate: VitaGrip1000
+    # v2 is a 3 mm shell with two vented handle cavities and reported 3 bodies
+    # while being a single, perfectly printable solid.
+    #
+    # A cavity is still worth REPORTING - an unvented one slices as solid -
+    # but proving reachability is the flood-fill gate's job, not this one's.
+    parts = mesh.split(only_watertight=False)
+    if len(parts) <= 1:
+        n_solid, n_void = len(parts), 0
+    else:
+        vols = [q.volume for q in parts]
+        n_solid = sum(1 for v in vols if v > 0)
+        n_void = sum(1 for v in vols if v <= 0)
+
+    ok_bodies = n_solid == expect_bodies
+    detail = f"{n_solid} (expected {expect_bodies})"
+    if n_void:
+        detail += f" + {n_void} internal void{'s' if n_void > 1 else ''}"
     results.append((
         ok_bodies,
         "body_count",
-        f"{n_bodies} (expected {expect_bodies})",
+        detail,
         "" if ok_bodies else "part is not a single connected solid — not printable as one piece",
     ))
+    if n_void:
+        results.append((
+            True,
+            "internal_voids",
+            f"{n_void} cavity surface{'s' if n_void > 1 else ''}",
+            "",
+        ))
 
     ok_wt = bool(mesh.is_watertight)
     results.append((
@@ -168,6 +201,21 @@ def render_shaded(mesh, out_path, view="front", size=900):
     except Exception:
         pass
 
+    # Orthographic, not perspective. matplotlib's 3D default is a perspective
+    # camera at focal_length=1, which converges straight edges and foreshortens
+    # depth — a render compared against a photo should be a projection, not a
+    # lens. Measured effect on silhouette aspect is small (VitaGrip: 0.4% front,
+    # 0.2% iso), so this fixes correctness, not a large visible error.
+    #
+    # It is NOT a substitute for choosing the right view. A 40x35 mm volumetric
+    # handle still reads as a flat slab from `iso` under BOTH projections; only
+    # `right`/`left` showed its true depth. When depth is the question, render
+    # the view whose image plane contains the depth axis.
+    try:
+        ax.set_proj_type("ortho")
+    except Exception:
+        pass
+
     ax.view_init(elev=elev, azim=azim)
     ax.set_axis_off()
     fig.tight_layout(pad=0)
@@ -224,14 +272,22 @@ def compare_to_reference(render_path, reference_path, out_path):
     return p_ren, p_ref, out_path, fill(m_ren), fill(m_ref)
 
 
+def renders_dir(mesh_path: pathlib.Path) -> pathlib.Path:
+    """Projects keep models in stl/ and step/ and PNGs in the sibling renders/."""
+    base = mesh_path.parent
+    if base.name in ("stl", "step"):
+        base = base.parent
+    return base / "renders"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stl", help="path to the STL to check")
     ap.add_argument("--views", nargs="*", default=[],
-                    help=f"shaded views to render: {' '.join(sorted(VIEWS))}")
+                    help=f"flat (unlit) views to render: {' '.join(sorted(VIEWS))}")
     ap.add_argument("--out-dir", default=None,
-                    help="where to write renders (default: alongside the STL)")
+                    help="where to write renders (default: the project's renders/)")
     ap.add_argument("--expect-bodies", type=int, default=1,
                     help="expected body_count (default 1; raise for multi-piece files)")
     ap.add_argument("--reference", default=None,
@@ -262,7 +318,7 @@ def main():
     print()
 
     if args.views:
-        out_dir = pathlib.Path(args.out_dir) if args.out_dir else stl_path.parent
+        out_dir = pathlib.Path(args.out_dir) if args.out_dir else renders_dir(stl_path)
         out_dir.mkdir(parents=True, exist_ok=True)
         for view in args.views:
             out = out_dir / f"{stl_path.stem}_{view}.png"
