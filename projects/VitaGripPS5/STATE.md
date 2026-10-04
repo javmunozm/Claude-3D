@@ -11,7 +11,7 @@ Keep this file under about 150 lines. Agents read it instead of the README. Hist
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
 - **Working preview:** none; the bake is current.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).
-- **Method:** a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep. Fillets cannot be made on this mesh. Whether to rebuild as B-rep (v2) is decided after the print.
+- **Method:** r16 is a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep; fillets cannot be made on it. **The user decided on 2026-10-04 to rebuild the case as a CAD (B-rep) design** in `v2/` (`docs/versioning.md`); a spike runs first (`v2/audit/spike/spike_report.md`). r16 stays the printable bake until a v2 replaces it.
 - **The part:** X width 220.08; Y fore-aft from the handle tips at -68.0025 to the rear at +78.550; Z up, pocket floor -8.80, flat top 11.40. 137 216 faces, watertight, 1 body, genus 2, volume 266 520.9 mm3.
 
 ## Open entries
@@ -74,7 +74,7 @@ Not swept in r16: D38, the fillet families D27/D28/D31/D32, the groove at y -9.2
 - **Locating a user mark:** ray-cast through the red pixels with the render's camera, after validating the camera by silhouette IoU. Use VTK's OBBTree: the pure-Python trimesh ray backend runs out of memory on large batches.
 
 ## Rounds
-List price of the agent runs only (the orchestrator is not included); measured 2026-10-04 with `system_improvement/drafts/tools/maxturns_review.py`. Rounds r10-r16 with the orchestrator: $118.14.
+List price of the agent runs only (the orchestrator is not included); measured 2026-10-04 with `tools/token_audit/maxturns_review.py`. Rounds r10-r16 with the orchestrator: $118.14.
 
 | Round | Date | Agents (tool calls) | List price | Result |
 |-------|------|---------------------|------------|--------|
@@ -89,6 +89,6 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 ## Decisions pending for the user
 1. **The first print.** Check: snap retention and insertion (insertion safety factor 2.0; `audit/r11/lip_sizing_r11.md`); shoulder-button reach with a real finger (model ii 91 %, model i 77-80 %); the console's fit in the pocket and the lip clearance (CLEAR_Z 0.2); the handle ends at y -68 in the hand.
 2. **Print orientation:** the README does not state one; the r16 slice test was in Z only.
-3. **After the print:** keep r16 and fix only what the print shows, or approve the B-rep v2 spike (`system_improvement/06_cad_method.md`).
+3. **Method, decided 2026-10-04:** rebuild as B-rep. Next: the spike's go / no-go for a full v2 (`docs/cad_method.md`, "VitaGripPS5 v2 spike"; report `v2/audit/spike/spike_report.md`).
 4. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
 5. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).

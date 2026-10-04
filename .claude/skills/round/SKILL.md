@@ -56,7 +56,7 @@ This step needs the user's approval of the register.
 3. If the method-change trigger is met, say **METHOD REVIEW** and stop the
    cycle. The trigger: 3 or more new regression IDs (the auditor sorts
    `form_sweep.py`'s NEW/WORSE components into IDs), or a region in its third
-   consecutive register. See `system_improvement/06_cad_method.md`.
+   consecutive register. See `docs/cad_method.md`.
 4. Update STATE.md:
    - the open entries;
    - the preview path;

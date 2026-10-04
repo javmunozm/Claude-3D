@@ -134,7 +134,7 @@ behind, the corner views the user marks).
   agent length and context: VitaGripPS5 r14 designer 260 tool calls / 505k
   tokens, r15 designer 298 calls / 522k tokens / about 9 h wall-clock, r16
   designer (one switch, short brief) 36 calls / 114k tokens. Images were about
-  4 % of the cost of the largest run (`system_improvement/03_token_economics.md`).
+  4 % of the cost of the largest run (measured 2026-10-03).
 - **Every fix-pass brief states a ceiling in builds and in tool calls** (the
   r14-r16 briefs named "stop at a valid mesh" but no call ceiling). Suggested:
   4 builds, and the harness-count ceiling from "Briefing agents" below. At the
@@ -182,8 +182,8 @@ From the 2026-09-23 audit of 17 runs:
 
 Measured on the 36 agent runs made after the budget rules were committed
 (2026-09-24): the 19 briefs that named a number had a median of 42 tool calls
-and $1.76 mean list price; the 17 without one had a median of 71 and $5.78.
-Details: `system_improvement/02_briefing.md`.
+and $1.76 mean list price; the 17 without one had a median of 71 and $5.78
+(`tools/token_audit/agent_behavior_check.py runs`).
 
 ### Required fields
 

@@ -48,6 +48,8 @@ photo — see [docs/agents.md](docs/agents.md).
 | [docs/versioning.md](docs/versioning.md) | Nesting a second generation inside a project, the move procedure, the path constants it breaks, retiring a version |
 | [docs/attempts.md](docs/attempts.md) | `attempts/` folders, and the record-then-delete procedure when the user rejects work |
 | [docs/projects.md](docs/projects.md) | Index of all projects with description and status |
+| [docs/workflow.md](docs/workflow.md) | Roles, a session, a project from intake to print, the bounded fix-round cycle, feedback on renders |
+| [docs/cad_method.md](docs/cad_method.md) | B-rep by default; bringing a scanned shape into B-rep; CAD tools compared; the stage cache |
 | [docs/lessons.md](docs/lessons.md) | Post-mortems with their numbers — one entry per incident, read by the agents each concerns |
 
 Agents are briefed from `docs/templates/` with numeric ceilings; see `docs/workflow.md`.

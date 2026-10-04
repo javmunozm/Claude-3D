@@ -1,9 +1,7 @@
 # Workflow
 
-*In force from 2026-10-04 (Phase 1 of `system_improvement/09_implementation_plan.md`).
-Numbers come from the transcripts of 29 sessions and 60 agent runs, measured
-2026-10-03. Parts marked "Phase 3" or "Phase 4" (`STATE.md`, the skills, the
-sweep tool, review renders) are not built yet.*
+*In force from 2026-10-04. Numbers come from the transcripts of 29 sessions
+and 60 agent runs, measured 2026-10-03 (`tools/token_audit/`).*
 
 ## Roles
 
@@ -23,13 +21,12 @@ The user approves:
 
 The orchestrator has no definition file today. Its rules are spread over
 `CLAUDE.md`, `docs/agents.md` and the memory. This document, the brief
-templates (`docs/templates/`) and the `/round` skill (Phase 3; drafted in
-`system_improvement/drafts/skills/round/`) are its definition.
+templates (`docs/templates/`) and the `/round` skill are its definition.
 
 ## A session
 
 1. **Start.** Begin a fresh session (or `/clear`). Read
-   `projects/<Project>/STATE.md` (Phase 3; until it exists, the project's
+   `projects/<Project>/STATE.md` (if a project has none yet, its
    `NEXT_SESSION.md`) and nothing else whole. Say the plan in three
    lines, and ask if it starts a build or a round.
 2. **During.**
@@ -38,8 +35,7 @@ templates (`docs/templates/`) and the `/round` skill (Phase 3; drafted in
    - The orchestrator reads summary blocks, not whole reports.
    - Images only when a number cannot answer, as one region sheet per question
      (`tools/render_roi.py`).
-3. **End.** Run `/session-end <Project>` (Phase 3; drafted in
-   `system_improvement/drafts/skills/session-end/`). It updates `STATE.md` and
+3. **End.** Run `/session-end <Project>`. It updates `STATE.md` and
    `NEXT_SESSION.md`, records the cost, lists the uncommitted system files, and
    proposes memory edits for approval.
 4. **A usage limit stops a run.** The deliverable and `handoff.md` on disk let
@@ -59,7 +55,7 @@ context makes both cheap.
    vector-tracer and accuracy-reviewer when an outline matters (a pocket, a
    profile).
 3. **Method gate (new).** Choose the representation before any geometry, and
-   record the choice in the README (`system_improvement/06_cad_method.md`):
+   record the choice in the README (`docs/cad_method.md`):
    - B-rep in build123d by default;
    - a mesh pipeline only when the part *is* a scan or a sculpt (BrokeFeet).
 4. **Build.** cad-designer, from a brief with ceilings. Stage modules
@@ -68,10 +64,10 @@ context makes both cheap.
 5. **Verify.**
    - The hard gates (`/verify` a–b) and one region render.
    - A form-auditor register of the whole part.
-   - Review renders for the user (`system_improvement/05_verification.md`).
+   - Review renders for the user (`tools/render_views.py`, at the cameras in `STATE.md`).
 6. **Fix rounds.** The bounded cycle below, until the user accepts.
 7. **Bake.** A byte copy of a checked preview into `stl/`, with the user's
-   approval. Then prune the macro (`system_improvement/04_project_state.md`).
+   approval. Then prune the macro (`docs/architecture.md`, "At a bake").
 8. **Print and measure.** Record the results in the README. A new round only if
    the print shows a problem, and only after asking.
 9. **New generation.** Nested as `v2/` (`docs/versioning.md`).
@@ -112,8 +108,8 @@ Rules:
 
 ## Giving feedback on renders
 
-- **Draw on the review renders.** These are smooth-shaded and zebra views from
-  the cameras listed in `STATE.md`. Save the `.xcf` and a flattened `.png` in
+- **Draw on the review renders.** These are the lit views from the cameras
+  listed in `STATE.md`. Save the `.xcf` and a flattened `.png` in
   `renders/case_preview_r<NN>/`.
 - **Add one short note per image** ("bump here", "should be one surface", "cut
   on both sides"). In r9 the marks had no written note. The README records the
@@ -123,8 +119,9 @@ Rules:
   camera. That method works: the r13 cameras were validated at silhouette IoU
   0.997 and 0.990.
 - **form-auditor classifies each mark** with the number that decides it. On
-  r13, 6 of the 12 marked paths measured as sub-layer facet noise, which says
-  the review renders themselves need fixing (`system_improvement/05_verification.md`).
+  r13, 6 of the 12 marked paths measured as sub-layer facet noise. They are real
+  facet edges of the scan mesh, so no render setting hides them (tested
+  2026-10-04 with `tools/render_review.py`); the measurement decides.
 
 ## Commits
 

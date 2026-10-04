@@ -26,7 +26,7 @@ README:
   freeform body and a block (1 mm worked, 2 mm did not). Shape such transitions
   into the loft instead of filleting them afterwards.
 
-See `system_improvement/06_cad_method.md`.
+See `docs/cad_method.md`.
 
 ## The core failure mode in this work
 
@@ -320,7 +320,7 @@ check (`docs/agents.md`, "Briefing agents"). This section is what they cannot.
   `sleep` loops; view files with Read / Glob / Grep. A hook denies the rest and
   says how to rewrite it.
 - **A build over 5 minutes is fixed with a stage cache**
-  (`system_improvement/04_project_state.md`, "A stage cache"), not waited out:
+  (`docs/cad_method.md`, "A stage cache"), not waited out:
   a subagent's prompt cache lasts 5 minutes, and in the r10 designer run the
   re-billing after its 10-minute builds was 40 % of the cost.
 

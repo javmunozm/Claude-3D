@@ -123,7 +123,7 @@ Smooth shading with every vertex normal averaged (no feature split), and a
 zebra pass whose stripes break at a crease or a curvature step. **Measured
 limit (2026-10-04):** on the VitaGripPS5 scan mesh it does not separate
 tessellation marks from real defects, because those marks are real facet
-edges; classify marks by measurement there (`system_improvement/05_verification.md`).
+edges; classify marks by measurement there (form-auditor's mark classes).
 Meant for smooth (B-rep) tessellations; not yet tested on one.
 
 ### Sweep the whole part, and compare with the baseline
@@ -155,7 +155,9 @@ They read the session transcripts in `~/.claude/projects/D--CAD-Claude-Projects/
 Dollar figures are API list-price equivalents, used only to compare runs; a
 claude.ai plan is not billed that way. The other scripts in the folder
 (`cache_misses.py`, `composition.py`, `calibrate.py`, `thinking_share.py`,
-`agent_static_check.py`) produced the measurements in `system_improvement/`.
+`agent_static_check.py`, `maxturns_review.py`) produced the measurements of
+the 2026-10-04 system review; `maxturns_review.py` is the basis of the turn
+limits in `docs/agents.md`.
 Record each round's line in the project's `STATE.md` ("Rounds").
 
 ## Run structural / verification checks

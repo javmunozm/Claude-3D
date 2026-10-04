@@ -1,5 +1,5 @@
 """PreToolUse hook: enforce the repo's shell rules before a command can stall on a
-permission prompt. Source and history: system_improvement/07_enforcement.md.
+permission prompt. Described in docs/agents.md, "Briefing agents".
 
 Rules (every agent's "Shell commands" section, docs/agents.md, user memory):
   - never `cd`; every path absolute

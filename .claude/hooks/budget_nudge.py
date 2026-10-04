@@ -13,8 +13,8 @@ count tool calls against budgets.json (the warning, then the stop and every
 5 calls after). Main-thread calls (no `agent_id` in the input) are ignored.
 
 State: one small JSON per agent_id under <scratchpad_dir or %TEMP%>/budget_state/.
-Test: test_hooks.py, next to this file. Source and history:
-system_improvement/07_enforcement.md.
+Test: test_hooks.py, next to this file. Described in docs/agents.md,
+"Briefing agents".
 """
 import json
 import re
