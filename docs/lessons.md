@@ -657,3 +657,59 @@ the part changed.
   its target reports a failure instead of a pass.
 - When the part changes, re-derive the gate, then prove it still catches the
   defect it was written for.
+
+---
+
+## Ten defect IDs were one glued-in patch, and every gate passed
+
+VitaGripPS5, rounds 7-10 (2026-09-26 to 10-02). The DualSense scan's corners
+carry the trigger paddles. `build_case_ext.py` removed them in two booleans:
+- a **difference** that cut out everything below the floor inside a polygon
+  over |x| > 55, Y > 52 ("trigger zone clear", line 1195);
+- then a **union** of a separately built block ("trigger zone refill",
+  line 1218).
+
+Each corner was therefore a hole with a patch glued into it. The user saw it
+on the r10 render as "puzzle pieces added to the main frame".
+
+The register never said so. It split the patch's outline into **ten IDs by
+location**: D1, D2, D11, D12, D16, D19, D20, D21, D23 and D35. Four rounds
+tuned the patch's edges one at a time (the fade, the pit exclusion, the inset,
+the outline), and each tuning produced a new defect on the same outline:
+
+| Round | Change to the patch | New defect on its outline |
+|---|---|---|
+| r8 | zone = union of 1 mm boxes | seams on the first column x 55.5 and the first row Y 52.5 (D11, D12) |
+| r9 | smooth contour, refill to the silhouette | refill ledge, flat top at the floor Z (D23) |
+| r10 | refill inset `REFILL_IN` 0.5 inside the cleared zone | **open air slit 0.5-0.9 mm wide, 7-12 mm deep** across each lobe back (D35) |
+
+### Why nothing caught it
+
+- **The topology gates are blind to it.** A slit open to the outside is still
+  one closed shell: r10 read watertight, 1 body and genus 2. A glued-in patch
+  is also 1 body once the union fuses.
+- **The register was organised by symptom location, not by cause.** Ten
+  entries each looked small, so no single entry pointed at the boolean that
+  made all of them.
+- **No report described the construction in plain words.** The macro comments
+  say "replacement" and the reports give turn angles per ID. The sentence
+  "the corner is cut out and a separate block is glued back in" was first
+  written in round 10, after the user asked.
+- Visual check: the main session looked at the r10 corner closeup and called
+  it "still patched". Only the form-auditor's rays found that it was a slit.
+
+### How to apply
+
+- **Group a register by the construction step that made each entry**, not
+  only by location. When three or more entries lie on the outline of one
+  boolean, the defect is that boolean. Re-derive the method; do not tune its
+  edges one constant per round.
+- **Avoid cut-then-refill** on a visible surface. The outline of the cut is a
+  seam that every later stage has to hide. Shape the region with the same
+  continuous operation as its surroundings.
+- **Gate slits with rays, not with topology.** Cast rays across any boolean
+  outline and fail on any air gap. Watertight, body count and genus all pass
+  an open slit.
+- **Every fix report and review states, in one plain sentence, what the
+  geometry physically is** ("a block glued into a hole", "a slit"), before the
+  numbers.
