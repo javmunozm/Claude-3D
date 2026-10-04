@@ -44,11 +44,15 @@ python tools/render_check.py projects/<Project>/stl/<Part>.stl
 and report the failure — do not proceed to rendering. If the part is
 legitimately multi-piece, the user must pass `--expect-bodies N`.
 
-### (c) Shaded render
+### (c) Form render
 
 ```
-python tools/render_check.py projects/<Project>/stl/<Part>.stl --views front back
+python tools/render_views.py projects/<Project>/stl/<Part>.stl --views front back
 ```
+
+`render_check.py`'s own images are flat, unlit silhouettes: they show the
+outline and hide every cross-section and surface defect inside it. Judge form
+on the lit views of `render_views.py`.
 
 After rendering, **read each PNG** with the Read tool and describe in your
 response what the render shows:

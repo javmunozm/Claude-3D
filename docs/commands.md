@@ -112,6 +112,52 @@ clearance, and confirm the assembled stack reaches the intended overall
 dimension. Where one piece is already printed, its exported STL — not a
 constant in the script or a claim in a README — is the constraint.
 
+### Zebra and no-split smooth renders (surface continuity)
+
+```
+python tools\render_review.py <mesh.stl> --outdir <dir> --views iso top ^
+    --camera cornerR:190,150,-90:90,65,-12:30
+```
+
+Smooth shading with every vertex normal averaged (no feature split), and a
+zebra pass whose stripes break at a crease or a curvature step. **Measured
+limit (2026-10-04):** on the VitaGripPS5 scan mesh it does not separate
+tessellation marks from real defects, because those marks are real facet
+edges; classify marks by measurement there (`system_improvement/05_verification.md`).
+Meant for smooth (B-rep) tessellations; not yet tested on one.
+
+### Sweep the whole part, and compare with the baseline
+
+```
+python tools\form_sweep.py projects\VitaGripPS5\audit\r17\case_preview_r17.stl ^
+    --regions projects\VitaGripPS5\audit\regions.json --out projects\VitaGripPS5\audit\r17\sweep ^
+    --tag r17 --baseline projects\VitaGripPS5\audit\r16\sweep\sweep_r16.json
+```
+
+It prints, per region, the surface lumps, hollows and creases, the
+non-convexity, the back thickness, the plan outline, the flank fields, the
+sharp-edge chains, the walls and the mirror symmetry. With `--baseline` it adds
+the height changes and the NEW/WORSE components against the baseline's stored
+fields. It writes `sweep_<tag>.json` and the fields to `--out`; `--stages
+hf,ys,edges,walls,sym` runs a subset. The project's region rules, thresholds
+and fixed geometry are in its `audit/regions.json` (VitaGripPS5's comes from
+`macros/export_sweep_regions.py`). About 8 s on the 137k-face r16 case.
+
+## Measure what a session or an agent run cost
+
+```
+python tools\token_audit\cost.py <session-id prefix>                  # list price per session and per agent run
+python tools\token_audit\token_audit.py agents <session-id prefix>     # tool calls, context, tokens per agent run
+python tools\token_audit\agent_behavior_check.py runs                 # every agent run: brief with a number or not, rule breaks
+```
+
+They read the session transcripts in `~/.claude/projects/D--CAD-Claude-Projects/`.
+Dollar figures are API list-price equivalents, used only to compare runs; a
+claude.ai plan is not billed that way. The other scripts in the folder
+(`cache_misses.py`, `composition.py`, `calibrate.py`, `thinking_share.py`,
+`agent_static_check.py`) produced the measurements in `system_improvement/`.
+Record each round's line in the project's `STATE.md` ("Rounds").
+
 ## Run structural / verification checks
 
 Project-specific, dependency-free scripts that validate the design against
@@ -296,7 +342,11 @@ plotter.add_mesh(mesh, color="lightblue")
 plotter.screenshot("output.png")
 ```
 
-## Live-watch a model while editing it (VitaGripPS5)
+## Live-watch a model while editing it (VitaGripPS5 socket grip, historical)
+
+**Historical:** this is the superseded 2026-09-14 socket-grip workflow. The
+current VitaGripPS5 case is built by `macros/build_case_ext.py` (see the
+project's `STATE.md`); `watch_model.py` does not watch it.
 
 `tools/watch_model.py` holds a pyvista window open, polls the placement
 module and its input meshes for changes, and rebuilds + repaints

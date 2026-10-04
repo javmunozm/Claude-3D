@@ -50,7 +50,8 @@ vectors/*.svg,*.dxf     Generated vector output, written to the project's vector
       │
 stl/*.stl, step/*.step  Generated CAD output, written to the project's stl/ and step/ folders
       │
-      ├─► render_check.py   topology + shaded renders (matplotlib or Blender)
+      ├─► render_check.py   topology gate + flat (unlit) silhouettes
+      ├─► render_views.py   lit views with depth, for judging form
       ├─► pymeshfix         mesh repair if topology gate fails
       ├─► pyvista           interactive inspection / offscreen renders
       ├─► ocp-vscode        interactive 3D viewer (browser or VS Code panel)
@@ -142,7 +143,11 @@ Rules:
   stays in its project until a second project needs it; then it moves to a
   shared module. No speculative library, no framework.
 - **Applied when a project is next reworked** (decided 2026-09-24). Existing
-  single-file macros stay as they are until then.
+  single-file macros stay as they are until then. **The moment to split**
+  (2026-10-04): the first round after a bake, before any new stage is added,
+  and any single macro over 60 KB before its next change. VitaGripPS5 was
+  reworked in 16 rounds without a split, and its one file grew from 68.8k
+  characters (r8) to 213.5k (r16).
   `projects/SurgicalDrillGuide/macros/` is the first project split this way
   (2026-09-25; exports and gate logs byte-identical before and after): the
   reference for the **file layout**. It does not yet meet item 5 (part builders): its part
@@ -182,7 +187,8 @@ unverified inputs.
 
 `tools/render_check.py` gates the exported mesh itself: `body_count`,
 watertightness, winding consistency, positive volume, bounding box, plus
-shaded renders from standard cameras. It exists because dimensional
+flat, unlit silhouette renders from standard cameras; form is judged with the
+lit views of `tools/render_views.py`. It exists because dimensional
 correctness does not imply shape correctness — see
 [commands.md](commands.md) for the failures that motivated it and the
 workflow that catches them.
@@ -220,8 +226,8 @@ conventions.
 
 | Tracked | Not tracked (stays on disk) |
 |---|---|
-| `.claude/` (agents, skills), `tools/`, `docs/`, `CLAUDE.md`, `.gitignore`, `revamp_suggestions.md` | `sources/`, including raw CT panes and multi-GB downloaded meshes |
-| each project's `README.md` (any depth) | `stl/`, `step/`, `renders/`, `vectors/`, `derived/`, `work/`, `blender/`, `docs/` data |
+| `.claude/` (agents, skills, hooks), `tools/`, `docs/`, `CLAUDE.md`, `.gitignore` | `sources/`, including raw CT panes and multi-GB downloaded meshes |
+| each project's `README.md` and `STATE.md` (any depth) | `stl/`, `step/`, `renders/`, `vectors/`, `derived/`, `work/`, `blender/`, `docs/` data |
 | each project's `macros/**/*.py`, as the skeleton and reference layout | `attempts/`, `__pycache__/`, `*.npy`, `*.blend` |
 
 `.gitignore` enforces this with an allowlist for `projects/`. Never
@@ -248,6 +254,39 @@ project's `vectors/` runs only on a machine that still has those folders.
   `.FCStd` files.
 - Viewing/inspection uses `ocp-vscode` (`python -m ocp_vscode`), not the
   FreeCAD GUI.
+
+### Project state and audit folders (2026-10-04)
+
+| File | Role | Rule |
+|---|---|---|
+| `STATE.md` | the present: bake, preview, macro, method, open entries, locks, gates, commands, rounds with their cost, pending decisions | at most about 150 lines (template `docs/templates/STATE.md`). Agents read it instead of the README. The orchestrator updates it at the end of every round and session (`/session-end`). Tracked |
+| `README.md` | the brief, the history, rejected approaches, measured negative results | appended, never rewritten. Agents Grep it by section and never read it whole in a round |
+| `NEXT_SESSION.md` | a human summary for the next session | at most 60 lines; points to `STATE.md`; ends with the first decision needed |
+
+```
+projects/<Project>/audit/
+├── regions.json            region rules, thresholds and fixed geometry for tools/form_sweep.py
+├── r<NN>/
+│   ├── brief_register.md   register.md        (summary block first)
+│   ├── brief_fix.md        fix_report.md      handoff.md (if a pass stopped early)
+│   ├── brief_review.md     review.md          (summary block first)
+│   ├── sweep/              sweep_r<NN>.json + its fields (the baseline for the next round, after a bake)
+│   ├── scripts/            checks specific to one defect only
+│   └── case_preview_r<NN>.stl, logs/
+└── archive/                rounds before the last bake, moved here with the user's approval
+```
+
+- **No copied review scripts.** The whole-part sweep and the comparison with
+  the baseline are `tools/form_sweep.py`; nothing is copied and retargeted per
+  round. In VitaGripPS5 r11 a copied script still pointed at r10, and its
+  first run overwrote two r10 logs. The tool reproduced the r13 and r16
+  reviews' sweep logs line for line (2026-10-04).
+- **No macro snapshot per round.** Git history, or one snapshot at a bake, is
+  enough; VitaGripPS5's `audit/r9`..`r16` each hold a 69–216 KB copy.
+- **At a bake:** record the SHA-256 in `STATE.md`, sweep the baked mesh into
+  `audit/r<NN>/sweep/` and name it the baseline, prune the macro's unused
+  stages and switches, and move older rounds to `audit/archive/` (with the
+  user's approval).
 
 ## Adding a new project
 
