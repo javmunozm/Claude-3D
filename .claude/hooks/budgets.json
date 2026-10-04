@@ -1,0 +1,13 @@
+{
+  "_comment": "FALLBACK ONLY. budget_nudge.py counts turns from the agent's transcript (80% of maxTurns, then maxTurns - 3). These tool-call counts apply only when the agent has no maxTurns or its transcript cannot be found. Values: the drafted ones (system_improvement/02_briefing.md); a replay of 57 past runs showed they fit normal runs better than counts tied to maxTurns (system_improvement/07_enforcement.md, Results).",
+  "cad-designer": {"warn": 64, "stop": 80},
+  "form-auditor": {"warn": 48, "stop": 60},
+  "reference-analyst": {"warn": 40, "stop": 50},
+  "perspective-checker": {"warn": 24, "stop": 30},
+  "print-tolerance-expert": {"warn": 32, "stop": 40},
+  "vector-tracer": {"warn": 48, "stop": 60},
+  "accuracy-reviewer": {"warn": 32, "stop": 40},
+  "bone-morphologist": {"warn": 40, "stop": 50},
+  "blender-handoff": {"warn": 40, "stop": 50},
+  "default": {"warn": 40, "stop": 50}
+}

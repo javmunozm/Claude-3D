@@ -28,8 +28,10 @@ user's decisions behind conditions of your own.
 Geometry that runs and exports without error can still be physically wrong —
 every defect found in this repo so far passed both of those tests. After any
 geometry change run `python tools\render_check.py projects\<Project>\stl\<Part>.stl
---views front` and **look at the render**; before trusting any structural
-verdict, read its `tools/reconcile.py` block.
+--views front` (the topology gate; its images are flat silhouettes), then
+`python tools\render_views.py <same stl> --views front back` and **look at the
+lit render**; before trusting any structural verdict, read its
+`tools/reconcile.py` block.
 
 **A render is not a measurement.** Ask `form-auditor` for a number before
 believing a picture, and `perspective-checker` before comparing a picture to a
@@ -47,6 +49,8 @@ photo — see [docs/agents.md](docs/agents.md).
 | [docs/attempts.md](docs/attempts.md) | `attempts/` folders, and the record-then-delete procedure when the user rejects work |
 | [docs/projects.md](docs/projects.md) | Index of all projects with description and status |
 | [docs/lessons.md](docs/lessons.md) | Post-mortems with their numbers — one entry per incident, read by the agents each concerns |
+
+Agents are briefed from `docs/templates/` with numeric ceilings; see `docs/workflow.md`.
 
 ## Two rules that cost this repo the most
 

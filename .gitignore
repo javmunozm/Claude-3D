@@ -12,10 +12,11 @@ __pycache__/
 /sources/
 /references/
 
-# Projects: allowlist. Everything is ignored except each README.md and the macros' Python code.
+# Projects: allowlist. Everything is ignored except each README.md, each STATE.md and the macros' Python code.
 /projects/**
 !/projects/**/
 !/projects/**/README.md
+!/projects/**/STATE.md
 !/projects/**/macros/**/*.py
 # ...but never rejected attempts (deleted on explicit user rejection, lesson recorded in the README;
 # see docs/attempts.md)
