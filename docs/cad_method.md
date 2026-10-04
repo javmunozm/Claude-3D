@@ -98,7 +98,10 @@ Measured on this machine, 2026-10-03:
    region.
 8. **Export.**
    - STEP, which is exact.
-   - STL with `tolerance=0.02, angular_tolerance=0.2`, giving even triangles.
+   - STL with `tolerance=0.002, angular_tolerance=0.05`. Measured on the
+     VitaGripPS5 v2 spike (2026-10-04): 0.02 / 0.2 gave triangles up to 28 mm
+     long, a 0.37 mm chord error against the B-rep and streaks in the renders;
+     0.002 / 0.05 took 5 s, 471k faces, watertight, streaks gone.
 
 ## CAD tools that could work with this system
 
