@@ -47,8 +47,8 @@ TIP_ROLL = 3.0
 # simplified floor plate (r16 x-sections: z -13.3..-8.8, y -11.2..78.55 for |x| < 66)
 PLATE_Y0, PLATE_Y1 = -11.2, 78.55
 PLATE_Z0 = -13.3
-FRONT_R = 1.0              # plate front face / handle edges (p1_post.py: 3 and 2 fail, 1 valid);
-                           # the 15 deg blend crossing takes no fillet at 3 / 2 / 1
+FRONT_R = 0.0              # plate front face / handle edges (p1_post.py: 3 and 2 fail, 1 valid); failed at r 1 in
+                           # p1c / p1d; on the fitted loft (pass fit) the attempt crashed the process (segfault), so off
 
 # plate built into the grip end (pass 1, S2): boxes for the flat plate, a lofted blend for the junction
 BLEND_XS = 60.0            # main slab x 0..60; the blend loft is trimmed at x >= 60 (both planes)
@@ -140,6 +140,20 @@ MORPH_YS = [-15.0, -17.0, -19.0, -21.0, -22.5, -24.5, -25.0, -26.0, -26.5, -27.0
 SINGLE_LOFT = True
 SEAM_GUIDE = 0.0           # split lofts only (SINGLE_LOFT False): guide distance, 0 = none
 SEAM_GUIDE_N = 4
+# pass fit (method change, 2026-10-05): the loft no longer passes exactly through every station. Each matched point
+# index gets a smoothing spline along y over all stations (sections.fit_along_y); the stations between FIT_Y0 and
+# FIT_Y_TIP are replaced by evenly spaced fitted ones; the smoothing tapers in over FIT_RAMP below FIT_Y0 and out
+# over FIT_TIP_RAMP above FIT_Y_TIP. Off: the p1d stations (exact interpolation).
+FIT_ALONG_Y = True
+FIT_Y0 = -3.0              # stations y >= this stay as they are (the body y >= 5 must not move)
+FIT_RAMP = 5.0
+FIT_Y_TIP = -45.0          # stations y <= this stay as they are (tip roll, extrapolation, tip fillet)
+FIT_TIP_RAMP = 6.0
+FIT_SPACING = 1.5          # new station spacing, mm (grip-only trials at h 2: 1.0 valid, tip region worse;
+                           # 2.0: rim crest fails at r 2 / 1.5 / 1, tip at r 3, grip + blend invalid)
+FIT_SMOOTH = 2.0           # smoothing length h, mm (lam = h**4, weights = station y share). Trials, spacing 1.5:
+                           # h 1.5 rim crest fails at r 2 / 1.5 / 1; h 2.5 tip fillet only r 1 and the tip moves 0.77
+                           # (FIT_Y_TIP -48 at h 2: the loft fails)
 BODY_LOFT_OPTS = {}      # ThruSections overrides, e.g. dict(max_deg=3) or dict(par="Centripetal")
 HANDLE_LOFT_OPTS = {}
 HANDLE_SRC = [y for y in MAIN_STATIONS if y <= SHARED_Y - HANDLE_SHIFT - HANDLE_BLEND_T]   # r16 y, moved +shift

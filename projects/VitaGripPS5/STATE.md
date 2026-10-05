@@ -8,7 +8,7 @@ Keep this file under about 150 lines. Agents read it instead of the README. Hist
 ## Current
 - **Bake:** `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
-- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_p1d.stl` (uncommitted pass 1d; last commit `285ad15` = pass 1b). See "v2" below.
+- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_fit.stl` (pass "fit", reviewed, uncommitted; last commit `6cf587f` = pass 1d). See "v2" below.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).
 - **Method:** r16 is a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep; fillets cannot be made on it. **The user decided on 2026-10-04 to rebuild the case as a CAD (B-rep) design** in `v2/` (`docs/versioning.md`); a spike runs first (`v2/audit/spike/spike_report.md`). r16 stays the printable bake until a v2 replaces it.
 - **The part:** X width 220.08; Y fore-aft from the handle tips at -68.0025 to the rear at +78.550; Z up, pocket floor -8.80, flat top 11.40. 137 216 faces, watertight, 1 body, genus 2, volume 266 520.9 mm3.
@@ -77,13 +77,15 @@ Build: `python projects/VitaGripPS5/v2/macros/vita_grip_ps5_v2.py` (about 20 s t
 
 - **Built:** one grip end lofted from smoothed r16 sections (y-planes), mirrored exactly (max 3e-6 mm); flat top Z 11.40 with a 3 mm round built into the sections (flanks median 3.0); tip 3 mm round; 3D rolling-ball top at the U-turn; floor plate blended into the grips; rear corner part of the grip loft (no fin, rim 2 mm round); one upper lip per side with pit and 1 mm slots. Export `tolerance=0.002, angular_tolerance=0.05`.
 - **Handle 16 mm shorter (user, 2026-10-04):** 16 mm removed right below the console body, the rest moved +16 in y; tip at y -52.0025, root-to-tip 37.5 mm (DualSense 1:1: 38.7 L / 41.7 R); 15 mm morph from the root flare into the moved handle (inner flank 0.92–1.23 mm per mm, r16 about 0.9).
-- **Measured vs r16** (round band excluded): handle RMS 0.07–0.15, max 0.53 mm (r16 moved +16); body y >= -12 unchanged. Right handle: 0 edges > 30° (r16 1803).
+- **Fitted handle surface (pass "fit", 2026-10-05, method change):** the loft no longer passes exactly through r16's sections. A smoothing spline per matched point along y (h 2.0 mm), stations every 1.5 mm from y -3 to -45, ramps at both ends (`FIT_ALONG_Y` and `FIT_*` in `constants.py`; off = p1d). Cause measured first: p1d's station slopes swung 0.17–0.56 between stations 0.5–1.5 mm apart, r16's about 0.05.
+- **Measured (review `v2/audit/fit/review.md`, ACCEPT WITH LISTED ARTIFACTS, 0 regressions vs p1d):** ring lines gone (turn at y -9 / -13 / -27 at most 3.98°, bump 0.002–0.004 mm; p1d up to 22.3°); handle vs r16 moved +16 RMS 0.065–0.15, max 0.54; body y >= 5 within 0.060 of p1d, pocket walls, lip, pit and bar strip 0.0000; top round min 2.74 (S1 fixed); S5 6.44° (fixed); p1d's 0.002 mm knife-edge sliver at (66.5, -9.0, -7.3) gone, thinnest ramp wall 4.52. Left matches right to 0.0000.
 - **Open:**
-  - **Ring lines** around the handle at y about -13, -9 and -28 (outer flank turns 7–8° at -13, 22° at -27; r16 at most 3.4° there). They sit where r16 itself has faint rings: the loft interpolates r16's sections exactly and amplifies their ripples (observation from the renders plus the pass 1d numbers; not yet a dedicated test).
-  - Plate-front round (edges at (69, -11, -13.9)) fails even at 0.5 mm; S5 handle turn 10.2° at (79.7, -38.5, 2.2).
-  - Pass 1d went back to **one loft** (`SINGLE_LOFT = True`): no seam method worked in the full build. The split (the user's option 1) is kept behind the switch.
+  - **S2 plate front** (y -11.2, x 62–70, z -14): sharp 108.3° edge, intended r 1. The fillet failed in p1c/p1d and crashed the build on the fitted loft, so `FRONT_R = 0`. Needs a user decision (accept, or build the round into the plate profile before the fuse).
+  - Sub-layer, reported only: 3 cells of 8.4–8.9° on the flat-top tangent edge in the morph (bumps <= 0.039); bend y -29..-30 1.45° / 0.007; tip stations 3.83° / 0.013.
+  - `checks.outer_flank_turn` reads false fails at z 3.5–5 near the U-turn and tip: the fixed-z plane skims the top round there (review: fixed-z 13.3° / 0.469 mm, along the normal 2.02° / 0.006). Use the review's polar probe (`v2/audit/fit/scripts/fit_review.py`) until the check is fixed.
+  - Pass 1d is one loft (`SINGLE_LOFT = True`); the split (the user's option 1) is kept behind the switch.
+  - Not run this round: slit / sealed-void ray tests (rear band and corner moved <= 0.0215 vs p1d), S4 chord error.
   - Not built yet: second (lower) latch per side, touchscreen window 110 x 57 R 3.5, camera hole D 12, bottom opening, lower pits; pocket/lip/window lock check against r16; strength check (print-tolerance-expert).
-- **Method-change trigger met** (the handle root reworked in 4 consecutive passes): next step is the method decision below, not pass 1e.
 
 ## Rounds
 List price of the agent runs only (the orchestrator is not included); measured 2026-10-04 with `tools/token_audit/maxturns_review.py`. Rounds r10-r16 with the orchestrator: $118.14.
@@ -99,15 +101,16 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 | r16 | 2026-10-03 | designer 36, review 75 | $3.79 | baked, ACCEPT WITH LISTED ARTIFACTS |
 | v2 spike | 2026-10-04 | designer 10 (usage-limit stop) + 36, review 21 | $6.57 | go; ACCEPT WITH LISTED ARTIFACTS (`bcdb801`) |
 | v2 p1 / 1b | 2026-10-04 | designer 20 (stop) + 39, 47 | $11.01 | 3 mm round, plate blend, one-piece corner (`285ad15`) |
-| v2 p1c / 1d | 2026-10-04..05 | designer 50, 46 | $6.31 | handle -16 mm, waist fixed, ring lines open (uncommitted) |
+| v2 p1c / 1d | 2026-10-04..05 | designer 50, 46 | $6.31 | handle -16 mm, waist fixed, ring lines open (`6cf587f`) |
+| v2 fit | 2026-10-05 | designer 75, review (usage-limit stop) + 42 | at `/session-end` | fitted surface; rings gone; ACCEPT WITH LISTED ARTIFACTS (uncommitted) |
 
 Session 49ca6a61 total, orchestrator included: $85.10 list (main $61.04, agents $24.06).
 
 ## Decisions pending for the user
 1. **The first print.** Check: snap retention and insertion (insertion safety factor 2.0; `audit/r11/lip_sizing_r11.md`); shoulder-button reach with a real finger (model ii 91 %, model i 77-80 %); the console's fit in the pocket and the lip clearance (CLEAR_Z 0.2); the handle ends at y -68 in the hand.
 2. **Print orientation:** the README does not state one; the r16 slice test was in Z only.
-3. **v2 method (first decision next time):** fit the handle surface to r16's sections (smooth each matched point's track along y before lofting, or one smoothed B-spline surface fit) instead of interpolating them exactly. Recommended; it should remove the ring lines and may let the split lofts work again.
-4. **Commit pass 1d** as the new fallback (valid, no folds, includes the -16 mm handle)? Run `/verify` first.
+3. **Commit pass "fit"** (5 files: `v2/README.md`, `constants.py`, `sections.py`, `checks.py`, `vita_grip_ps5_v2.py`)? Reviewed, rebuild byte-identical. Pass 1d is committed (`6cf587f`).
+4. **S2 plate front:** accept the sharp 108° edge, or build the r 1 round into the plate profile / sections before the fuse. Then pass 2 (latches, window, camera hole, bottom opening).
 5. Handle tolerance against r16: working limit RMS 0.3 / max 2.0 mm, round band excluded (set by the orchestrator; confirm or change). The user chose the 3 mm round everywhere and the 15 mm root transition.
 6. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
 7. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).

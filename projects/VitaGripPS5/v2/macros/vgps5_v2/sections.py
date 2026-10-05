@@ -402,6 +402,42 @@ def seam_guides(before, after, y0, g):
     return (y0 + g, cs(y0 + g)), (y0 - g, cs(y0 - g))
 
 
+def fit_along_y(stations, y0, ramp, y_tip, tip_ramp, spacing, h):
+    """Fitted surface (pass fit): for every matched point index, a cubic smoothing spline along y through that
+    index's (x, z) over ALL the stations (weights = each station's share of the y span, so dense stations do not
+    dominate; lam = h**4, h about the smoothing length in mm), then the stations between y0 and y_tip are replaced
+    by evenly spaced ones (about `spacing` mm). There the loop is I + w (F - I): I the interpolating spline, F the
+    smoothing spline, w a smoothstep 0 at y0 -> 1 at y0 - ramp, 1 at y_tip + tip_ramp -> 0 at y_tip, so the
+    smoothing tapers to zero at both ends (no kink against the stations kept as they are).
+    stations: [(y, Nx2)] rear to tip. Returns (stations, info)."""
+    from scipy.interpolate import CubicSpline, make_smoothing_spline
+    st = sorted(stations, key=lambda s: s[0])
+    Y = np.array([s[0] for s in st])
+    L = np.stack([s[1] for s in st])
+    g = np.diff(Y)
+    w = 0.5 * (np.r_[g, g[-1]] + np.r_[g[0], g])
+    I = CubicSpline(Y, L, axis=0)
+    flat = L.reshape(len(Y), -1)
+    F = [make_smoothing_spline(Y, flat[:, j], w=w, lam=h ** 4) for j in range(flat.shape[1])]
+
+    def fitted(y):
+        return np.array([f(y) for f in F]).reshape(L.shape[1:])
+
+    n = max(1, int(round((y0 - y_tip) / spacing)))
+    new_y = y0 - (y0 - y_tip) * np.arange(1, n) / n
+    out = []
+    for y in new_y:
+        wt = _ramp((y0 - y) / ramp) * _ramp((y - y_tip) / tip_ramp)
+        a = I(y)
+        out.append((float(y), a + wt * (fitted(y) - a)))
+    keep = [(y, lp) for y, lp in stations if y >= y0 - 1e-9 or y <= y_tip + 1e-9]
+    res = np.array([np.abs(fitted(y) - lp).max() for y, lp in stations if y_tip < y < y0])
+    info = dict(n_new=len(out), spacing=round((y0 - y_tip) / n, 4), dropped=len(stations) - len(keep),
+                fit_residual_max=round(float(res.max()), 4) if len(res) else 0.0,
+                fit_residual_median=round(float(np.median(res)), 4) if len(res) else 0.0)
+    return sorted(keep + out, key=lambda s: -s[0]), info
+
+
 def shrunk(loop, scale):
     """Loop scaled about its centroid (keeps an overlap section strictly inside its neighbour)."""
     c = loop.mean(axis=0)

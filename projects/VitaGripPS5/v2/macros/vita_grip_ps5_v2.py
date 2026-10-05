@@ -1,6 +1,6 @@
-"""VitaGripPS5 v2 main (pass 1d): the case's right grip end as B-rep (build123d), two lofts sharing the station
-y -13.5 with a tangent (G1) seam (body/corner and handle; the handle 16 mm shorter than r16, 15 mm root
-transition), plate built in, mirrored.
+"""VitaGripPS5 v2 main (pass fit): the case's right grip end as B-rep (build123d), one loft rear face to tip (the
+handle 16 mm shorter than r16, 15 mm root transition) through stations FITTED along y below y -3 (a smoothing
+spline per matched point, evenly spaced stations), plate built in, mirrored.
 
   timeout 300 python vita_grip_ps5_v2.py [--out-step P] [--out-stl P] [--results P] [--sections-only]
                                          [--half-brep P] [--grip-only P.stl] [--no-gates]
@@ -20,7 +20,7 @@ def main():
     from build123d import export_brep, export_step, export_stl
     from vgps5_v2 import constants as C
     from vgps5_v2.sections import load_mesh, station_loops, extrapolate, blend_profile, uturn_field, morph, \
-        seam_guides
+        seam_guides, fit_along_y
     from vgps5_v2.shapes import one_solid, oval_cutter, valid, try_fillet, clip_cutter
     from vgps5_v2.parts.grip_end import build_body, build_handle, build_single, fuse_at_seam
     from vgps5_v2.parts.plate import build_plate_half, build_blend
@@ -29,9 +29,9 @@ def main():
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_p1d.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_p1d.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "p1d" / "p1d_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_fit.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_fit.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "fit" / "fit_results.json"))
     ap.add_argument("--sections-only", action="store_true")
     ap.add_argument("--half-brep", default=None, help="write the half before the lip (BREP), for fillet searches")
     ap.add_argument("--no-gates", action="store_true")
@@ -99,7 +99,12 @@ def main():
     cutter = clip_cutter(C.CLIP_W, C.CLIP_PHI, C.CLIP_K, C.ROUND_R, C.CLIP_RF, C.TOP_Z + C.ROUND_EPS, C.FLOOR_Z)
     sc = C.SHARED_Y
     if C.SINGLE_LOFT:
-        end, R["rim_r"], R["tip_roll"] = build_single(st_body + st_hand, C.TIP_Y_NEW, C.TOP_Z, C.PLATE_Y1, cutter,
+        stations = st_body + st_hand
+        if C.FIT_ALONG_Y:
+            stations, R["fit"] = fit_along_y(stations, C.FIT_Y0, C.FIT_RAMP, C.FIT_Y_TIP, C.FIT_TIP_RAMP,
+                                             C.FIT_SPACING, C.FIT_SMOOTH)
+            log("fitted along y (h %.2f): %s; stations now %d" % (C.FIT_SMOOTH, R["fit"], len(stations)))
+        end, R["rim_r"], R["tip_roll"] = build_single(stations, C.TIP_Y_NEW, C.TOP_Z, C.PLATE_Y1, cutter,
                                                       C.RIM_RADII, (C.FLOOR_Z, 75.0, 55.0), C.TIP_ROLL, log)
         R["seam_union"] = "none (one loft)"
     else:
@@ -212,13 +217,36 @@ def main():
                              "moved y%.1f..-46" % (sy - C.HANDLE_BLEND_T):
                              checks.inner_flank_rate(m, sy - C.HANDLE_BLEND_T, -46.0)}
     log("inner flank rate (mm/mm, at y): %s" % R["inner_flank_rate"])
-    prev = C.V2_DIR / "stl" / "VitaGripPS5_v2_p1c.stl"
-    if prev.exists():
-        R["vs_p1c"] = checks.deviation(m, trimesh.load(str(prev), force="mesh"),
-                                       {"body y-12..55": (0.0, 1e3, -12.0, 55.0), "corner y55..80": (0.0, 1e3, 55.0, 80.0),
-                                        "handle y<-13.5": (0.0, 1e3, -60.0, sy)})
-        for k, d in R["vs_p1c"].items():
-            log("vs p1c %-18s %s" % (k, {t: (q["rms"], q["max"], q["max_at"]) for t, q in d.items()}))
+    # ring-line gate (pass fit): outer-flank turn between 1 mm chords along y, against r16 (its handle at y - 16
+    # below the shared station: the same datum as the moved handle) + 1 deg
+    zt = (-20.0, -10.0, 0.0, 5.0)
+    R["flank_turn"] = checks.outer_flank_turn(m, -51.0, -5.0, zt)
+    R["flank_turn_r16"] = checks.outer_flank_turn(r16, -51.0, -5.0, zt,
+                                                  y_shift_map=lambda y: y if y >= sy else y - s)
+    # the 15 mm root morph itself bends the flank (r16's own surface morphed the same way: up to 6.6 deg at z -20 /
+    # -10 between 1 mm chords); in the morph the reference is the larger of r16 and this design floor
+    fl = checks.outer_flank_turn(r16, sy - C.HANDLE_BLEND_T - 1.5, sy + 1.5, zt, morph=(sy, s, C.HANDLE_BLEND_T))
+    ys_all = R["flank_turn"]["ys"]
+    R["flank_turn_floor"] = dict(ys=ys_all, max=fl["max"], turn={k: [dict(zip(fl["ys"], v)).get(y) for y in ys_all]
+                                                                 for k, v in fl["turn"].items()})
+    R["flank_turn_vs_r16"] = checks.turn_vs_reference(R["flank_turn"], R["flank_turn_r16"], 1.0)
+    R["flank_turn_vs_r16_or_floor"] = checks.turn_vs_reference(R["flank_turn"],
+                                                               [R["flank_turn_r16"], R["flank_turn_floor"]], 1.0)
+    log("outer-flank turn max (deg, y): %s; r16 %s; floor %s" % (R["flank_turn"]["max"], R["flank_turn_r16"]["max"],
+                                                                 R["flank_turn_floor"]["max"]))
+    for tag in ("flank_turn_vs_r16", "flank_turn_vs_r16_or_floor"):
+        for k, v in R[tag].items():
+            log("  %s + 1, %s: %s" % (tag[11:], k, v))
+    for tag, prev, reg in (("vs_p1d", "VitaGripPS5_v2_p1d.stl",
+                            {"body y>=5": (0.0, 1e3, 5.0, 80.0), "body y-3..5": (0.0, 1e3, -3.0, 5.0),
+                             "handle y<-3": (0.0, 1e3, -60.0, -3.0)}),
+                           ("vs_p1c", "VitaGripPS5_v2_p1c.stl",
+                            {"body y-12..55": (0.0, 1e3, -12.0, 55.0), "corner y55..80": (0.0, 1e3, 55.0, 80.0)})):
+        pth = C.V2_DIR / "stl" / prev
+        if pth.exists():
+            R[tag] = checks.deviation(m, trimesh.load(str(pth), force="mesh"), reg)
+            for k, d in R[tag].items():
+                log("%s %-18s %s" % (tag, k, {t: (q["rms"], q["max"], q["max_at"]) for t, q in d.items()}))
     R["total_s"] = round(time.time() - t0, 1)
     Path(args.results).write_text(json.dumps(R, indent=1, default=str))
     log("gates written to %s" % args.results)

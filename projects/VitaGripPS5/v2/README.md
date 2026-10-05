@@ -87,6 +87,40 @@ Pass-1 stage changes:
 
 Pass 1 replaced the spike's main; the spike's code is at commit `bcdb801`. The spike outputs (`*_v2_spike.*`) are still on disk, unchanged.
 
+## Fitted surface along y (pass fit, 2026-10-05)
+The main's defaults now write `step|stl/VitaGripPS5_v2_fit.*` and `audit/fit/fit_results.json` (178.6 s with the gates).
+
+**What it does.** Up to p1d the loft passed exactly through every r16 station. Each station is smoothed on its own, so
+each one keeps 0.01-0.18 mm of noise. Between stations 0.5-1.5 mm apart that noise became the ring lines (measured
+in `audit/fit/fix_report.md`, step 1). `sections.fit_along_y` now runs before the single loft:
+- for every matched point index, a cubic smoothing spline along y through that index's (x, z) over all stations
+  (`make_smoothing_spline`, weights = each station's share of the y span, lam = h^4);
+- the stations between `FIT_Y0` and `FIT_Y_TIP` are replaced by evenly spaced ones;
+- the smoothing fades in and out with smoothstep ramps, so it leaves no kink against the stations kept as they are.
+
+**Constants** (`constants.py`):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `FIT_ALONG_Y` | True | off = the p1d stations, exact interpolation |
+| `FIT_Y0` | -3 | stations y >= -3 are not changed (body y >= 5 vs p1d: max 0.062 mm) |
+| `FIT_RAMP` | 5 | the smoothing is fully on from y -8 |
+| `FIT_Y_TIP`, `FIT_TIP_RAMP` | -45, 6 | fully on down to y -39; the stations at y <= -45 (tip roll, extrapolation) are not changed |
+| `FIT_SPACING` | 1.5 | 27 new stations replace 24 |
+| `FIT_SMOOTH` | 2.0 mm (h) | residual to the old stations: median 0.25, max 0.73 mm (in the top round band) |
+
+**Tried and failed** (grip-only trials):
+
+| Variant | Result |
+|---|---|
+| h 1.5 | rim crest fillet fails at r 2, 1.5 and 1 |
+| h 2.5 | tip fillet only valid at r 1; the tip moves 0.77 mm |
+| spacing 1.0 | valid, but the tip zone gets worse (z -20: 3.85° over the reference at y -45) |
+| spacing 2.0 | rim crest fails, tip r 3 fails, grip + blend invalid |
+| `FIT_Y_TIP` -48 | the loft fails |
+
+On the fitted loft the plate-front fillet attempt (r 1) crashed the process (segfault). It had never succeeded (p1c, p1d), so `FRONT_R` is now 0.
+
 ## Files
 - `step/VitaGripPS5_v2_spike.step`, `stl/VitaGripPS5_v2_spike.stl`: the spike part (both halves).
 - `audit/spike/spike_results.json`: gate numbers from the build.

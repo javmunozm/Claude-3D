@@ -199,6 +199,102 @@ def inner_flank_rate(mesh, y_hi, y_lo, zs=(5.0, 8.0, 9.5, 10.5), step=0.5, x_min
     return out
 
 
+def _outer_rows(mesh, y, zs, x_min):
+    from shapely.geometry import Polygon, LineString, box
+    from shapely.ops import unary_union
+    out = np.full(len(zs), np.nan)
+    s = mesh.section(plane_origin=[0, y, 0], plane_normal=[0, 1, 0])
+    if s is None:
+        return out
+    # the body's section is one loop across both grips (plate): keep the part right of x_min
+    P = unary_union([Polygon(e[:, [0, 2]]).buffer(0) for e in s.discrete if len(e) > 8])
+    P = P.intersection(box(x_min, -500.0, 500.0, 500.0))
+    if P.is_empty:
+        return out
+    for k, z in enumerate(zs):
+        r = P.intersection(LineString([(x_min, z), (300.0, z)]))
+        if not r.is_empty:
+            out[k] = r.bounds[2]
+    return out
+
+
+def outer_flank_turn(mesh, y_lo, y_hi, zs=(-20.0, -10.0, 0.0, 5.0), chord=1.0, step=0.25, y_shift_map=None,
+                     x_min=60.0, morph=None):
+    """Ring-line probe: outer-flank x (max x of the right y-section's row at z) every step mm of y, and the turn
+    angle (deg) in the (y, x) plane between consecutive chord-mm chords. y_shift_map(y) gives the mesh y to cut for
+    output y (r16 tested against v2: r16's handle at y - 16); chords across a jump of the map are left out.
+    morph = (shared_y, shift, t): the design floor instead - the root morph applied to the mesh's own flank,
+    x = (1 - w) x(y) + w x(y - shift), w = smoothstep((shared_y - y) / t), and x(y - shift) below the morph.
+    Returns ys, turn {z: list (nan where the row or a chord is missing)}, and per z the max and its y."""
+    ys = np.arange(y_hi, y_lo - 1e-9, -step)
+    ym = np.array([y_shift_map(y) if y_shift_map else y for y in ys])
+    X = np.full((len(ys), len(zs)), np.nan)
+    for i, y in enumerate(ym):
+        if morph is None or y >= morph[0]:
+            X[i] = _outer_rows(mesh, y, zs, x_min)
+            continue
+        t = np.clip((morph[0] - y) / morph[2], 0.0, 1.0)
+        w = t * t * (3.0 - 2.0 * t)
+        b = _outer_rows(mesh, y - morph[1], zs, x_min)
+        X[i] = b if w >= 1.0 else (1.0 - w) * _outer_rows(mesh, y, zs, x_min) + w * b
+    k = int(round(chord / step))
+    T = np.full(X.shape, np.nan)
+    for i in range(k, len(ys) - k):
+        if abs((ym[i - k] - ym[i + k]) - (ys[i - k] - ys[i + k])) > 1e-6:
+            continue
+        a = np.stack([ys[i] - ys[i - k] + 0 * X[i], X[i] - X[i - k]], axis=1)
+        b = np.stack([ys[i + k] - ys[i] + 0 * X[i], X[i + k] - X[i]], axis=1)
+        c = (a * b).sum(1) / (np.linalg.norm(a, axis=1) * np.linalg.norm(b, axis=1))
+        T[i] = np.degrees(np.arccos(np.clip(c, -1.0, 1.0)))
+    out = dict(ys=[round(float(y), 3) for y in ys], turn={}, max={})
+    for j, z in enumerate(zs):
+        key = "z%.0f" % z
+        out["turn"][key] = [None if np.isnan(t) else round(float(t), 3) for t in T[:, j]]
+        if np.all(np.isnan(T[:, j])):
+            out["max"][key] = None
+            continue
+        i = int(np.nanargmax(T[:, j]))
+        out["max"][key] = (round(float(T[i, j]), 2), round(float(ys[i]), 2))
+    return out
+
+
+def turn_vs_reference(test, ref, margin=1.0, at=(-9.0, -13.0, -27.0), win=1.0):
+    """Outer-flank turn of test against ref (both from outer_flank_turn on the same ys): per z the worst excess
+    test - ref - margin (> 0 fails) and where, and the max of each within +-win of the named ys.
+    ref may be a list: the reference is then the larger of them at each y (r16 and the morph's design floor)."""
+    ys = np.array(test["ys"])
+    refs = ref if isinstance(ref, (list, tuple)) else [ref]
+    out = {}
+    for key, tv in test["turn"].items():
+        t = np.array([np.nan if v is None else v for v in tv], float)
+        with np.errstate(all="ignore"):
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r = np.nanmax(np.stack([np.array([np.nan if v is None else v for v in q["turn"][key]], float)
+                                        for q in refs]), axis=0)
+        e = t - r - margin
+        ok = ~np.isnan(e)
+        row = dict(n=int(ok.sum()))
+        if ok.any():
+            i = int(np.nanargmax(e))
+            row.update(worst_excess=round(float(e[i]), 2), worst_at=round(float(ys[i]), 2),
+                       test_there=round(float(t[i]), 2), ref_there=round(float(r[i]), 2),
+                       n_fail=int((e[ok] > 0).sum()))
+            # contiguous failing y ranges: (y_from, y_to, worst excess)
+            f = np.where(ok & (np.nan_to_num(e, nan=-1.0) > 0))[0]
+            rng = []
+            for grp in np.split(f, np.where(np.diff(f) > 1)[0] + 1) if len(f) else []:
+                rng.append((round(float(ys[grp[0]]), 2), round(float(ys[grp[-1]]), 2), round(float(e[grp].max()), 2)))
+            row["fail_ranges"] = rng
+        for y in at:
+            w = np.abs(ys - y) <= win
+            row["y%.0f" % y] = (None if np.all(np.isnan(t[w])) else round(float(np.nanmax(t[w])), 2),
+                                None if np.all(np.isnan(r[w])) else round(float(np.nanmax(r[w])), 2))
+        out[key] = row
+    return out
+
+
 def sharp_edges(mesh, box, deg=30.0, cell=2.0):
     """STL edges with dihedral > deg inside box (x0, x1, y0, y1): count, max, and clusters (cell mm) by max angle."""
     ang = np.degrees(mesh.face_adjacency_angles)
