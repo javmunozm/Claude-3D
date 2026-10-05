@@ -89,6 +89,6 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 ## Decisions pending for the user
 1. **The first print.** Check: snap retention and insertion (insertion safety factor 2.0; `audit/r11/lip_sizing_r11.md`); shoulder-button reach with a real finger (model ii 91 %, model i 77-80 %); the console's fit in the pocket and the lip clearance (CLEAR_Z 0.2); the handle ends at y -68 in the hand.
 2. **Print orientation:** the README does not state one; the r16 slice test was in Z only.
-3. **Method, decided 2026-10-04:** rebuild as B-rep. Next: the spike's go / no-go for a full v2 (`docs/cad_method.md`, "VitaGripPS5 v2 spike"; report `v2/audit/spike/spike_report.md`).
+3. **Method, decided 2026-10-04:** rebuild as B-rep. **Spike done 2026-10-04** (commit `bcdb801`; review `v2/audit/spike/review_spike.md`, ACCEPT WITH LISTED ARTIFACTS): right handle vs r16 RMS 0.10–0.26 mm, max 1.7 at the root top edge; 0 edges over 30° (r16 1803). Open: top round 1 mm, not 3 (S1); no fillet at the plate's bottom junction (S2); inner top-edge band 14.9° (S5). **Waiting for you:** go / no-go for the full v2, and the handle tolerance against r16. Plan basis: the spike plan (`docs/cad_method.md`, "VitaGripPS5 v2 spike"; report `v2/audit/spike/spike_report.md`).
 4. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
 5. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).

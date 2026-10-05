@@ -1,6 +1,18 @@
 # VitaGripPS5 v2: the case as B-rep (spike)
 
-**Status: spike, not a printable case.** r16 (`../stl/VitaGripPS5_case_r16.stl`) stays the printable bake.
+**Status: pass 1b done in part, 2026-10-04; not a printable case.** r16 (`../stl/VitaGripPS5_case_r16.stl`) stays the printable bake.
+
+Pass 1b (`audit/p1b/fix_report.md`; outputs `step/` and `stl/VitaGripPS5_v2_p1b.*`; valid, watertight, 1 body):
+- **Rear corner:** now part of the one grip-end loft (tip to rear face, y 78.55). Its top is one cutter with the rounds built in: 3 mm top round, 1:20 wall at 25° in plan, 6.5 mm foot, flat at the floor. It was fitted to r16 (RMS 1.10). The rear slab, the second loft and the y 61 step are gone. Open: a fin at the wall's outer end (155.7° at (96, 64, 0)), and the rim crest is sharp (its fillet fails). The fix for both breaks three other booleans through the global loft (builds 2-3).
+- **U-turn:** top from a 3D ball opening (r 3) of the height field; handle edges over 30° 3 → 0; a soft ripple remains.
+- **S5:** 14.88° → 12.9°. **Regression:** the plate-front 1 mm fillet no longer builds.
+- **Handle vs r16, top-round band excluded:** RMS 0.08-0.15, max 0.52-1.54 (limit 0.3 / 2.0). Band included: root 0.327.
+
+Pass 1 (`audit/p1/fix_report.md`; outputs `step/` and `stl/VitaGripPS5_v2_p1.*`):
+- **Top round:** 3 mm, built into the sections on the flanks (B-rep median 3.02). At the handle U-turn (y ≈ -42) it left a transverse crease: 3 STL edges over 30°, open as N2.
+- **Plate:** built into the grip end. Plate boxes plus a lofted blend; the old concave step is now a 15° crossing. The front edges carry a 1 mm round.
+- **S5:** unchanged (14.88°).
+- **Handle vs r16:** root rms 0.326 (over the 0.3 working limit, from the 3 mm inner round); middle 0.088-0.114; tip 0.12-0.15.
 
 ## Goal
 Rebuild the VitaGripPS5 snap-in case as a CAD B-rep in build123d instead of r16's 69-stage mesh pipeline (user decision, 2026-10-04). This spike tests the hardest part first:
@@ -30,7 +42,7 @@ The precise features are modelled from the r16 constants:
 | sections | `sections.py` | slices r16 at y-planes, keeps x >= 66.5. For y >= -11.5 it fills the pocket, pits and slots row by row (z >= -14), so they can be re-cut exactly. Sections with r16's flat top are extended above z 8 by the domed cap of r16's uncut section at y -46, moved up the handle-top slope (0.36) |
 | shapes | `shapes.py` | spline section wires, loft, pocket cutter, the fillet try-ladder, single-solid check |
 | parts | `parts/grip_end.py` | right grip end. The main loft runs y 61 to -70 and handle plus end wall are ONE loft (no handle/body junction edge). A low rear-corner loft runs y 59 to 76.5. r16's corner clip (plane through y 59.7 at the top, 4.1 mm z per mm y) cuts the rear; the top is trimmed at 11.4, the tip at -68.0025 and the tip edge is rolled |
-| parts | `parts/plate.py` | simplified floor plate, x 0..68.5 (2 mm into the loft), y -11.2..78.55, z -13.3..-8.8; no window or camera hole |
+| parts | `parts/plate.py` | pass 1, floor plate with no window or camera hole: boxes x 0..60 (z -13.3..-8.8) and x 0..67.5 (z -12..-8.8) for y -11.2..61, rear box x 0..68.5 for y 61..78.55, plus a lofted blend (y -11.2..61): flat at -13.3 to x 61, then a cubic crossing the grip underside at x 69 at 15° |
 | parts | `parts/lip.py` | right upper finger with lip at (90.61, 46.20), n (0.986, 0.164), and its pit |
 | assemble | `assemble.py` | junction edges between the plate and the loft; mirror about x = 0 and union |
 | checks | `checks.py` | topology, mirror deviation, handle deviation from r16 |
@@ -39,10 +51,20 @@ Main: `macros/vita_grip_ps5_v2.py`. Nothing runs at import.
 
 ## Build
 ```
-timeout 300 python projects/VitaGripPS5/v2/macros/vita_grip_ps5_v2.py [--out-step P] [--out-stl P] [--results P] [--junction-brep P]
-python projects/VitaGripPS5/v2/audit/spike/scripts/junction_search.py <half_pre.brep>
+timeout 300 python projects/VitaGripPS5/v2/macros/vita_grip_ps5_v2.py [--out-step P] [--out-stl P] [--results P] [--half-brep P] [--no-gates] [--sections-only] [--grip-only]
+python projects/VitaGripPS5/v2/audit/p1/scripts/p1_post.py
 ```
-The build takes 80 s. The junction search runs each fillet attempt in its own subprocess: in-process, an OCC fillet at r 1 ended the build twice with no Python error.
+Pass 1 build:
+- 19 s to export, 68 s with the gates.
+- Defaults write `step/VitaGripPS5_v2_p1.step`, `stl/VitaGripPS5_v2_p1.stl` and `audit/p1/p1_results.json`.
+- `--half-brep` writes the half before the lip. `p1_post.py` reads that file (path set in the script) for fillet trials, one subprocess each: in-process, an OCC fillet at r 1 ended the spike build twice with no Python error.
+
+Pass-1 stage changes:
+- `sections.py`: `round_top`, `apex_clip`, `resample_aligned` (graded spacing), `blend_profile`.
+- `parts/plate.py`: plate boxes and the blend loft.
+- `checks.py`: `edge_creases`, `round_radii`, `handle_smoothness`.
+
+Pass 1 replaced the spike's main; the spike's code is at commit `bcdb801`. The spike outputs (`*_v2_spike.*`) are still on disk, unchanged.
 
 ## Files
 - `step/VitaGripPS5_v2_spike.step`, `stl/VitaGripPS5_v2_spike.stl`: the spike part (both halves).
@@ -64,6 +86,10 @@ See `audit/spike/spike_report.md`. In short:
 - **Trapezoid extension of flat-topped sections.** The z 11.4 contour got plan corners of R 0.33-1.4 at the handle U-turn and the rear inner corner, and the top roll failed at 1 mm (build 1). With the trapezoid on body stations and the cap sweep on handle stations, the contour kinked at y -11..-12.6 (R 0.5; build 3).
 - **Rear loft overlap section as an unscaled copy.** It met the main loft's end face near-tangentially at (±78, 61, -20.5). The solid was valid, but the STL had 10 open edges (build 3).
 - **Junction fillet search in the build process.** At r 1 the process ended silently (builds 1 and 3).
+- **Pass 1, blend crossing at 10° (x 68.5):** the union left a zero-volume sliver at y 56-57. 15° at x 69 fuses cleanly.
+- **Pass 1, uniform-parameter loops with ungraded segment spacing** (up to 9× jumps on the dome stations): the tip round failed at 3/2/1.
+- **Pass 1, extra stations at y -37 and -39.5:** the main loft blew up (volume 1.4e8).
+- **Pass 1, flat at TOP_Z + 0.01:** loft ringing of about 0.04 left two dimple islands in the flat top. 0.03 leaves none.
 
 ## Verification checklist (open)
 - The rear corner (y 59-77), the plate (no window or camera hole), the second lip and the lower fingers are simplified or absent. None of them is verified against r16.

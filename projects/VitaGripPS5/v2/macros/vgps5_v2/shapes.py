@@ -20,13 +20,29 @@ def one_solid(shape, what):
     return s
 
 
-def section_wire(y, loop):
+def section_wire(y, loop, uniform=False):
+    """Periodic spline through the loop. uniform: parameter i at point i, so every station gets the same knots
+    and the loft pairs points by index (for index-aligned loops)."""
     pts = [Vector(float(x), float(y), float(z)) for x, z in loop]
-    return Wire([Edge.make_spline(pts, periodic=True)])
+    par = [float(i) for i in range(len(pts) + 1)] if uniform else None
+    return Wire([Edge.make_spline(pts, periodic=True, parameters=par)])
 
 
-def loft(stations, what):
-    wires = [section_wire(y, loop) for y, loop in stations]
+def loft(stations, what, uniform=False):
+    wires = [section_wire(y, loop, uniform) for y, loop in stations]
+    return one_solid(Solid.make_loft(wires, ruled=False), what)
+
+
+def blend_wire(y, prof):
+    """Bezier bottom + straight corners, in the plane y (same edge count on every station)."""
+    v = lambda p: Vector(float(p[0]), float(y), float(p[1]))
+    edges = [Edge.make_bezier(*[v(p) for p in prof["bezier"]])]
+    c = prof["corners"]
+    edges += [Edge.make_line(v(a), v(b)) for a, b in zip(c[:-1], c[1:])]
+    return Wire(edges)
+
+
+def loft_wires(wires, what):
     return one_solid(Solid.make_loft(wires, ruled=False), what)
 
 
@@ -43,6 +59,44 @@ def prism_in_frame(pts2d, h0, h1, plane):
     f = polygon_face(pts2d).moved(Location((0, 0, h0)))
     s = Solid.extrude(f, Vector(0, 0, h1 - h0))
     return s.moved(Location(plane))
+
+
+def clip_cutter(w, phi_deg, k, rt, rf, zh, zf, u_far=60.0, z_hi=40.0, half_len=150.0):
+    """Rear-corner cutter: the solid above the corner's top surface. In the (u, z) plane (u along the plan normal
+    n = (-sin phi, cos phi), toward the rear) the surface is: flat at zh, a convex rt round, a wall falling k mm per
+    mm u, a concave rf foot, flat at zf. u = 0 at the round's end on the wall line through w = (x, y).
+    Extruded along the plan direction t = (cos phi, sin phi). Rounds are true arcs (no facets)."""
+    th = np.arctan(1.0 / k)
+    c1 = np.array([-rt * np.cos(th), zh - rt])
+    z_end = c1[1] + rt * np.sin(th)
+    uf = (z_end - zf - rf + rf * np.sqrt(k * k + 1.0)) / k
+    c2 = np.array([uf, zf + rf])
+    nw = np.array([np.cos(th), np.sin(th)])
+    pt = c2 - rf * nw
+
+    def V(p):
+        return Vector(float(p[0]), float(p[1]), 0.0)
+
+    def on(c, r, a):
+        return c + r * np.array([np.cos(a), np.sin(a)])
+
+    a_top = 0.5 * (np.pi / 2 + th)
+    a_ft = 0.5 * (np.pi + th + 1.5 * np.pi)
+    p0 = np.array([c1[0], zh])
+    p1 = np.array([0.0, z_end])
+    p3 = np.array([uf, zf])
+    edges = [Edge.make_three_point_arc(V(p0), V(on(c1, rt, a_top)), V(p1)),
+             Edge.make_line(V(p1), V(pt)),
+             Edge.make_three_point_arc(V(pt), V(on(c2, rf, a_ft)), V(p3)),
+             Edge.make_line(V(p3), V((u_far, zf))),
+             Edge.make_line(V((u_far, zf)), V((u_far, z_hi))),
+             Edge.make_line(V((u_far, z_hi)), V((c1[0], z_hi))),
+             Edge.make_line(V((c1[0], z_hi)), V(p0))]
+    f = Face(Wire(edges)).moved(Location((0, 0, -half_len)))
+    s = Solid.extrude(f, Vector(0, 0, 2.0 * half_len))
+    ph = np.radians(phi_deg)
+    plane = Plane(origin=(w[0], w[1], 0.0), x_dir=(-np.sin(ph), np.cos(ph), 0.0), z_dir=(np.cos(ph), np.sin(ph), 0.0))
+    return one_solid(s.moved(Location(plane)), "clip cutter")
 
 
 def oval_cutter(xc, a, b, yc, y_lo, y_hi, z0, z1):

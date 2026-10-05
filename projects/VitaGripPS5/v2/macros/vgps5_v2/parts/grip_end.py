@@ -1,28 +1,16 @@
-"""Right grip end: handle + end wall as one loft of r16 y-sections, clipped at the rear corner, trimmed flat at the
-top and the tip; the tip edge rolled here, the top edge rolled after the pocket cut (roll_top)."""
-from build123d import GeomType, Plane
-
-from ..shapes import loft, one_solid, box, face_at, try_fillet, prism_in_frame
+"""Right grip end: handle, end wall and rear corner as ONE loft of r16 y-sections (tip to the rear face), trimmed
+flat at the top, the tip and the rear face; the rear corner's top is one cutter with its rounds built in."""
+from ..shapes import loft, one_solid, box, face_at, try_fillet
 
 
-def rear_clip_cutter(y0, z0, slope, x0=0.0, x1=250.0):
-    """Wedge above the plane z = z0 - slope * (y - y0), extruded along X."""
-    zt = z0 + 20.0
-    y_far = y0 + 40.0
-    pts = [(y0 - 20.0 / slope, zt), (y_far, zt), (y_far, z0 - slope * (y_far - y0))]
-    return prism_in_frame(pts, x0, x1, Plane(origin=(0, 0, 0), x_dir=(0, 1, 0), z_dir=(1, 0, 0)))
-
-
-def build_grip_end(main_stations, rear_stations, top_z, tip_y, tip_roll, clip, log=print):
-    """main_stations / rear_stations: [(y, Nx2 (x, z) loop)], rear to tip. clip: (y0, slope).
-    Returns (solid, results dict)."""
+def build_grip_end(stations, top_z, tip_y, rear_y, tip_roll, cutter, log=print):
+    """stations: [(y, Nx2 (x, z) loop)], rear to tip. cutter: shapes.clip_cutter solid. Returns (solid, results)."""
     res = {}
-    main = loft(main_stations, "main loft")
-    rear = loft(rear_stations, "rear loft")
-    log("  lofts valid: main vol %.0f, rear vol %.0f" % (main.volume, rear.volume))
-    main = one_solid(main.cut(rear_clip_cutter(clip[0], top_z, clip[1])), "rear clip")
-    end = one_solid(main.fuse(rear), "grip end lofts")
-    end = one_solid(end.intersect(box(0.0, 250.0, tip_y, 150.0, -80.0, top_z)), "grip end trimmed")
+    end = loft(stations, "grip-end loft", uniform=True)
+    log("  loft valid: volume %.0f" % end.volume)
+    end = one_solid(end.intersect(box(0.0, 250.0, tip_y, rear_y, -80.0, top_z)), "grip end trimmed")
+    end = one_solid(end.cut(cutter), "rear corner cut")
+    log("  rear corner cut: valid, volume %.0f" % end.volume)
     tip_edges = [e for f in face_at(end, "y", tip_y) for e in f.edges()]
     log("  tip face edges: %d" % len(tip_edges))
     r, end = try_fillet(end, tip_edges, [tip_roll, 2.0, 1.0], "tip edge", log)
@@ -30,18 +18,15 @@ def build_grip_end(main_stations, rear_stations, top_z, tip_y, tip_roll, clip, l
     return end, res
 
 
-def roll_top(solid, top_z, r, x_keep, pocket_ys, log=print):
-    """Roll the outer edges of the flat top: skip pocket edges (ellipse caps, straight lines at the pocket's
-    y limits) and the inner edges (centre x < x_keep)."""
-    edges = []
-    for f in face_at(solid, "z", top_z):
+def rim_edges(solid, zf, x_min, y_min, log=print):
+    """Edges of the corner's flat (the cutter's floor at zf) on the outer side (x > x_min, y > y_min) and the
+    cutter-to-flank edges running up from it: the rim crest to be rolled."""
+    out = []
+    for f in face_at(solid, "z", zf):
         for e in f.edges():
             c = e.center()
-            if e.geom_type == GeomType.ELLIPSE or c.X < x_keep:
-                continue
-            if e.geom_type == GeomType.LINE and any(abs(c.Y - py) < 0.02 for py in pocket_ys):
-                continue
-            edges.append(e)
-            log("    top edge: %-8s len %6.2f centre (%.2f, %.2f)" % (e.geom_type.name, e.length, c.X, c.Y))
-    rr, out = try_fillet(solid, edges, [r, 2.0, 1.0], "top edge", log)
-    return rr, out
+            if c.X > x_min and c.Y > y_min and e.geom_type.name != "LINE":
+                out.append(e)
+                log("    rim edge: %-8s len %6.2f centre (%.2f, %.2f, %.2f)" % (e.geom_type.name, e.length, c.X, c.Y,
+                                                                              c.Z))
+    return out
