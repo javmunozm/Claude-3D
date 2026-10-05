@@ -28,9 +28,23 @@ def section_wire(y, loop, uniform=False):
     return Wire([Edge.make_spline(pts, periodic=True, parameters=par)])
 
 
-def loft(stations, what, uniform=False):
-    wires = [section_wire(y, loop, uniform) for y, loop in stations]
-    return one_solid(Solid.make_loft(wires, ruled=False), what)
+def loft(stations, what, uniform=False, max_deg=None, par=None):
+    """Smooth loft (BRepOffsetAPI_ThruSections) through the stations; max_deg / par (Approx_ParametrizationType
+    name, e.g. "Centripetal") override OCC's defaults (8, chord length)."""
+    if max_deg is None and par is None:
+        wires = [section_wire(y, loop, uniform) for y, loop in stations]
+        return one_solid(Solid.make_loft(wires, ruled=False), what)
+    from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
+    from OCP.Approx import Approx_ParametrizationType
+    t = BRepOffsetAPI_ThruSections(True, False, 1e-6)
+    if max_deg:
+        t.SetMaxDegree(max_deg)
+    if par:
+        t.SetParType(getattr(Approx_ParametrizationType, "Approx_" + par))
+    for y, loop in stations:
+        t.AddWire(section_wire(y, loop, uniform).wrapped)
+    t.Build()
+    return one_solid(Solid(t.Shape()), what)
 
 
 def blend_wire(y, prof):

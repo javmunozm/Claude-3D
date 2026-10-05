@@ -1,6 +1,27 @@
 # VitaGripPS5 v2: the case as B-rep (spike)
 
-**Status: pass 1b done in part, 2026-10-04; not a printable case.** r16 (`../stl/VitaGripPS5_case_r16.stl`) stays the printable bake.
+**Status: pass 1d done in part, 2026-10-05; not a printable case.** r16 (`../stl/VitaGripPS5_case_r16.stl`) stays the printable bake.
+
+Pass 1d (`audit/p1d/fix_report.md`; outputs `step/` and `stl/VitaGripPS5_v2_p1d.*`; valid, watertight, 1 body):
+- **One loft again, rear face to tip:** there is no seam at y -13.5 (no B-rep edge; STL max 9.47° there, no folds). Every guided split-loft variant failed in the full build; see the report.
+- **Root transition 15 mm** (y -13.5..-28.5, user choice 14-16). Inner flank 0.92 / 1.23 mm per mm at z 5 / 8.
+- **Open:**
+  - **The ring lines are still visible,** at y -13 and y -27/-28. They are not the seam: they stay with one loft. Suspected cause, not measured: station noise across close stations.
+  - Plate-front round; S5.
+- Body y >= -12 is unchanged from p1c (max 0.07). Handle vs r16 moved +16: middle RMS 0.07-0.09, max 0.47; tip RMS 0.12-0.15, max 0.53.
+
+Pass 1c (`audit/p1c/fix_report.md`; outputs `step/` and `stl/VitaGripPS5_v2_p1c.*`; valid, watertight, 1 body):
+- **Two lofts:**
+  - body/corner: rear face to y -13.5;
+  - handle: y -13.5 to the tip.
+  They meet on one shared section (identical caps, exact fuse). Open: the seam is a crease, median 16-18°, max 48-51°, against 8°. Three seam methods were tried; see the report.
+- **Handle 16 mm shorter (user request):**
+  - Tip plane at y -52.0025; root (-14.48) to tip 37.5 mm.
+  - r16's stations from y -39.5 to the tip are moved +16 mm, unchanged: middle and tip vs moved r16, RMS <= 0.15, max <= 0.53.
+  - y -13.5..-23.5 morphs from r16's root into the moved handle. r16's 16 mm root flare is compressed into 10 mm there, which leaves a pinched waist on the inner side of the root (flank slope up to 1.86 mm/mm).
+- **Rear corner:** the wall-end fin is gone (outer lean -0.1); the rim crest has a 2 mm round.
+- **Still open:** the plate-front round (no edge takes r 1), and S5 (11.5°, now in the morph).
+- **The body at y -12..55 is unchanged from p1b:** max 0.19.
 
 Pass 1b (`audit/p1b/fix_report.md`; outputs `step/` and `stl/VitaGripPS5_v2_p1b.*`; valid, watertight, 1 body):
 - **Rear corner:** now part of the one grip-end loft (tip to rear face, y 78.55). Its top is one cutter with the rounds built in: 3 mm top round, 1:20 wall at 25° in plan, 6.5 mm foot, flat at the floor. It was fitted to r16 (RMS 1.10). The rear slab, the second loft and the y 61 step are gone. Open: a fin at the wall's outer end (155.7° at (96, 64, 0)), and the rim crest is sharp (its fillet fails). The fix for both breaks three other booleans through the global loft (builds 2-3).
@@ -83,6 +104,15 @@ See `audit/spike/spike_report.md`. In short:
 - handle RMS 0.12-0.28 mm from r16.
 
 ## Rejected approaches (spike)
+- p1d, G1 seam between two lofts (`audit/p1d/fix_report.md`):
+  - Spline guide stations at -13.5 +- g: the body loft's top cut returns nothing. This happened at every g (0.02-0.2), at max degree 3 / 5 / 8, and with centripetal parametrisation.
+  - A handle guide along the body's own end tangent: the trimmed handle was invalid. That tangent is up to 74° off the chords.
+  - No guide at T 15: the pieces do not fuse.
+- p1c, seam between two lofts:
+  - Overlapping lofts trimmed at the station plane y -13.5: crease max 66°, STL folds 179°. Fragile: the fuse gave 2 solids without the fillets, and some trims returned nothing.
+  - Overlapping lofts cut at -13.25, between stations: a micro-step, 30 seam edges at 80-97°.
+  - A -14 station on the handle side: the trimmed handle loft was invalid.
+  Details: `audit/p1c/fix_report.md`.
 - **Trapezoid extension of flat-topped sections.** The z 11.4 contour got plan corners of R 0.33-1.4 at the handle U-turn and the rear inner corner, and the top roll failed at 1 mm (build 1). With the trapezoid on body stations and the cap sweep on handle stations, the contour kinked at y -11..-12.6 (R 0.5; build 3).
 - **Rear loft overlap section as an unscaled copy.** It met the main loft's end face near-tangentially at (±78, 61, -20.5). The solid was valid, but the STL had 10 open edges (build 3).
 - **Junction fillet search in the build process.** At r 1 the process ended silently (builds 1 and 3).

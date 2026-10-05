@@ -91,6 +91,7 @@ REAR_STATIONS = [77.5, 75.0, 73.0, 71.0, 68.5, 66.0, 63.5]
 REAR_EXTRAP_Y = 79.05      # extrapolated from the last two, past the rear face; the loft is trimmed at PLATE_Y1
 REAR_CUT_Z = -10.5
 REAR_LEAN = 0.15           # extension lean limit, mm x per mm z
+REAR_OUTER_LEAN = -0.1     # pass 1c (N3): fixed inward lean of the outer side (the free lean left a fin at (96, 64, 0))
 # cutter fitted to r16's corner top heights (x 84..outline-2.5, y 56..70, outside the pocket; 938 points):
 # rms 1.10 mm (p1's y-plane wedge at slope 4.1: 3.35). Wall line through CLIP_W at CLIP_PHI deg in plan,
 # falling CLIP_K mm per mm, CLIP_RF concave foot to the floor; the top round is ROUND_R, tangent to TOP_Z + eps
@@ -108,13 +109,43 @@ S5 = dict(sigma=2.0, z=(3.5, 5.0, 8.5, 9.8), x=(75.0, 78.0), y=(-41.0, -38.0, -1
 # (build 1: turn 14.88 -> 12.9 deg, now at z 3.77 on the lower ramp. Build 2 with sigma 2.5, z 0 / 2.5 / 8.5 / 9.8:
 # tip fillet, plate-front fillet and the pit cut failed, so it was reverted)
 
-# stations, rear to tip (y): REAR_STATIONS + MAIN_STATIONS, one loft
+# stations (r16 y), rear to tip. Pass 1c: two lofts sharing the station SHARED_Y. The body/corner loft runs
+# REAR_STATIONS + MAIN_STATIONS >= SHARED_Y; the handle loft from SHARED_Y to the tip.
 MAIN_STATIONS = [61.0, 57.0, 53.0, 49.0, 45.0, 41.0, 37.0, 33.0, 29.0, 25.0, 21.0, 17.0, 13.0, 9.0, 5.0,
-                 1.0, -3.0, -6.0, -8.5, -10.0, -11.0, -12.0, -13.5, -15.0, -17.0, -19.0, -21.5, -24.0,
+                 1.0, -3.0, -6.0, -8.5, -10.0, -11.0, -12.0, -13.0, -13.5, -15.0, -17.0, -19.0, -21.5, -24.0,
                  -27.0, -30.0, -33.0, -36.0, -38.5, -40.5, -41.0, -42.0, -42.5, -43.0, -43.5, -45.0, -47.0,
                  -49.5, -52.0, -55.0, -58.0, -61.0, -64.0]
+SHARED_Y = -13.5           # the station both lofts pass through (each loft also takes the other's first neighbour
+                           # and is trimmed at this plane, so both have the same tangent there)
+# handle shortened (user, 2026-10-04): the r16 span below SHARED_Y is removed and the rest moved +HANDLE_SHIFT in y.
+# r16's root section is 3.6 (z 0) to 6.4 mm (z 10.5) wider on the inner side than r16 at y - 16 (it flares into the
+# wall plane x 66.8), so the first HANDLE_BLEND_T mm below SHARED_Y morph point-wise from r16(y) to r16(y - shift)
+# (smoothstep weight); below that the stations are r16's, moved, unchanged.
+HANDLE_SHIFT = 16.0
+# pass 1d: root transition 15 mm (user: 14-16). Inner flank rate on the loops, z 5 / 8: T 10 1.30 / 1.72,
+# T 15 1.00 / 1.25 (r16 moved alone 1.00 / 1.06 over the same y)
+HANDLE_BLEND_T = 15.0
+# new y; -24.5..-27.5 are r16's dense U-turn stations (-40.5..-43.5) moved, so the morph keeps them
+MORPH_YS = [-15.0, -17.0, -19.0, -21.0, -22.5, -24.5, -25.0, -26.0, -26.5, -27.0, -27.5]
+# seam (pass 1d): both lofts end on the shared section, and each takes one guide station SEAM_GUIDE mm past the
+# body's last / before the handle's first ... on its own side: the value at SHARED_Y +- SEAM_GUIDE of a per-point
+# cubic spline through SEAM_GUIDE_N stations on each side. Both lofts then leave the shared section along the
+# same tangent (scratch trials, crease on 180 seam points: no guide max 67 / median 16; guide 0.25: 9.4 / 1.2;
+# 0.1: 3.8 / 0.46; 0.05: 1.9 / 0.23; loft vs spline at y -12.25..-15.75 within 0.08)
+# In the full build every guided variant failed: with a guide on the body loft its top cut at TOP_Z returns
+# nothing (any extra body station: 0.02..0.25, max degree 3 / 5 / 8, centripetal); a guide on the handle only,
+# along the body loft's own end tangent, made the trimmed handle invalid (that tangent is up to 74 deg off the
+# handle's chords at (70.4, -12.7)); without guides the T 15 pieces do not fuse (volume off 0.12 %).
+# So pass 1d lofts body and handle as ONE loft through all stations (SINGLE_LOFT): no seam at all.
+SINGLE_LOFT = True
+SEAM_GUIDE = 0.0           # split lofts only (SINGLE_LOFT False): guide distance, 0 = none
+SEAM_GUIDE_N = 4
+BODY_LOFT_OPTS = {}      # ThruSections overrides, e.g. dict(max_deg=3) or dict(par="Centripetal")
+HANDLE_LOFT_OPTS = {}
+HANDLE_SRC = [y for y in MAIN_STATIONS if y <= SHARED_Y - HANDLE_SHIFT - HANDLE_BLEND_T]   # r16 y, moved +shift
+HANDLE_EXTRAP = [-66.5 + HANDLE_SHIFT, -70.0 + HANDLE_SHIFT]      # new y; extrapolated (r16 tip roll from -65)
+TIP_Y_NEW = TIP_Y + HANDLE_SHIFT
 # blend stations: the plate front (PLATE_Y0) plus the grip stations from -10 to the rear (BLEND_Y1); the last
 # profile is copied to BLEND_EXTRAP_Y and the blend trimmed at PLATE_Y1
 BLEND_STATIONS = [PLATE_Y0] + sorted(y for y in REAR_STATIONS + MAIN_STATIONS if -10.0 <= y <= BLEND_Y1)
 BLEND_EXTRAP_Y = 79.05
-EXTRAP_STATIONS = [-66.5, -70.0]   # extrapolated linearly from the last two (r16 tip roll starts at -65)

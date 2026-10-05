@@ -1,15 +1,14 @@
 # VitaGripPS5: STATE
 
-Updated: 2026-10-04, by the system-improvement session (Phase 3a), from
-`NEXT_SESSION.md`, the README section "Rounds 14-16" and
-`audit/r16/review/review_r16.md`.
+Updated: 2026-10-05 by `/session-end` (session 49ca6a61: system improvement,
+then the v2 B-rep spike and passes 1–1d).
 
 Keep this file under about 150 lines. Agents read it instead of the README. History, rejected approaches and narrative stay in the README.
 
 ## Current
 - **Bake:** `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
-- **Working preview:** none; the bake is current.
+- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_p1d.stl` (uncommitted pass 1d; last commit `285ad15` = pass 1b). See "v2" below.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).
 - **Method:** r16 is a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep; fillets cannot be made on it. **The user decided on 2026-10-04 to rebuild the case as a CAD (B-rep) design** in `v2/` (`docs/versioning.md`); a spike runs first (`v2/audit/spike/spike_report.md`). r16 stays the printable bake until a v2 replaces it.
 - **The part:** X width 220.08; Y fore-aft from the handle tips at -68.0025 to the rear at +78.550; Z up, pocket floor -8.80, flat top 11.40. 137 216 faces, watertight, 1 body, genus 2, volume 266 520.9 mm3.
@@ -73,6 +72,19 @@ Not swept in r16: D38, the fillet families D27/D28/D31/D32, the groove at y -9.2
 - **Corner closeups:** `python <audit/r9/closeup.py> <stl> <png> 90 65 -12 190 150 -90` (R); `-90 65 -12 -190 150 -90` (L).
 - **Locating a user mark:** ray-cast through the red pixels with the render's camera, after validating the camera by silhouette IoU. Use VTK's OBBTree: the pure-Python trimesh ray backend runs out of memory on large batches.
 
+## v2 (B-rep rebuild in `v2/`, build123d)
+Build: `python projects/VitaGripPS5/v2/macros/vita_grip_ps5_v2.py` (about 20 s to export, about 70–150 s with its gates). Reports: `v2/audit/<pass>/fix_report.md`.
+
+- **Built:** one grip end lofted from smoothed r16 sections (y-planes), mirrored exactly (max 3e-6 mm); flat top Z 11.40 with a 3 mm round built into the sections (flanks median 3.0); tip 3 mm round; 3D rolling-ball top at the U-turn; floor plate blended into the grips; rear corner part of the grip loft (no fin, rim 2 mm round); one upper lip per side with pit and 1 mm slots. Export `tolerance=0.002, angular_tolerance=0.05`.
+- **Handle 16 mm shorter (user, 2026-10-04):** 16 mm removed right below the console body, the rest moved +16 in y; tip at y -52.0025, root-to-tip 37.5 mm (DualSense 1:1: 38.7 L / 41.7 R); 15 mm morph from the root flare into the moved handle (inner flank 0.92–1.23 mm per mm, r16 about 0.9).
+- **Measured vs r16** (round band excluded): handle RMS 0.07–0.15, max 0.53 mm (r16 moved +16); body y >= -12 unchanged. Right handle: 0 edges > 30° (r16 1803).
+- **Open:**
+  - **Ring lines** around the handle at y about -13, -9 and -28 (outer flank turns 7–8° at -13, 22° at -27; r16 at most 3.4° there). They sit where r16 itself has faint rings: the loft interpolates r16's sections exactly and amplifies their ripples (observation from the renders plus the pass 1d numbers; not yet a dedicated test).
+  - Plate-front round (edges at (69, -11, -13.9)) fails even at 0.5 mm; S5 handle turn 10.2° at (79.7, -38.5, 2.2).
+  - Pass 1d went back to **one loft** (`SINGLE_LOFT = True`): no seam method worked in the full build. The split (the user's option 1) is kept behind the switch.
+  - Not built yet: second (lower) latch per side, touchscreen window 110 x 57 R 3.5, camera hole D 12, bottom opening, lower pits; pocket/lip/window lock check against r16; strength check (print-tolerance-expert).
+- **Method-change trigger met** (the handle root reworked in 4 consecutive passes): next step is the method decision below, not pass 1e.
+
 ## Rounds
 List price of the agent runs only (the orchestrator is not included); measured 2026-10-04 with `tools/token_audit/maxturns_review.py`. Rounds r10-r16 with the orchestrator: $118.14.
 
@@ -85,10 +97,17 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 | r14 | 2026-10-02..03 | register 66, designer 260, review 65 | $21.16 | rejected as a bake: R rim cliff, L wall altered |
 | r15 | 2026-10-03 | designer 298 | $18.12 | lens scoop on the R flank, 3 gates unmet |
 | r16 | 2026-10-03 | designer 36, review 75 | $3.79 | baked, ACCEPT WITH LISTED ARTIFACTS |
+| v2 spike | 2026-10-04 | designer 10 (usage-limit stop) + 36, review 21 | $6.57 | go; ACCEPT WITH LISTED ARTIFACTS (`bcdb801`) |
+| v2 p1 / 1b | 2026-10-04 | designer 20 (stop) + 39, 47 | $11.01 | 3 mm round, plate blend, one-piece corner (`285ad15`) |
+| v2 p1c / 1d | 2026-10-04..05 | designer 50, 46 | $6.31 | handle -16 mm, waist fixed, ring lines open (uncommitted) |
+
+Session 49ca6a61 total, orchestrator included: $85.10 list (main $61.04, agents $24.06).
 
 ## Decisions pending for the user
 1. **The first print.** Check: snap retention and insertion (insertion safety factor 2.0; `audit/r11/lip_sizing_r11.md`); shoulder-button reach with a real finger (model ii 91 %, model i 77-80 %); the console's fit in the pocket and the lip clearance (CLEAR_Z 0.2); the handle ends at y -68 in the hand.
 2. **Print orientation:** the README does not state one; the r16 slice test was in Z only.
-3. **Method, decided 2026-10-04:** rebuild as B-rep. **Spike done 2026-10-04** (commit `bcdb801`; review `v2/audit/spike/review_spike.md`, ACCEPT WITH LISTED ARTIFACTS): right handle vs r16 RMS 0.10–0.26 mm, max 1.7 at the root top edge; 0 edges over 30° (r16 1803). Open: top round 1 mm, not 3 (S1); no fillet at the plate's bottom junction (S2); inner top-edge band 14.9° (S5). **Waiting for you:** go / no-go for the full v2, and the handle tolerance against r16. Plan basis: the spike plan (`docs/cad_method.md`, "VitaGripPS5 v2 spike"; report `v2/audit/spike/spike_report.md`).
-4. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
-5. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).
+3. **v2 method (first decision next time):** fit the handle surface to r16's sections (smooth each matched point's track along y before lofting, or one smoothed B-spline surface fit) instead of interpolating them exactly. Recommended; it should remove the ring lines and may let the split lofts work again.
+4. **Commit pass 1d** as the new fallback (valid, no folds, includes the -16 mm handle)? Run `/verify` first.
+5. Handle tolerance against r16: working limit RMS 0.3 / max 2.0 mm, round band excluded (set by the orchestrator; confirm or change). The user chose the 3 mm round everywhere and the 15 mm root transition.
+6. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
+7. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).

@@ -218,10 +218,11 @@ def tall_rear(poly, p):
     cz = p["rear_cut_z"]
     a = _row_extent(poly, cz)
     b = _row_extent(poly, cz - 1.5) or a
-    # the lean follows the rows below cz; it leans the outer side out at y 61..64 and leaves a fin at the wall end
-    # ((96, 64, 0), 155 deg). A fixed inward lean (-0.1) removed it but broke the tip fillet, the plate-front fillet
-    # and the pit cut (builds 2 and 3): open, see audit/p1b/fix_report.md
+    # a lean that follows the rows below cz leans the outer side out at y 61..64 (a fin at (96, 64, 0)); so the
+    # outer side takes the fixed p["rear_outer_lean"] when given (N3)
     sl = np.clip([(a[0] - b[0]) / 1.5, (a[1] - b[1]) / 1.5], -p["rear_lean"], p["rear_lean"])
+    if p.get("rear_outer_lean") is not None:
+        sl[1] = p["rear_outer_lean"]
     h = p["ext_max"] - cz
     trap = Polygon([(a[0], cz - 0.3), (a[1], cz - 0.3), (a[1] + sl[1] * h, p["ext_max"]),
                     (a[0] + sl[0] * h, p["ext_max"])])
@@ -382,6 +383,23 @@ def blend_profile(poly, b):
         + (3 * (1 - t) * t ** 2)[:, None] * P[2] + (t ** 3)[:, None] * P[3]
     margin = min(_zlo(poly, x) - z for x, z in curve if b["grip_x"] + 0.05 <= x < xa - 0.05)
     return dict(bezier=bez, corners=corners, za=za, slope_grip=sa, slope_blend=s_h, margin=margin)
+
+
+def morph(root, moved, shared_y, t):
+    """Point-wise blend of index-aligned loops: root [(y, r16 loop at y)] into moved [(y, r16 loop at y - shift)],
+    weight smoothstep((shared_y - y) / t): 0 with zero slope at shared_y, 1 with zero slope at shared_y - t."""
+    return [(y, (1.0 - _ramp((shared_y - y) / t)) * a + _ramp((shared_y - y) / t) * b)
+            for (y, a), (_, b) in zip(root, moved)]
+
+
+def seam_guides(before, after, y0, g):
+    """Guide sections at y0 + g and y0 - g: a per-point cubic spline (not-a-knot) through the index-aligned
+    stations before (y > y0, ending at y0) and after (y < y0). Each loft gets the guide on its own side, so both
+    leave the shared section along the spline's tangent (G1 seam)."""
+    from scipy.interpolate import CubicSpline
+    st = sorted({round(y, 4): (y, lp) for y, lp in before + after}.values(), key=lambda s: s[0])
+    cs = CubicSpline(np.array([s[0] for s in st]), np.stack([s[1] for s in st]), axis=0)
+    return (y0 + g, cs(y0 + g)), (y0 - g, cs(y0 - g))
 
 
 def shrunk(loop, scale):

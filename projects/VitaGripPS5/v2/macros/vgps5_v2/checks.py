@@ -159,6 +159,46 @@ def deviation(v2, r16, regions, band=None, n=150000):
     return out
 
 
+def band_dihedral(mesh, box):
+    """STL edges with midpoints in box (x0, x1, y0, y1): count, max / p99 dihedral (deg) and where the max is."""
+    ang = np.degrees(mesh.face_adjacency_angles)
+    mid = mesh.vertices[mesh.face_adjacency_edges].mean(axis=1)
+    x0, x1, y0, y1 = box
+    s = (mid[:, 0] > x0) & (mid[:, 0] < x1) & (mid[:, 1] > y0) & (mid[:, 1] < y1)
+    i = int(np.argmax(np.where(s, ang, -1.0)))
+    return dict(n=int(s.sum()), max=round(float(ang[i]), 2), p99=round(float(np.percentile(ang[s], 99)), 2),
+                max_at=mid[i].round(2).tolist())
+
+
+def inner_flank_rate(mesh, y_hi, y_lo, zs=(5.0, 8.0, 9.5, 10.5), step=0.5, x_min=60.0):
+    """Right handle: inner-flank x (lowest x of the y-section's row at z) every step mm of y; max |dx/dy| per z
+    and where. The rows are on the STL's y-sections, so this measures the loft, not its stations."""
+    from shapely.geometry import Polygon, LineString
+    ys = np.arange(y_hi, y_lo - 1e-9, -step)
+    X = np.full((len(ys), len(zs)), np.nan)
+    for i, y in enumerate(ys):
+        s = mesh.section(plane_origin=[0, y, 0], plane_normal=[0, 1, 0])
+        if s is None:
+            continue
+        loops = [e[:, [0, 2]] for e in s.discrete if e[:, 0].mean() > x_min and len(e) > 8]
+        if not loops:
+            continue
+        P = Polygon(max(loops, key=lambda e: Polygon(e).area)).buffer(0)
+        for k, z in enumerate(zs):
+            r = P.intersection(LineString([(x_min, z), (300.0, z)]))
+            if not r.is_empty:
+                X[i, k] = r.bounds[0]
+    R = np.abs(np.diff(X, axis=0)) / step
+    out = {}
+    for k, z in enumerate(zs):
+        if np.all(np.isnan(R[:, k])):
+            out["z%.1f" % z] = None        # the row leaves the section (the top falls below z)
+            continue
+        j = int(np.nanargmax(R[:, k]))
+        out["z%.1f" % z] = (round(float(R[j, k]), 2), round(float(ys[j] - step / 2), 2))
+    return out
+
+
 def sharp_edges(mesh, box, deg=30.0, cell=2.0):
     """STL edges with dihedral > deg inside box (x0, x1, y0, y1): count, max, and clusters (cell mm) by max angle."""
     ang = np.degrees(mesh.face_adjacency_angles)
