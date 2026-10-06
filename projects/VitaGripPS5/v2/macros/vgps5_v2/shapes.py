@@ -124,6 +124,29 @@ def oval_cutter(xc, a, b, yc, y_lo, y_hi, z0, z1):
     return one_solid(mid.fuse(*caps), "pocket cutter")
 
 
+def rounded_rect_prism(xc, y0, y1, w, r, z0, z1):
+    """Prism z0..z1 over the rectangle x xc +- w/2, y y0..y1 with corner radius r (true arcs)."""
+    x0, x1 = xc - w / 2.0, xc + w / 2.0
+    s = np.sqrt(0.5) * r
+
+    def V(x, y):
+        return Vector(float(x), float(y), float(z0))
+
+    edges = [Edge.make_line(V(x0 + r, y0), V(x1 - r, y0)),
+             Edge.make_three_point_arc(V(x1 - r, y0), V(x1 - r + s, y0 + r - s), V(x1, y0 + r)),
+             Edge.make_line(V(x1, y0 + r), V(x1, y1 - r)),
+             Edge.make_three_point_arc(V(x1, y1 - r), V(x1 - r + s, y1 - r + s), V(x1 - r, y1)),
+             Edge.make_line(V(x1 - r, y1), V(x0 + r, y1)),
+             Edge.make_three_point_arc(V(x0 + r, y1), V(x0 + r - s, y1 - r + s), V(x0, y1 - r)),
+             Edge.make_line(V(x0, y1 - r), V(x0, y0 + r)),
+             Edge.make_three_point_arc(V(x0, y0 + r), V(x0 + r - s, y0 + r - s), V(x0 + r, y0))]
+    return one_solid(Solid.extrude(Face(Wire(edges)), Vector(0, 0, z1 - z0)), "rounded rectangle prism")
+
+
+def cylinder_z(x, y, r, z0, z1):
+    return one_solid(Solid.make_cylinder(r, z1 - z0, Plane(origin=(x, y, z0))), "cylinder")
+
+
 def face_at(solid, axis, value, tol=0.02):
     """Planar faces whose normal is along axis and that lie at the given coordinate."""
     out = []

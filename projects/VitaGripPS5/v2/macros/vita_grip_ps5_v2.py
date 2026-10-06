@@ -1,9 +1,10 @@
-"""VitaGripPS5 v2 main (pass fit): the case's right grip end as B-rep (build123d), one loft rear face to tip (the
+"""VitaGripPS5 v2 main (pass 2): the case's right grip end as B-rep (build123d), one loft rear face to tip (the
 handle 16 mm shorter than r16, 15 mm root transition) through stations FITTED along y below y -3 (a smoothing
-spline per matched point, evenly spaced stations), plate built in, mirrored.
+spline per matched point, evenly spaced stations), plate built in, upper and lower lips with pits, bottom opening,
+mirrored; rear window and camera hole cut through the plate.
 
   timeout 300 python vita_grip_ps5_v2.py [--out-step P] [--out-stl P] [--results P] [--sections-only]
-                                         [--half-brep P] [--grip-only P.stl] [--no-gates]
+                                         [--half-brep P] [--grip-only P.stl] [--no-gates] [--off all|SWITCH,...]
 """
 import argparse
 import json
@@ -26,14 +27,15 @@ def main():
     from vgps5_v2.parts.plate import build_plate_half, build_blend, front_round_cutter, corner_round_web
     from vgps5_v2.parts.lip import finger_profile, pit_profile, build_finger, build_pit
     from vgps5_v2.assemble import mirror_union
-    from vgps5_v2.shapes import box
+    from vgps5_v2.shapes import box, rounded_rect_prism, cylinder_z
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_corner.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_corner.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "corner" / "corner_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_s8.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_s8.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "s8" / "s8_results.json"))
     ap.add_argument("--corner-round", type=float, default=None, help="override CORNER_ROUND (0 = pass front)")
+    ap.add_argument("--off", default="", help="comma list of pass-2 switches to turn off, or 'all' (= pass corner)")
     ap.add_argument("--sections-only", action="store_true")
     ap.add_argument("--half-brep", default=None, help="write the half before the lip (BREP), for fillet searches")
     ap.add_argument("--no-gates", action="store_true")
@@ -41,6 +43,11 @@ def main():
     args = ap.parse_args()
     if args.corner_round is not None:
         C.CORNER_ROUND = args.corner_round
+    p2_switches = ("LOWER_LIP_ON", "WINDOW_ON", "CAMERA_ON", "BOTTOM_OPEN_ON")
+    for k in (p2_switches if args.off == "all" else [s for s in args.off.split(",") if s]):
+        if k not in p2_switches:
+            raise SystemExit("unknown switch %s" % k)
+        setattr(C, k, False)
 
     t0 = time.time()
 
@@ -163,6 +170,16 @@ def main():
         fx = [e for e in half.edges() if abs(e.center().Y - C.PLATE_Y0) < 0.4 and 63.0 < e.center().X < 70.0
               and e.center().Z < -9.0 and e.geom_type.name == "BSPLINE"]
         R["front_r_applied"], half = try_fillet(half, fx, [C.FRONT_R], "plate front junction", log)
+    if C.BOTTOM_OPEN_ON:
+        # pass 2: nothing above the floor in front of the pocket for x < OPEN_X_END (r16's bottom opening); the box
+        # reaches into the pocket's air (y > POCKET_Y_BOTTOM) and starts on the floor plane
+        oc = box(-1.0, C.OPEN_X_END, C.OPEN_Y_LO, C.POCKET_Y_BOTTOM + 1.0, C.FLOOR_Z, C.TOP_Z + 1.0)
+        rm = half.intersect(oc)
+        rms = rm.solids() if hasattr(rm, "solids") else [rm]
+        R["bottom_open_removed"] = [(round(s.volume, 4), [round(v, 3) for v in tuple(s.bounding_box().min)],
+                                     [round(v, 3) for v in tuple(s.bounding_box().max)]) for s in rms]
+        half = one_solid(half.cut(oc), "bottom opening cut")
+        log("bottom opening x < %.2f: removed %s" % (C.OPEN_X_END, R["bottom_open_removed"]))
 
     n = np.array(C.FINGER_N) / np.linalg.norm(C.FINGER_N)
     prof, info = finger_profile(C.LIP_U, C.LIP_TOP_Z, C.ROOT_Z, C.FINGER_T_ROOT, C.FINGER_T_TIP, C.LIP_OVERHANG,
@@ -178,12 +195,34 @@ def main():
     finger = one_solid(build_finger(C.FINGER_P, n, C.FINGER_W, prof), "finger")
     half = one_solid(half.fuse(finger), "finger union")
     log("lip: valid, half volume %.0f" % half.volume)
+    if C.LOWER_LIP_ON:
+        # pass 2: the lower finger, lip and pit, the upper ones' mirror about YC (r16: y_lo = 2 YC - y_up)
+        n_lo = np.array(C.FINGER_N_LO) / np.linalg.norm(C.FINGER_N_LO)
+        pit_lo = build_pit(C.FINGER_P_LO, n_lo, pit_profile(C.FINGER_W, C.FINGER_SLOT, C.FINGER_INNER_SLOT,
+                                                            C.FINGER_T_ROOT, C.FINGER_GAP, C.PIT_CORNER_R),
+                           C.ROOT_Z, C.TOP_Z + 10.0)
+        half = one_solid(half.cut(pit_lo), "lower pit cut")
+        half = one_solid(half.fuse(one_solid(build_finger(C.FINGER_P_LO, n_lo, C.FINGER_W, prof), "lower finger")),
+                         "lower finger union")
+        log("lower lip at (%.3f, %.3f) n (%.3f, %.3f): valid, half volume %.0f"
+            % (C.FINGER_P_LO + tuple(n_lo) + (half.volume,)))
 
     full, _ = mirror_union(half)
     R["valid_full"] = valid(full)
     if not R["valid_full"]:
         raise RuntimeError("mirrored union not valid")
     log("mirrored union: valid, volume %.0f, faces %d" % (full.volume, len(full.faces())))
+    if C.WINDOW_ON:
+        win = rounded_rect_prism(0.0, C.WIN_Y0, C.WIN_Y1, C.WINDOW_W, C.WINDOW_R, C.HOLE_Z0, C.HOLE_Z1)
+        full = one_solid(full.cut(win), "rear window cut")
+        log("rear window %.2f x %.2f (y %.3f..%.3f) R %.1f: valid" % (C.WINDOW_W, C.WIN_Y1 - C.WIN_Y0, C.WIN_Y0,
+                                                                      C.WIN_Y1, C.WINDOW_R))
+    if C.CAMERA_ON:
+        cam = cylinder_z(0.0, C.CAMERA_Y, C.CAMERA_HOLE_D / 2.0, C.HOLE_Z0, C.HOLE_Z1)
+        full = one_solid(full.cut(cam), "camera hole cut")
+        log("camera hole D %.1f at (0, %.3f): valid" % (C.CAMERA_HOLE_D, C.CAMERA_Y))
+    R["valid_full"] = valid(full)
+    R["switches"] = {k: getattr(C, k) for k in p2_switches}
 
     for pth in (args.out_step, args.out_stl):
         Path(pth).parent.mkdir(parents=True, exist_ok=True)
@@ -317,6 +356,11 @@ def main():
             R[tag] = checks.deviation(m, trimesh.load(str(pth), force="mesh"), reg)
             for k, d in R[tag].items():
                 log("%s %-18s %s" % (tag, k, {t: (q["rms"], q["max"], q["max_at"]) for t, q in d.items()}))
+    # pass 2 gates: topology + genus, sky test, walls / back, lock check against r16, change against pass corner
+    from vgps5_v2 import gates_p2
+    corner_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_corner.stl"
+    R["p2"] = gates_p2.run(m, r16, trimesh.load(str(corner_stl), force="mesh"), C, Path(args.results).parent,
+                           args.out_stl, log)
     R["total_s"] = round(time.time() - t0, 1)
     Path(args.results).write_text(json.dumps(R, indent=1, default=str))
     log("gates written to %s" % args.results)

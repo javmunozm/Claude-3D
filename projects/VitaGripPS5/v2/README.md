@@ -135,6 +135,23 @@ fused into the half, not a fillet. `CORNER_ROUND = 1.0` (0 = pass front: the has
 material over `CORNER_ROUND_SINK`; the web is trimmed at the floor plane. Open: the web's B-rep radius dips locally to 0.32 where the plate
 front turns into the front round (median 1.005); details in `audit/corner/fix_report.md`.
 
+## Pass 2 (2026-10-05): lower latches, window, camera hole, bottom opening
+r16's remaining features, each an exact B-rep feature behind its own switch in `constants.py`. With
+`--off all` the build reproduces pass corner's STL byte for byte (SHA-256 `7391D824…9AA05A`, measured).
+Defaults now write `step/VitaGripPS5_v2_p2.step`, `stl/VitaGripPS5_v2_p2.stl`, `audit/p2/p2_results.json`.
+
+| Switch | Feature | Constants |
+|--------|---------|-----------|
+| `LOWER_LIP_ON` | lower finger + lip + pit per side, the upper one's mirror about YC 33.275 (r16's rule `y_lo = 2 YC - y_up`); same `lip.py` profiles | `FINGER_P_LO` (90.61, 20.35), `FINGER_N_LO` (0.986, -0.164) |
+| `WINDOW_ON` | rear window through the floor plate, 110 x 57.05, R 3.5, x 0, y 3.00..60.05 | `WINDOW_W`, `WIN_Y0`, `WIN_Y1`, `WINDOW_R` (derived as r16 from `CLEAR_Y`, `PANEL_*`, `WINDOW_GROW`) |
+| `CAMERA_ON` | camera hole D 12 at (0, 68.05) through the plate | `CAMERA_HOLE_D`, `CAMERA_Y` |
+| `BOTTOM_OPEN_ON` | nothing above the floor (z >= -8.8) in front of the pocket for abs(x) < `OPEN_X_END` (p2: 66.75, r16's right-side end; pass s8 2026-10-05: **67.4**, user's option (a) for S8, r16's OPEN_WALL rule; the y-wall in front of the end is now >= 3.286, was 1.43; new permanent gate `gates_p2.end_wall_y`, wall in y at fixed x, x `OPEN_X_END`..72, z -8.8..11.4, both sides; it reproduces 1.43 / 2.26 on p2; `audit/s8/fix_report.md`) | `OPEN_X_END`, `OPEN_Y_LO` |
+
+- Window and camera are cut on the mirrored solid, the lower lip and the opening on the half before the mirror.
+- The opening cut takes 10.24 mm3 per side (x 66.36..66.75, y -13.61..-9.0, z -8.8..8.15): the grip's inner face sat at x 66.5–66.6 there. v2 was already open for abs(x) < 66.5.
+- New gates in `vgps5_v2/gates_p2.py` (topology + genus, flood-fill sky test with a sealed-void control, walls / back by `tools/form_sweep.py`, lock check against r16, change against pass corner); helpers in `checks.py`. Numbers in `audit/p2/fix_report.md`.
+- Pass-2 build: 57 s to export, 296 s with all gates.
+
 ## Files
 - `step/VitaGripPS5_v2_spike.step`, `stl/VitaGripPS5_v2_spike.stl`: the spike part (both halves).
 - `audit/spike/spike_results.json`: gate numbers from the build.
@@ -170,6 +187,11 @@ See `audit/spike/spike_report.md`. In short:
 - **Pass 1, flat at TOP_Z + 0.01:** loft ringing of about 0.04 left two dimple islands in the flat top. 0.03 leaves none.
 
 ## Verification checklist (open)
-- The rear corner (y 59-77), the plate (no window or camera hole), the second lip and the lower fingers are simplified or absent. None of them is verified against r16.
-- Pocket wall, floor and lip locks (STATE.md) are built from the constants but were **not measured** on the spike's export.
-- No structural check: print-tolerance-expert has not seen this geometry.
+- The rear corner (y 59-77) is simplified; it is not verified against r16. The window, camera hole, lower lips and bottom opening were added in pass 2.
+- Lock check against r16 (pass 2, measured on `stl/VitaGripPS5_v2_p2.stl`, `audit/p2/fix_report.md`). These pass: lip u on all four lips (max 0.0002 from r16), the floor, and the change against pass corner. These are open:
+  - the bottom-bar strip differs from r16 by up to 1.29 mm (v2's simplified plate; unchanged since the spike);
+  - pocket wall 0.021 at (87.68, 57.67, z 0) and 0.010 at (-87.18, 59.01, z -5), where the lock is 0.005;
+  - the window outline is 0.0075 and the camera hole 0.0056 from r16's mesh. v2 sits on r16's design constants; the measured offset is r16's mesh edge;
+  - upper pit walls 3.95–4.93 (r16 3.43–3.99), lower pit walls 7.72–9.50 (r16 R 7.08–9.53). This is the outer loft, untouched.
+- Ring wall in front of the bottom opening's closed end (x 67): 2.28 mm at z -8.7, 2.71 at z -6 (r16: 3.30 / 3.54; r16's `OPEN_WALL` rule is 3.15). This is the loft's outer face, the same on pass corner.
+- No structural check: print-tolerance-expert has not seen this geometry, including the lower fingers.

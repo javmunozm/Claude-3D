@@ -8,7 +8,7 @@ Keep this file under about 150 lines. Agents read it instead of the README. Hist
 ## Current
 - **Bake:** `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
-- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_corner.stl` (passes "front" + "corner", reviewed, uncommitted; last commit `f5b81d8` = pass "fit"). See "v2" below.
+- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_s8.stl` (pass 2 + s8, reviewed ACCEPT WITH LISTED ARTIFACTS, committed 2026-10-06 after `7d796cc`). Next: pass "edge", the round on the bottom opening's closed-end edge (user, 2026-10-06). See "v2" below.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).
 - **Method:** r16 is a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep; fillets cannot be made on it. **The user decided on 2026-10-04 to rebuild the case as a CAD (B-rep) design** in `v2/` (`docs/versioning.md`); a spike runs first (`v2/audit/spike/spike_report.md`). r16 stays the printable bake until a v2 replaces it.
 - **The part:** X width 220.08; Y fore-aft from the handle tips at -68.0025 to the rear at +78.550; Z up, pocket floor -8.80, flat top 11.40. 137 216 faces, watertight, 1 body, genus 2, volume 266 520.9 mm3.
@@ -43,9 +43,9 @@ Not swept in r16: D38, the fillet families D27/D28/D31/D32, the groove at y -9.2
 | Flat top, Z 11.4000 | 0.0024 | the top plane the console sits 1.40 below |
 | Pocket walls and floor (z -8.80) | 0.005 walls, < 0.02 floor | the console's fit |
 | Lips and fingers, lip u at Z 9.30 / 9.47 / 9.80 / 10.20 / 11.00 = -0.00 / -1.49 / -1.30 / -1.06 / -0.60 | 0.005 | snap retention (`audit/r11/lip_sizing_r11.md`) |
-| Pit walls, Z 0..10.2 (L 3.97..3.38, R 3.99..3.43) | 0.01 | wall thickness |
-| Window and camera hole (+2 mm each) | 0.005 | the console's rear window and camera |
-| Bottom-bar strip, abs(x) < 62, y -12..-8.5 | 0.005 | |
+| Pit walls, Z 0..10.2 (r16: L 3.97..3.38, R 3.99..3.43; **v2, re-based 2026-10-05:** upper 3.95–4.93, lower 7.71–9.50) | 0.01 | wall thickness |
+| Window and camera hole (+2 mm each) (**v2:** exact at r16's constants, window 110 x 57.05 R 3.5, y 3.00..60.05; camera D 12 at (0, 68.05); r16's mesh sits 0.0075 / 0.0054 inside) | 0.005 | the console's rear window and camera |
+| Bottom-bar strip, abs(x) < 62, y -12..-8.5 (**v2:** its own flat plate as in pass 2, 0.8–1.3 mm more material than r16) | 0.005 | |
 | Handle girth, y -20..-63.3 | 0.3 mm2 per section | hand fit |
 | Handle tips: flat face at y -68.0025, 3.0 mm roll | as built | the user's trim, 2026-10-02 |
 
@@ -80,13 +80,17 @@ Build: `python projects/VitaGripPS5/v2/macros/vita_grip_ps5_v2.py` (about 20 s t
 - **Fitted handle surface (pass "fit", 2026-10-05, method change):** the loft no longer passes exactly through r16's sections. A smoothing spline per matched point along y (h 2.0 mm), stations every 1.5 mm from y -3 to -45, ramps at both ends (`FIT_ALONG_Y` and `FIT_*` in `constants.py`; off = p1d). Cause measured first: p1d's station slopes swung 0.17–0.56 between stations 0.5–1.5 mm apart, r16's about 0.05.
 - **Measured (review `v2/audit/fit/review.md`, ACCEPT WITH LISTED ARTIFACTS, 0 regressions vs p1d):** ring lines gone (turn at y -9 / -13 / -27 at most 3.98°, bump 0.002–0.004 mm; p1d up to 22.3°); handle vs r16 moved +16 RMS 0.065–0.15, max 0.54; body y >= 5 within 0.060 of p1d, pocket walls, lip, pit and bar strip 0.0000; top round min 2.74 (S1 fixed); S5 6.44° (fixed); p1d's 0.002 mm knife-edge sliver at (66.5, -9.0, -7.3) gone, thinnest ramp wall 4.52. Left matches right to 0.0000.
 - **Plate front (passes "front" + "corner", 2026-10-05; review `v2/audit/corner/review.md`):** the convex bottom edge is an r 1 round (B-rep face f92, x 64–68 median 1.005, min 0.989), cut into the lone blend loft before the fuse, ramping from 0 at x 62.25 (`FRONT_ROUND*`, `parts/plate.front_round_cutter`). The concave plate-front / grip corner is an r 1.005 rolling-ball web fused in before the plate fuse (`CORNER_ROUND`, `parts/plate.corner_round_web`); corner box max 26.2° (fit 108.3°). Switch off = the previous pass, byte-identical. Hard gates pass: no voids or slits (sky test), plate-front wall 4.46, locks 0.0000, everything else re-meshed only. Accepted by the user: the 0.047 mm end step at x 62.0–62.25 and the web's radius dip (min 0.32 at (67.57, -11.2, -12.92), +0.002..+0.005 mm from an ideal r 1).
+- **Pass 2 (2026-10-05; review `v2/audit/p2/review.md`):** per side a lower finger/lip/pit (the upper one mirrored about y 33.275, at (90.61, 20.35), n (0.986, -0.164); +0.004 / +0.040 from r16 R), rear window 110 x 57.05 R 3.5 (y 3.00..60.05), camera hole D 12 at (0, 68.05), bottom opening (nothing above the floor inside |x| 66.75, flat closed end; r16 R value used on both sides). Switches `LOWER_LIP_ON`, `WINDOW_ON`, `CAMERA_ON`, `BOTTOM_OPEN_ON`; all off = pass corner, byte-identical. Hard gates: 1 body, watertight, genus 2, back min 4.50, no voids/slits (sky test), lips within 0.0002 of r16 on all four. 229.65 cm3.
+- **Locks vs r16, first check (pass 2 review):** pocket wall = geometry (S9); window / camera outlines = r16's mesh is 0.0075 / 0.0054 inside its own constants, v2 exact; bottom-bar strip up to 1.29 = v2's simplified flat plate (more material); upper pit walls 3.95–4.93 (r16 3.43–3.99) = v2's rear corner 0.5–1.2 further out; lower pit walls match at z 0–5, +0.64 at z 10.2 (3 mm top round). Window–camera bridge 2.000 (r16 2.002).
 - **Open:**
+  - **S8 FIXED (pass s8, 2026-10-05, review `v2/audit/s8/review.md`, ACCEPT WITH LISTED ARTIFACTS, 0 regressions):** `OPEN_X_END` 67.4; wall >= 3.0 everywhere from the end face to x 72, min 3.2862 at (±67.41, z -8.79) (x-section method 3.196, r16 3.296); new gate `gates_p2.end_wall_y` (proven on p2: 1.432 / 2.258); its top-round exclusion (z > 8.4) verified sound (90° plan corner, disk test). Open from it: the end face / grip edge turns 21–35° (B-rep 20.7–34.1, convex, 23.1 mm long, z -8.80..9.34; p2 10–22°; r16 had a 1.2 mm fillet there). **The user chose on 2026-10-06 to round it (pass "edge").** History: the wall in front of the bottom opening's closed end, x 66.75–67.28, z -8.8..-5, measured in y at fixed x (r16's `OPEN_WALL` rule, 3.15): 1.43 at the end face, 2.26 at x 67 (r16 3.29). Not a pass-2 regression: at the floor the front face moved 1.02 mm in pass "fit" (p1d -12.29 → fit -11.27); the fit review's 4.52 used a different wall method and missed it. Options (review): (a) `OPEN_X_END` 66.75 → 67.4 (r16's rule; shaves <= 0.2 off the inner flank's top round); (b) keep the fit smoothing off the root's front face (reopens the fit loft; the S7 web sits on that face); (c) a local pad on the front face.
+  - **S9 (ACCEPTED by the user 2026-10-05 as a listed artifact):** rear-corner pocket wall, x 87.2–88.4, y 55.4–59, z -6..8: up to 0.024 mm of material inside r16's pocket outline (lock 0.005). Real, sub-layer, already in corner.
   - **S7 (new; METHOD REVIEW by the third-register rule; ACCEPTED by the user 2026-10-05 as a listed artifact):** the round's and the web's boundary edges are not tangent: f92/f95 (round / underside, x 65.8–69.2) 10.4° median, 12.25° max, 0.023 mm deep; f91/f92 (web / round) 15.9°, 0.038 mm; f92/f225 (round end into the grip, 0.44 mm long, x 69.4–69.5) 21–27°, about 0.1 mm. The web meets both faces at 5.72° by design (`cross` 0.005). Fix proposed by the review: place the cutter arc's end point tangent to the underside (a method change in the cutter, not a constant).
   - Sub-layer, reported only: 3 cells of 8.4–8.9° on the flat-top tangent edge in the morph (bumps <= 0.039); bend y -29..-30 1.45° / 0.007; tip stations 3.83° / 0.013.
   - `checks.outer_flank_turn` reads false fails at z 3.5–5 near the U-turn and tip: the fixed-z plane skims the top round there (review: fixed-z 13.3° / 0.469 mm, along the normal 2.02° / 0.006). Use the review's polar probe (`v2/audit/fit/scripts/fit_review.py`) until the check is fixed.
   - Pass 1d is one loft (`SINGLE_LOFT = True`); the split (the user's option 1) is kept behind the switch.
   - Not run this round: slit / sealed-void ray tests (rear band and corner moved <= 0.0215 vs p1d), S4 chord error.
-  - Not built yet: second (lower) latch per side, touchscreen window 110 x 57 R 3.5, camera hole D 12, bottom opening, lower pits; pocket/lip/window lock check against r16; strength check (print-tolerance-expert).
+  - Not done: strength check of the fingers, lower ones included (print-tolerance-expert); tangency of pass 2's cut edges; S4 chord error.
 
 ## Rounds
 List price of the agent runs only (the orchestrator is not included); measured 2026-10-04 with `tools/token_audit/maxturns_review.py`. Rounds r10-r16 with the orchestrator: $118.14.
@@ -104,14 +108,17 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 | v2 p1 / 1b | 2026-10-04 | designer 20 (stop) + 39, 47 | $11.01 | 3 mm round, plate blend, one-piece corner (`285ad15`) |
 | v2 p1c / 1d | 2026-10-04..05 | designer 50, 46 | $6.31 | handle -16 mm, waist fixed, ring lines open (`6cf587f`) |
 | v2 fit | 2026-10-05 | designer 75, review (usage-limit stop) + 42 | at `/session-end` | fitted surface; rings gone; ACCEPT WITH LISTED ARTIFACTS (`f5b81d8`) |
-| v2 front + corner | 2026-10-05 | designer 60 + 37 (front), 52 (corner), review (usage-limit stop) + 26 | at `/session-end` | plate-front r 1 round + concave corner web; S2 fixed, S7 new; METHOD REVIEW (third register on the plate front) (uncommitted) |
+| v2 front + corner | 2026-10-05 | designer 60 + 37 (front), 52 (corner), review (usage-limit stop) + 26 | at `/session-end` | plate-front r 1 round + concave corner web; S2 fixed, S7 new and accepted (`7d796cc`) |
+| v2 p2 | 2026-10-05 | designer 98, review 46 | at `/session-end` | lower latches, window, camera hole, bottom opening; S8 wall fails (from pass fit), S9; METHOD REVIEW (committed with s8, 2026-10-06) |
+| v2 s8 | 2026-10-05 | designer 39, review 33 | at `/session-end` | opening end 67.4, wall 3.286, end-wall gate; ACCEPT WITH LISTED ARTIFACTS (committed with p2, 2026-10-06) |
 
 Session 49ca6a61 total, orchestrator included: $85.10 list (main $61.04, agents $24.06).
 
 ## Decisions pending for the user
 1. **The first print.** Check: snap retention and insertion (insertion safety factor 2.0; `audit/r11/lip_sizing_r11.md`); shoulder-button reach with a real finger (model ii 91 %, model i 77-80 %); the console's fit in the pocket and the lip clearance (CLEAR_Z 0.2); the handle ends at y -68 in the hand.
 2. **Print orientation:** the README does not state one; the r16 slice test was in Z only.
-3. **Pass 2** (approved 2026-10-05, after S7 was accepted): lower latches, touchscreen window, camera hole, bottom opening, lower pits.
+3. **S8:** done. The user chose (a), `OPEN_X_END` 66.75 → 67.4 (2026-10-05); pass "s8" ran it. Locks re-based on v2 and S9 accepted (same date).
+4. **Pass 2 + s8** committed 2026-10-06 (the user's choice). The closed-end edge: the user chose to round it (2026-10-06); pass "edge" runs it.
 5. Handle tolerance against r16: working limit RMS 0.3 / max 2.0 mm, round band excluded (set by the orchestrator; confirm or change). The user chose the 3 mm round everywhere and the 15 mm root transition.
 6. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
 7. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).

@@ -204,6 +204,206 @@ def change_vs(new, ref, boxes):
     return out
 
 
+def topology_p2(mesh):
+    """Pass 2: watertight, winding, bodies, Euler number and genus (one closed surface: genus = (2 - euler) / 2)."""
+    parts = mesh.split(only_watertight=False)
+    eu = int(mesh.euler_number)
+    return dict(watertight=bool(mesh.is_watertight), winding=bool(mesh.is_winding_consistent), bodies=len(parts),
+                euler=eu, genus=(2 - eu) / 2.0 if len(parts) == 1 else None)
+
+
+def zregion(mesh, z):
+    """Material region of the z-section (shapely), loops combined even-odd."""
+    from shapely.geometry import Polygon
+    s = mesh.section(plane_origin=[0, 0, z], plane_normal=[0, 0, 1])
+    g = Polygon()
+    if s is None:
+        return g
+    for e in s.discrete:
+        if len(e) > 3:
+            g = g.symmetric_difference(Polygon(e[:, :2]).buffer(0))
+    return g
+
+
+def lip_u(mesh, fingers, zs, u_lo=-4.0, u_hi=0.6):
+    """Lip u per finger (p, n) and Z: the smallest u (outward along n from the pocket wall point p) with material on
+    the segment u_lo..u_hi of the z-section."""
+    from shapely.geometry import LineString
+    out = []
+    for p, n in fingers:
+        p, n = np.asarray(p, float), np.asarray(n, float) / np.linalg.norm(n)
+        row = {}
+        for z in zs:
+            g = zregion(mesh, z)
+            seg = LineString([p + u_lo * n, p + u_hi * n])
+            hit = g.intersection(seg)
+            if hit.is_empty:
+                row["%.2f" % z] = None
+                continue
+            pts = np.array([c for geom in getattr(hit, "geoms", [hit]) for c in geom.coords])
+            row["%.2f" % z] = round(float(((pts - p) @ n).min()), 4)
+        out.append(dict(p=[round(float(c), 3) for c in p], u=row))
+    return out
+
+
+def pocket_wall_dev(meshes, pocket, zs, keep):
+    """Distance of r16's pocket outline points (keep(pt) True) to each mesh's z-section boundary; per z the max over
+    the points where the reference mesh (first) lies within 0.005, and the reference's own max."""
+    out = {}
+    P = np.asarray(pocket, float)
+    P = P[[keep(q) for q in P]]
+    from shapely.geometry import Point
+    for z in zs:
+        ds = []
+        for m in meshes:
+            b = zregion(m, z).boundary
+            ds.append(np.array([b.distance(Point(q)) for q in P]))
+        ok = ds[0] <= 0.005
+        row = dict(n=int(len(P)), n_ref_on=int(ok.sum()), ref_max=round(float(ds[0].max()), 4))
+        for k, d in enumerate(ds[1:], 1):
+            i = int(np.argmax(np.where(ok, d, -1.0)))
+            row["mesh%d_max_where_ref_on" % k] = round(float(d[i]), 4)
+            row["mesh%d_max_at" % k] = P[i].round(2).tolist()
+        out["z%.1f" % z] = row
+    return out
+
+
+def floor_check(mesh, pts, z_floor, ds=(0.005, 0.02)):
+    """Floor plane lock: at each (x, y) the z-section at z_floor + d must be air and at z_floor - d material."""
+    import shapely
+    out = {}
+    for d in ds:
+        up, dn = zregion(mesh, z_floor + d), zregion(mesh, z_floor - d)
+        out["+-%.3f" % d] = dict(n=len(pts), material_above=int(shapely.contains_xy(up, pts[:, 0], pts[:, 1]).sum()),
+                                 air_below=int((~shapely.contains_xy(dn, pts[:, 0], pts[:, 1])).sum()))
+    return out
+
+
+def holes_at(mesh, z, near):
+    """Interior rings of the z-section whose centre is within 'near' (x, y, tol) boxes: {name: ring polygon}."""
+    from shapely.geometry import Polygon
+    g = zregion(mesh, z)
+    out = {}
+    for pg in getattr(g, "geoms", [g]):
+        for r in pg.interiors:
+            q = Polygon(r)
+            c = q.centroid
+            for name, (x, y, tol) in near.items():
+                if abs(c.x - x) < tol and abs(c.y - y) < tol:
+                    out[name] = q
+    return out
+
+
+def hole_lock(a, b, z, near):
+    """Hole outlines of mesh a against mesh b at z: Hausdorff distance, bounds of each, area."""
+    ha, hb = holes_at(a, z, near), holes_at(b, z, near)
+    out = {}
+    for k in near:
+        if k not in ha or k not in hb:
+            out[k] = dict(found=(k in ha, k in hb))
+            continue
+        from shapely.geometry import Point
+        ra, rb = ha[k].exterior, hb[k].exterior
+        sa = [ra.interpolate(t) for t in np.arange(0.0, ra.length, 0.05)]
+        da = np.array([rb.distance(q) for q in sa])
+        sb = [rb.interpolate(t) for t in np.arange(0.0, rb.length, 0.05)]
+        db = np.array([ra.distance(q) for q in sb])
+        out[k] = dict(a_to_b_max=round(float(da.max()), 4), a_to_b_at=np.round(sa[int(np.argmax(da))].coords[0], 3).tolist(),
+                      b_to_a_max=round(float(db.max()), 4), b_to_a_at=np.round(sb[int(np.argmax(db))].coords[0], 3).tolist(),
+                      hausdorff=round(float(ra.hausdorff_distance(rb)), 4),
+                      bounds=np.round(ha[k].bounds, 4).tolist(), ref_bounds=np.round(hb[k].bounds, 4).tolist(),
+                      area=round(ha[k].area, 3), ref_area=round(hb[k].area, 3))
+    return out
+
+
+def box_dev(a, b, box6):
+    """Vertices of each mesh inside box6 to the other mesh's surface: max both ways and where."""
+    lo, hi = np.array(box6[0::2]), np.array(box6[1::2])
+    out = {}
+    for tag, m, t in (("a->b", a, b), ("b->a", b, a)):
+        v = m.vertices[np.all((m.vertices > lo) & (m.vertices < hi), axis=1)]
+        if not len(v):
+            out[tag] = dict(n=0)
+            continue
+        _, d, _ = trimesh.proximity.closest_point(t, v)
+        i = int(np.argmax(d))
+        out[tag] = dict(n=len(v), max=round(float(d.max()), 5), p99=round(float(np.percentile(d, 99)), 5),
+                        max_at=v[i].round(3).tolist())
+    return out
+
+
+def opening_table(mesh, zs, y_front=-9.3, x0=60.0, x1=75.0, step=0.05, wall_x=None):
+    """Bottom opening: per z, the first x (from x0 outward) with material at y < y_front, and (wall_x) the material's
+    y extent in front of the pocket line at x = wall_x (ring wall in front of the closed end)."""
+    from shapely.geometry import box as sbox
+    out = {}
+    for z in zs:
+        g = zregion(mesh, z)
+        hit = None
+        for x in np.arange(x0, x1, step):
+            if not g.intersection(sbox(x - 0.002, -40.0, x + 0.002, y_front)).is_empty:
+                hit = round(float(x), 3)
+                break
+        row = dict(first_x=hit)
+        if wall_x is not None:
+            s = g.intersection(sbox(wall_x - 0.002, -40.0, wall_x + 0.002, -9.0))
+            row["wall_y_min_at_x%.2f" % wall_x] = None if s.is_empty else round(float(s.bounds[1]), 3)
+        out["z%.1f" % z] = row
+    return out
+
+
+def sealed_air(mesh, boxes, step=0.5, reach=60.0):
+    """Flood-fill sky test. Air voxels (outside the z-section's material grown 0.02) on a step grid in each box
+    (x0, x1, y0, y1, z0, z1); seeds = the top / bottom layer's air voxels whose +Z / -Z ray leaves the mesh (VTK
+    OBBTree); air components (6-connected) without a seed are reported as sealed (or connected only outside the box).
+    The z-sections are shared between boxes."""
+    import shapely
+    import vtk
+    from scipy import ndimage
+    from vtk.util import numpy_support as ns
+    pts = vtk.vtkPoints()
+    pts.SetData(ns.numpy_to_vtk(np.ascontiguousarray(mesh.vertices, dtype=np.float64), deep=True))
+    cells = vtk.vtkCellArray()
+    f = np.hstack([np.full((len(mesh.faces), 1), 3), mesh.faces]).astype(np.int64).ravel()
+    cells.SetCells(len(mesh.faces), ns.numpy_to_vtkIdTypeArray(f, deep=True))
+    pd = vtk.vtkPolyData()
+    pd.SetPoints(pts)
+    pd.SetPolys(cells)
+    tree = vtk.vtkOBBTree()
+    tree.SetDataSet(pd)
+    tree.BuildLocator()
+    hp, hc = vtk.vtkPoints(), vtk.vtkIdList()
+    cache = {}
+    out = {}
+    for name, b in boxes.items():
+        xs = np.arange(b[0], b[1] + 1e-9, step)
+        ys = np.arange(b[2], b[3] + 1e-9, step)
+        zs = np.arange(b[4], b[5] + 1e-9, step)
+        X, Y = np.meshgrid(xs, ys, indexing="ij")
+        air = np.zeros((len(xs), len(ys), len(zs)), bool)
+        for k, z in enumerate(zs):
+            key = round(float(z), 4)
+            if key not in cache:
+                cache[key] = zregion(mesh, z).buffer(0.02)
+            air[:, :, k] = ~shapely.contains_xy(cache[key], X, Y)
+        seed = np.zeros_like(air)
+        for i, x in enumerate(xs):
+            for j, y in enumerate(ys):
+                if air[i, j, -1] and tree.IntersectWithLine((x, y, zs[-1]), (x, y, zs[-1] + reach), hp, hc) == 0:
+                    seed[i, j, -1] = True
+                if air[i, j, 0] and tree.IntersectWithLine((x, y, zs[0]), (x, y, zs[0] - reach), hp, hc) == 0:
+                    seed[i, j, 0] = True
+        lab, n = ndimage.label(air)
+        open_ids = set(np.unique(lab[seed]).tolist()) - {0}
+        sealed = air & ~np.isin(lab, list(open_ids))
+        idx = np.argwhere(sealed)
+        out[name] = dict(air=int(air.sum()), seeds=int(seed.sum()), components=int(n), open=len(open_ids),
+                         sealed=int(sealed.sum()),
+                         first=[[round(float(xs[a]), 2), round(float(ys[c]), 2), round(float(zs[e]), 2)]
+                                for a, c, e in idx[:5]])
+    return out
+
+
 def band_dihedral(mesh, box):
     """STL edges with midpoints in box (x0, x1, y0, y1): count, max / p99 dihedral (deg) and where the max is."""
     ang = np.degrees(mesh.face_adjacency_angles)

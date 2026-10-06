@@ -179,3 +179,32 @@ TIP_Y_NEW = TIP_Y + HANDLE_SHIFT
 # profile is copied to BLEND_EXTRAP_Y and the blend trimmed at PLATE_Y1
 BLEND_STATIONS = [PLATE_Y0] + sorted(y for y in REAR_STATIONS + MAIN_STATIONS if -10.0 <= y <= BLEND_Y1)
 BLEND_EXTRAP_Y = 79.05
+
+# pass 2 (2026-10-05): r16's remaining features as exact B-rep features. Every switch off = pass corner, byte-identical.
+# lower finger + lip + pit: r16 mirrors the upper finger's outline station about YC (y_lo = 2 YC - y_up), same profile
+LOWER_LIP_ON = True
+FINGER_P_LO = (FINGER_P[0], 2.0 * YC - FINGER_P[1])
+FINGER_N_LO = (FINGER_N[0], -FINGER_N[1])
+# rear window and camera hole through the floor plate (r16 build_case_ext.py: console rectangle from the pocket)
+WINDOW_ON = True
+CAMERA_ON = True
+CLEAR_Y = 0.50
+PANEL_W = 108.0
+PANEL_FROM_TOP, PANEL_FROM_BOTTOM = 16.0, 12.5
+WINDOW_GROW = 1.0
+WINDOW_R = 3.5
+CAMERA_FROM_TOP = 7.0
+CAMERA_HOLE_D = 12.0
+CONSOLE_TOP_Y = POCKET_Y_TOP - CLEAR_Y
+CONSOLE_BOT_Y = POCKET_Y_BOTTOM + CLEAR_Y
+WIN_Y1 = CONSOLE_TOP_Y - PANEL_FROM_TOP + WINDOW_GROW        # 60.05
+WIN_Y0 = CONSOLE_BOT_Y + PANEL_FROM_BOTTOM - WINDOW_GROW     # 3.0
+WINDOW_W = PANEL_W + 2 * WINDOW_GROW                          # 110
+CAMERA_Y = CONSOLE_TOP_Y - CAMERA_FROM_TOP                    # 68.05
+HOLE_Z0 = PLATE_Z0 - 5.0                                      # through cutters run from under the plate ...
+HOLE_Z1 = FLOOR_Z + 2.0                                       # ... into the pocket's air
+# bottom opening: r16 leaves no material above the floor in front of the pocket for |x| < 66.75 (R; L 68.75, accepted
+# by the user). v2 is open there already except the grip's inner face at x 66.5-66.6; the cut takes x < OPEN_X_END.
+BOTTOM_OPEN_ON = True
+OPEN_X_END = 67.4                                             # pass s8: 66.75 left a 1.43 mm y-wall (S8); r16 OPEN_WALL rule
+OPEN_Y_LO = -25.0                                             # r16: no material at x < 66.75, y -25..-9.3, z >= -8.8
