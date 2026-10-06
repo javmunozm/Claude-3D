@@ -121,6 +121,20 @@ in `audit/fit/fix_report.md`, step 1). `sections.fit_along_y` now runs before th
 
 On the fitted loft the plate-front fillet attempt (r 1) crashed the process (segfault). It had never succeeded (p1c, p1d), so `FRONT_R` is now 0.
 
+**Pass front (S2, 2026-10-05, outputs `*_front.*`, not baked).** The plate front's bottom edge is rounded by a cutter cut
+from the lone blend loft before any fuse (`parts/plate.py: front_round_cutter`), not by a fillet. `FRONT_ROUND = 1.0`
+(0 = pass fit) ramps by smoothstep from `FRONT_ROUND_X0 = 62` over `FRONT_ROUND_RAMP = 2`; sections start at
+X0 + `FRONT_ROUND_START = 0.25` (r 0.047, a 0.047 mm end step there); the underside line is a secant; the arc is drawn
+at r (1 + `FRONT_ROUND_CROSS = 0.005`); past the arc the cutter runs to 0.1 L under the real underside. Measured: r 0.989-1.013
+at x 64-69 (B-rep); details in `audit/front/fix_report.md`.
+
+**Pass corner (2026-10-05, outputs `*_corner.*`, not baked).** The concave plate-front / grip junction (x 66.9-68.5 on
+y -11.2, z -8.8..-13.07, then along the front round to (69.4, -10.6, -13.7)) has an r 1 rolling-ball round. It is a lone web solid
+(`parts/plate.py: corner_round_web`), lofted through ball-centre sections solved against the lone blend and grip end and
+fused into the half, not a fillet. `CORNER_ROUND = 1.0` (0 = pass front: the hash is identical); its end sinks into the
+material over `CORNER_ROUND_SINK`; the web is trimmed at the floor plane. Open: the web's B-rep radius dips locally to 0.32 where the plate
+front turns into the front round (median 1.005); details in `audit/corner/fix_report.md`.
+
 ## Files
 - `step/VitaGripPS5_v2_spike.step`, `stl/VitaGripPS5_v2_spike.stl`: the spike part (both halves).
 - `audit/spike/spike_results.json`: gate numbers from the build.

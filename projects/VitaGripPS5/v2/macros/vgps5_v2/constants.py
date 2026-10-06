@@ -49,6 +49,22 @@ PLATE_Y0, PLATE_Y1 = -11.2, 78.55
 PLATE_Z0 = -13.3
 FRONT_R = 0.0              # plate front face / handle edges (p1_post.py: 3 and 2 fail, 1 valid); failed at r 1 in
                            # p1c / p1d; on the fitted loft (pass fit) the attempt crashed the process (segfault), so off
+# pass front (S2): the plate front's bottom round, cut into the lone blend loft BEFORE the fuse (0 = pass fit).
+# Radius ramps (smoothstep) from 0 at FRONT_ROUND_X0 (the bar-strip lock ends at |x| 62) to FRONT_ROUND at X0 + RAMP.
+FRONT_ROUND = 1.0
+FRONT_ROUND_X0 = 62.0
+FRONT_ROUND_RAMP = 2.0
+FRONT_ROUND_START = 0.25   # first cutter section at X0 + this (r 0.047 there; at X0 itself a 0.004 end face folded)
+FRONT_ROUND_CROSS = 0.005  # the arc is drawn at r (1 + CROSS) so it crosses both faces instead of touching them
+# pass corner: concave rolling-ball round between the plate front (and the front round) and the grip, a lone web
+# solid fused into the half (0 = pass front). Junction on pass front: x 66.94 (z -8.8) .. 68.5 (z -13.07) on y -11.2,
+# then along the front round to (69.4, -10.6, -13.7), where its crease falls to 22-24 deg (the blend's own crease).
+CORNER_ROUND = 1.0
+CORNER_ROUND_Z_START = -8.5      # first ball centre (z), above the floor plane; the web is trimmed at FLOOR_Z
+CORNER_ROUND_GUESS = (66.3, -12.2)
+CORNER_ROUND_ALPHA_END = 25.0    # last station where the crease between the contact normals falls under this
+CORNER_ROUND_SINK = 1.0         # over the last mm of ball path the arc sinks into the material (no end face)
+CORNER_BOX = (66.0, 70.5, -12.5, -10.2, -14.2, -8.9)   # gate box (right side), from step 1
 
 # plate built into the grip end (pass 1, S2): boxes for the flat plate, a lofted blend for the junction
 BLEND_XS = 60.0            # main slab x 0..60; the blend loft is trimmed at x >= 60 (both planes)

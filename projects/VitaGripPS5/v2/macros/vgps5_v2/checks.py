@@ -47,9 +47,10 @@ def edge_creases(solid, inside, n=15):
     return out
 
 
-def round_radii(solid, zone, nu=160, nv=160):
+def round_radii(solid, zone, nu=160, nv=160, r_max=None, box6=None):
     """Principal radius across the round (1 / max |curvature|) on B-spline faces, at uv-grid points p with
-    zone(p) True. Returns (n, min, p5, median, p95, max, location of min)."""
+    zone(p) True. r_max: leave out radii above it (other faces in the zone); box6: skip faces whose bounding box
+    misses it. Returns (n, min, p5, median, p95, max, location of min)."""
     from OCP.BRep import BRep_Tool
     from OCP.BRepTools import BRepTools
     from OCP.GeomLProp import GeomLProp_SLProps
@@ -61,6 +62,11 @@ def round_radii(solid, zone, nu=160, nv=160):
     for f in solid.faces():
         if f.geom_type.name != "BSPLINE":
             continue
+        if box6 is not None:
+            bb = f.bounding_box()
+            if (bb.max.X < box6[0] or bb.min.X > box6[1] or bb.max.Y < box6[2] or bb.min.Y > box6[3]
+                    or bb.max.Z < box6[4] or bb.min.Z > box6[5]):
+                continue
         face = TopoDS.Face_s(f.wrapped)
         srf = BRep_Tool.Surface_s(face)
         u0, u1, v0, v1 = BRepTools.UVBounds_s(face)
@@ -75,7 +81,7 @@ def round_radii(solid, zone, nu=160, nv=160):
                 if not zone(q) or not pr.IsCurvatureDefined():
                     continue
                 k = max(abs(pr.MaxCurvature()), abs(pr.MinCurvature()))
-                if k > 1e-9:
+                if k > 1e-9 and (r_max is None or 1.0 / k <= r_max):
                     rr.append(1.0 / k)
                     where.append(q)
     if not rr:
@@ -156,6 +162,45 @@ def deviation(v2, r16, regions, band=None, n=150000):
                             p95=round(float(np.percentile(d, 95)), 3), max=round(float(d.max()), 3),
                             max_at=p[int(np.argmax(d))].round(2).tolist())
         out[name] = row
+    return out
+
+
+def box_dihedral(mesh, box6, deg=30.0):
+    """STL edges with midpoints in box6 (x0, x1, y0, y1, z0, z1): count, count > deg, max dihedral and where."""
+    ang = np.degrees(mesh.face_adjacency_angles)
+    mid = mesh.vertices[mesh.face_adjacency_edges].mean(axis=1)
+    lo, hi = np.array(box6[0::2]), np.array(box6[1::2])
+    s = np.all((mid > lo) & (mid < hi), axis=1)
+    if not s.any():
+        return dict(n=0)
+    i = int(np.argmax(np.where(s, ang, -1.0)))
+    return dict(n=int(s.sum()), over=int((s & (ang > deg)).sum()), max=round(float(ang[i]), 2),
+                max_at=mid[i].round(3).tolist())
+
+
+def change_vs(new, ref, boxes):
+    """Max distance, both ways, of each mesh's vertices to the other mesh, per {name: ([box6, ...], inside)}: inside
+    True takes the vertices in any of the boxes, False the vertices outside all of them. Vertices that coincide with a vertex of the other
+    mesh (< 1e-7) count 0; the rest are measured to the surface (trimesh closest_point)."""
+    from scipy.spatial import cKDTree
+    out = {k: dict(max=0.0, max_at=None, n=0) for k in boxes}
+    for a, b in ((new, ref), (ref, new)):
+        d, _ = cKDTree(b.vertices).query(a.vertices)
+        idx = np.where(d > 1e-7)[0]
+        if len(idx):
+            _, dd, _ = trimesh.proximity.closest_point(b, a.vertices[idx])
+            d[idx] = np.minimum(d[idx], dd)
+        for k, (b6s, inside) in boxes.items():
+            s = np.zeros(len(a.vertices), bool)
+            for b6 in b6s:
+                lo, hi = np.array(b6[0::2]), np.array(b6[1::2])
+                s |= np.all((a.vertices > lo) & (a.vertices < hi), axis=1)
+            s = s if inside else ~s
+            if s.any():
+                i = int(np.argmax(np.where(s, d, -1.0)))
+                out[k]["n"] += int(s.sum())
+                if d[i] >= out[k]["max"]:
+                    out[k]["max"], out[k]["max_at"] = round(float(d[i]), 5), a.vertices[i].round(3).tolist()
     return out
 
 

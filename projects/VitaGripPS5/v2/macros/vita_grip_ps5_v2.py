@@ -23,20 +23,24 @@ def main():
         seam_guides, fit_along_y
     from vgps5_v2.shapes import one_solid, oval_cutter, valid, try_fillet, clip_cutter
     from vgps5_v2.parts.grip_end import build_body, build_handle, build_single, fuse_at_seam
-    from vgps5_v2.parts.plate import build_plate_half, build_blend
+    from vgps5_v2.parts.plate import build_plate_half, build_blend, front_round_cutter, corner_round_web
     from vgps5_v2.parts.lip import finger_profile, pit_profile, build_finger, build_pit
     from vgps5_v2.assemble import mirror_union
+    from vgps5_v2.shapes import box
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_fit.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_fit.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "fit" / "fit_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_corner.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_corner.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "corner" / "corner_results.json"))
+    ap.add_argument("--corner-round", type=float, default=None, help="override CORNER_ROUND (0 = pass front)")
     ap.add_argument("--sections-only", action="store_true")
     ap.add_argument("--half-brep", default=None, help="write the half before the lip (BREP), for fillet searches")
     ap.add_argument("--no-gates", action="store_true")
     ap.add_argument("--grip-only", default=None, help="stop after the grip end + blend; write it as this STL")
     args = ap.parse_args()
+    if args.corner_round is not None:
+        C.CORNER_ROUND = args.corner_round
 
     t0 = time.time()
 
@@ -118,6 +122,18 @@ def main():
     log("seam edges at y %.2f (centre, length, type, max / median crease deg): %s" % (sc, R["seam_creases"]))
     blend = build_blend(blend_pr, C.BLEND_XS, C.PLATE_Y1)
     log("blend loft valid, volume %.0f" % blend.volume)
+    if C.FRONT_ROUND:
+        # pass front (S2): the round is cut into the lone blend, before any fuse (no fillet on the fused half)
+        cutter, info = front_round_cutter(blend, C.PLATE_Y0, C.FRONT_ROUND_X0, C.BLEND_XA + C.BLEND_EXT - 0.1,
+                                          C.FRONT_ROUND, C.FRONT_ROUND_RAMP, cross=C.FRONT_ROUND_CROSS,
+                                          start=C.FRONT_ROUND_START)
+        v0 = blend.volume
+        blend = one_solid(blend.cut(cutter), "plate blend, front round")
+        R["front_round_sections"] = info
+        R["front_round_top_z_max"] = max(q[4] for q in info)
+        log("front round cut (x, r, zb, k, top z): %s ... %s; removed %.4f mm3; top z max %.4f (upper slab %.1f)"
+            % (info[0], info[-1], v0 - blend.volume, R["front_round_top_z_max"], C.PLATE2_Z0))
+    grip0 = end
     end = one_solid(end.fuse(blend), "grip end + blend")
     log("blend fused: valid")
     if args.grip_only:
@@ -131,6 +147,17 @@ def main():
     plate = build_plate_half(C.BLEND_XS, C.PLATE2_X, C.PLATE2_Z0, C.PLATE_Y0, C.PLATE_Y1, C.PLATE_Z0, C.FLOOR_Z)
     half = one_solid(end.fuse(plate), "grip end + plate")
     log("plate fused: valid")
+    if C.CORNER_ROUND:
+        # pass corner: rolling-ball round between the plate front (and the front round) and the grip, built from the
+        # lone blend and grip end as a web solid and fused in (no fillet on the fused half)
+        plane = box(50.0, 75.0, C.PLATE_Y0, 0.0, -10.5, -6.0)        # the plate front plane, past the floor
+        web, info = corner_round_web([blend, plane], grip0, C.CORNER_ROUND, C.FLOOR_Z, C.CORNER_ROUND_Z_START,
+                                     C.CORNER_ROUND_ALPHA_END, *C.CORNER_ROUND_GUESS, sink=C.CORNER_ROUND_SINK)
+        R["corner_round_sections"] = info
+        v0 = half.volume
+        half = one_solid(half.fuse(web), "corner round web fused")
+        log("corner round web: %d sections, first %s, last %s; web %.4f mm3, B-rep volume change %.4f mm3 (GProp, imprecise: t1 read -11.5 where the STL gained +0.33 per side)"
+            % (len(info), info[0], info[-1], web.volume, half.volume - v0))
     if C.FRONT_R:
         # plate front face meeting the handle (radius from audit/p1/scripts/p1_post.py, subprocess trials)
         fx = [e for e in half.edges() if abs(e.center().Y - C.PLATE_Y0) < 0.4 and 63.0 < e.center().X < 70.0
@@ -197,6 +224,49 @@ def main():
     for name, bx in (("grip end x>60 y<55", (60.0, 200.0, -70.0, 55.0)), ("corner x>60 y>55", (60.0, 200.0, 55.0, 80.0))):
         R["sharp30 " + name] = checks.sharp_edges(m, bx)
         log("edges > 30 deg, %s: %s" % (name, R["sharp30 " + name]))
+    if C.FRONT_ROUND:
+        # pass front (S2) gates: STL dihedral in the S2 box, the round's radius on the B-rep, change vs pass fit
+        b6 = (C.FRONT_ROUND_X0, 70.0, -12.0, -10.4, -14.6, -12.6)
+        R["front_dihedral"] = {"box x62..70": checks.box_dihedral(m, b6),
+                               "box x62.25..70": checks.box_dihedral(m, (C.FRONT_ROUND_X0 + 0.25,) + b6[1:]),
+                               "tangent line y-10.6..-9.6": checks.box_dihedral(m, b6[:2] + (-10.6, -9.6) + b6[4:])}
+        zb6 = (C.FRONT_ROUND_X0, 70.0, -11.25, -9.8, -15.0, -12.4)
+        zone = lambda q: zb6[0] < q[0] < zb6[1] and zb6[2] < q[1] < zb6[3] and q[2] < zb6[5]
+        x_full = C.FRONT_ROUND_X0 + C.FRONT_ROUND_RAMP
+        R["front_round_r"] = {"x62..70": checks.round_radii(half, zone, r_max=1.8, box6=zb6),
+                              "x%.0f..69 (full radius)" % x_full: checks.round_radii(
+                                  half, lambda q: zone(q) and x_full <= q[0] <= 69.0, r_max=1.8, box6=zb6)}
+        ex = [(60.0, 72.0, -13.0, -9.0, -16.0, -10.0), (-72.0, -60.0, -13.0, -9.0, -16.0, -10.0)]
+        fit_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_fit.stl"
+        if fit_stl.exists():
+            R["vs_fit"] = checks.change_vs(m, trimesh.load(str(fit_stl), force="mesh"),
+                                           {"outside the S2 boxes": (ex, False), "inside the S2 boxes": (ex, True),
+                                            "bar strip |x|<62": ([(-62.0, 62.0, -12.0, -8.5, -100.0, 100.0)], True)})
+        R["front_round_r"]["x64..68"] = checks.round_radii(half, lambda q: zone(q) and 64.0 <= q[0] <= 68.0,
+                                                           r_max=1.8, box6=zb6)
+        for k in ("front_dihedral", "front_round_r", "vs_fit"):
+            log("%s: %s" % (k, R.get(k)))
+    R["max_z"] = round(float(m.bounds[1][2]), 5)
+    if C.CORNER_ROUND:
+        # pass corner gates: STL dihedral in the corner box (both sides), the web's radius on the B-rep, change vs
+        # pass front outside the corner boxes
+        cb = C.CORNER_BOX
+        cbm = (-cb[1], -cb[0]) + tuple(cb[2:])
+        # change box: up to z FLOOR_Z + 0.2, so it holds the web's top face on the floor plane (the dihedral box stops
+        # at z -8.9, under the plate front's designed 90 deg top edge)
+        cc = [tuple(b[:5]) + (C.FLOOR_Z + 0.2,) for b in (cb, cbm)]
+        inb = lambda q: all(cb[2 * i] < q[i] < cb[2 * i + 1] for i in range(3))
+        R["corner_dihedral"] = {"corner box": checks.box_dihedral(m, cb), "corner box (left)": checks.box_dihedral(m, cbm)}
+        R["corner_round_r"] = {"in front of the plate (y < -11.22)": checks.round_radii(
+                                   half, lambda q: inb(q) and q[1] < C.PLATE_Y0 - 0.02, r_max=1.8, box6=cb),
+                               "corner box, r <= 1.3": checks.round_radii(half, inb, r_max=1.3, box6=cb)}
+        front_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_front.stl"
+        R["vs_front"] = checks.change_vs(m, trimesh.load(str(front_stl), force="mesh"),
+                                         {"outside the corner boxes": (cc, False),
+                                          "inside the corner boxes": (cc, True),
+                                          "bar strip |x|<62": ([(-62.0, 62.0, -12.0, -8.5, -100.0, 100.0)], True)})
+        for k in ("max_z", "corner_dihedral", "corner_round_r", "vs_front"):
+            log("%s: %s" % (k, R.get(k)))
     outline = checks.flat_top_outline(m, h)
     s = C.HANDLE_SHIFT
     r16m = r16.copy()
