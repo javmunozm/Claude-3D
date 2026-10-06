@@ -135,6 +135,18 @@ fused into the half, not a fillet. `CORNER_ROUND = 1.0` (0 = pass front: the has
 material over `CORNER_ROUND_SINK`; the web is trimmed at the floor plane. Open: the web's B-rep radius dips locally to 0.32 where the plate
 front turns into the front round (median 1.005); details in `audit/corner/fix_report.md`.
 
+**Pass plate (2026-10-06, outputs `*_plate.*`, not baked).** The plate's front (y -11.2) and rear (y 78.55) edges are
+half-rounds, `PLATE_NOSE_R = 2.25` (0 = pass edge, STL byte-identical, SHA-256 `71A8050F…5A91D`, re-hashed run 3).
+Bottom edges and the front top: variable-radius OCC fillets on the lone plate before the fuse (`parts/plate.nose_fillet`).
+Top edges: r 2.24 to x 58, then down to r 0.5 at x 66 (rear) and 0.15 at x 65.5 (front), so a small notch stays where
+each round meets the grip (build 2's laws; run 3 fell back to them). Details and gates: `audit/plate/fix_report.md`.
+Rejected (run 3), carrying the round on along the grip:
+- rear: one fillet on the fused half (`parts/plate.nose_post_fillet`, kept, off with `PLATE_NOSE["post"] = {}`), r 2.24
+  -> 1.0 along the grip's rear edge -> 0.3 at the blend end face x 70.5. B-rep valid, STL watertight, but folded facets
+  where the round turns under the grip end: 479 edges up to 179.7 deg at (±72, 78, -12) (build 3).
+- front: the corner web's top edge leaves the plate edge at a 5.7 deg kink, so the contour stops there; adding it as a
+  second contour builds an invalid solid (r 1.0 to the end, and tapered to 0.3).
+
 ## Pass 2 (2026-10-05): lower latches, window, camera hole, bottom opening
 r16's remaining features, each an exact B-rep feature behind its own switch in `constants.py`. With
 `--off all` the build reproduces pass corner's STL byte for byte (SHA-256 `7391D824…9AA05A`, measured).
@@ -147,6 +159,8 @@ Defaults now write `step/VitaGripPS5_v2_p2.step`, `stl/VitaGripPS5_v2_p2.stl`, `
 | `CAMERA_ON` | camera hole D 12 at (0, 68.05) through the plate | `CAMERA_HOLE_D`, `CAMERA_Y` |
 | `BOTTOM_OPEN_ON` | nothing above the floor (z >= -8.8) in front of the pocket for abs(x) < `OPEN_X_END` (p2: 66.75, r16's right-side end; pass s8 2026-10-05: **67.4**, user's option (a) for S8, r16's OPEN_WALL rule; the y-wall in front of the end is now >= 3.286, was 1.43; new permanent gate `gates_p2.end_wall_y`, wall in y at fixed x, x `OPEN_X_END`..72, z -8.8..11.4, both sides; it reproduces 1.43 / 2.26 on p2; `audit/s8/fix_report.md`) | `OPEN_X_END`, `OPEN_Y_LO` |
 | `OPEN_END_R` | pass edge 2026-10-06 (user: "Round it"): the closed end's edge to the grip (23.1 mm, z -8.80..9.34) is an r 1.2 B-rep fillet, applied on the half right after the opening cut (`try_fillet`, fallback 1.0); radius median 1.1999, min 1.1987; facet turn in the end box max 7.16° (s8 35.4°); `end_wall_y` min 3.1429 (s8 3.2862); its top-round band now excludes a chord only by the erosion test (<= 2.2 at r 1.5), still reads 1.432 / 2.258 on p2; 0 = s8, byte-identical; `audit/edge/fix_report.md` | `OPEN_END_R`, `OPEN_END_R_FALLBACK` |
+| `PLATE_NOSE_R` | pass plate 2026-10-06 (user: full half-round on the plate's front and top-bridge edges), **left at 0 = pass edge** (SHA proven before the continuation's edits; not re-hashed since). With `--plate-nose-r 2.25`, both edges get variable-radius fillets on the lone plate (`nose_fillet`): r 2.24 top and bottom (a 0.02 flat at the tip) to x 58, then fading per `PLATE_NOSE` laws into the grip. Front and rear build valid as B-rep. Full build 1 (rear top r_e 0.15) was 1 body but **not watertight**, genus 3: 14 open edges at the rear-top cusp where the fillet meets the grip end (x ±66.3). The earlier cutter method is rejected: its loft never cut, which left a square edge and a 2.2 mm step at x 58 (`audit/plate/fix_report.md`). Open; see `audit/plate/handoff.md` | `PLATE_NOSE_R`, `PLATE_NOSE` |
+| G1 (gate) | `gates_p2.end_wall_y(ero_tx=0.5)`: in the top-round band a chord is excluded only if erosion distance <= 2.2 **and** \|t_x\| < 0.5. Proven: p2 still reads 1.432 / 2.258 and fails; edge reads 3.1429 and passes (333 excluded, all counted chords >= 3.1429); `audit/plate/g1_proof.json` | `end_wall_y` |
 
 - Window and camera are cut on the mirrored solid, the lower lip and the opening on the half before the mirror.
 - The opening cut takes 10.24 mm3 per side (x 66.36..66.75, y -13.61..-9.0, z -8.8..8.15): the grip's inner face sat at x 66.5–66.6 there. v2 was already open for abs(x) < 66.5.

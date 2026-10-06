@@ -24,16 +24,20 @@ def main():
         seam_guides, fit_along_y
     from vgps5_v2.shapes import one_solid, oval_cutter, valid, try_fillet, clip_cutter
     from vgps5_v2.parts.grip_end import build_body, build_handle, build_single, fuse_at_seam
-    from vgps5_v2.parts.plate import build_plate_half, build_blend, front_round_cutter, corner_round_web
+    from vgps5_v2.parts.plate import build_plate_half, build_blend, front_round_cutter, corner_round_web, nose_fillet, \
+        nose_post_fillet
     from vgps5_v2.parts.lip import finger_profile, pit_profile, build_finger, build_pit
     from vgps5_v2.assemble import mirror_union
     from vgps5_v2.shapes import box, rounded_rect_prism, cylinder_z
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_edge.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_edge.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "edge" / "edge_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_plate.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_plate.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "plate" / "plate_results.json"))
+    ap.add_argument("--plate-nose-r", type=float, default=None, help="override PLATE_NOSE_R (0 = pass edge)")
+    ap.add_argument("--plate-brep", default=None, help="write the lone plate (boxes + blend) before the noses; stop")
+    ap.add_argument("--pre-post-brep", default=None, help="write the half before the post-fuse nose fillets; stop")
     ap.add_argument("--open-end-r", type=float, default=None, help="override OPEN_END_R (0 = pass s8)")
     ap.add_argument("--corner-round", type=float, default=None, help="override CORNER_ROUND (0 = pass front)")
     ap.add_argument("--off", default="", help="comma list of pass-2 switches to turn off, or 'all' (= pass corner)")
@@ -46,6 +50,8 @@ def main():
         C.CORNER_ROUND = args.corner_round
     if args.open_end_r is not None:
         C.OPEN_END_R = args.open_end_r
+    if args.plate_nose_r is not None:
+        C.PLATE_NOSE_R = args.plate_nose_r
     p2_switches = ("LOWER_LIP_ON", "WINDOW_ON", "CAMERA_ON", "BOTTOM_OPEN_ON")
     for k in (p2_switches if args.off == "all" else [s for s in args.off.split(",") if s]):
         if k not in p2_switches:
@@ -132,7 +138,9 @@ def main():
     log("seam edges at y %.2f (centre, length, type, max / median crease deg): %s" % (sc, R["seam_creases"]))
     blend = build_blend(blend_pr, C.BLEND_XS, C.PLATE_Y1)
     log("blend loft valid, volume %.0f" % blend.volume)
-    if C.FRONT_ROUND:
+    nose = bool(C.PLATE_NOSE_R)
+    nose_sides = C.PLATE_NOSE["sides"] if nose else ()
+    if C.FRONT_ROUND and "front" not in nose_sides:
         # pass front (S2): the round is cut into the lone blend, before any fuse (no fillet on the fused half)
         cutter, info = front_round_cutter(blend, C.PLATE_Y0, C.FRONT_ROUND_X0, C.BLEND_XA + C.BLEND_EXT - 0.1,
                                           C.FRONT_ROUND, C.FRONT_ROUND_RAMP, cross=C.FRONT_ROUND_CROSS,
@@ -144,8 +152,9 @@ def main():
         log("front round cut (x, r, zb, k, top z): %s ... %s; removed %.4f mm3; top z max %.4f (upper slab %.1f)"
             % (info[0], info[-1], v0 - blend.volume, R["front_round_top_z_max"], C.PLATE2_Z0))
     grip0 = end
-    end = one_solid(end.fuse(blend), "grip end + blend")
-    log("blend fused: valid")
+    if not nose:
+        end = one_solid(end.fuse(blend), "grip end + blend")
+        log("blend fused: valid")
     if args.grip_only:
         export_stl(end, args.grip_only, tolerance=0.002, angular_tolerance=0.05)
         log("grip end written to %s" % args.grip_only)
@@ -155,13 +164,37 @@ def main():
     log("pocket cut: valid")
 
     plate = build_plate_half(C.BLEND_XS, C.PLATE2_X, C.PLATE2_Z0, C.PLATE_Y0, C.PLATE_Y1, C.PLATE_Z0, C.FLOOR_Z)
+    plate_side = blend
+    if nose:
+        # pass plate: the lone plate (boxes + blend, no front round) gets both half-round noses, then one fuse
+        if abs(2.0 * C.PLATE_NOSE_R - (C.FLOOR_Z - C.PLATE_Z0)) > 1e-9:
+            raise RuntimeError("PLATE_NOSE_R must be half the plate (%.3f)" % ((C.FLOOR_Z - C.PLATE_Z0) / 2.0))
+        P = one_solid(plate.fuse(blend), "plate + blend")
+        if args.plate_brep:
+            export_brep(P, args.plate_brep)
+            log("lone plate (boxes + blend) written to %s" % args.plate_brep)
+            return
+        R["nose"] = {}
+        rf = C.PLATE_NOSE_R - C.PLATE_NOSE["gap"]
+        for side, y0 in (("front", C.PLATE_Y0), ("rear", C.PLATE_Y1)):
+            if side not in nose_sides:
+                continue
+            v0 = P.volume
+            laws = dict(C.PLATE_NOSE[side])
+            if side in C.PLATE_NOSE.get("post", {}):
+                laws["top"] = None          # rounded after the fuse, on along the grip (nose_post_fillet)
+            P, info = nose_fillet(P, y0, C.FLOOR_Z, C.PLATE_Z0, rf, laws)
+            R["nose"][side] = dict(edges=info, removed=round(v0 - P.volume, 4))
+            log("%s nose fillet r %.3f, edges (x0, z0, x1, z1, r0, r1): %s; removed %.3f mm3"
+                % (side, rf, info, v0 - P.volume))
+        plate, plate_side = P, P
     half = one_solid(end.fuse(plate), "grip end + plate")
     log("plate fused: valid")
     if C.CORNER_ROUND:
         # pass corner: rolling-ball round between the plate front (and the front round) and the grip, built from the
         # lone blend and grip end as a web solid and fused in (no fillet on the fused half)
         plane = box(50.0, 75.0, C.PLATE_Y0, 0.0, -10.5, -6.0)        # the plate front plane, past the floor
-        web, info = corner_round_web([blend, plane], grip0, C.CORNER_ROUND, C.FLOOR_Z, C.CORNER_ROUND_Z_START,
+        web, info = corner_round_web([plate_side, plane], grip0, C.CORNER_ROUND, C.FLOOR_Z, C.CORNER_ROUND_Z_START,
                                      C.CORNER_ROUND_ALPHA_END, *C.CORNER_ROUND_GUESS, sink=C.CORNER_ROUND_SINK)
         R["corner_round_sections"] = info
         v0 = half.volume
@@ -200,6 +233,20 @@ def main():
             R["open_end_r_applied"], half = try_fillet(half, ee, radii, "closed-end edge", log)
             if R["open_end_r_applied"] is None:
                 raise RuntimeError("closed-end round failed at %s" % radii)
+    post = {s: q for s, q in C.PLATE_NOSE.get("post", {}).items() if s in nose_sides}
+    if post:
+        if args.pre_post_brep:
+            export_brep(half, args.pre_post_brep)
+            log("half before the post-fuse nose fillets written to %s" % args.pre_post_brep)
+            return
+        R["nose_post"] = {}
+        for side, y0 in (("front", C.PLATE_Y0), ("rear", C.PLATE_Y1)):
+            if side in post:
+                v0 = half.volume
+                half, rows = nose_post_fillet(half, y0, C.FLOOR_Z, post[side])
+                R["nose_post"][side] = dict(law=post[side], edges=rows, removed=round(v0 - half.volume, 4))
+                log("%s top nose, post-fuse fillet %s: %d spine edges %s; removed %.3f mm3"
+                    % (side, post[side], len(rows), rows, v0 - half.volume))
 
     n = np.array(C.FINGER_N) / np.linalg.norm(C.FINGER_N)
     prof, info = finger_profile(C.LIP_U, C.LIP_TOP_Z, C.ROOT_Z, C.FINGER_T_ROOT, C.FINGER_T_TIP, C.LIP_OVERHANG,

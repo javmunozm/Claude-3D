@@ -65,6 +65,27 @@ CORNER_ROUND_GUESS = (66.3, -12.2)
 CORNER_ROUND_ALPHA_END = 25.0    # last station where the crease between the contact normals falls under this
 CORNER_ROUND_SINK = 1.0         # over the last mm of ball path the arc sinks into the material (no end face)
 CORNER_BOX = (66.0, 70.5, -12.5, -10.2, -14.2, -8.9)   # gate box (right side), from step 1
+# pass plate: full half-round on the plate's front (y PLATE_Y0) and rear (PLATE_Y1) edges, r = half the plate (0 = pass
+# edge). Cut from the lone plate (boxes + blend) before the fuse with the grip end; it replaces FRONT_ROUND's cutter.
+# Full round to NOSE["x1"]; then the top arc (front) / both arcs (rear) shrink to r_end and lift off into air by
+# x_shrink + lift, before the grip (inner clip 66.5) and the corner web (contacts from x 65.5); the front bottom arc
+# goes to FRONT_ROUND (r 1, crossing 0.005) by x_bf and runs on to the old cutter's end.
+PLATE_NOSE_R = 2.25        # half the plate (0 = pass edge, byte-identical)
+# Variable-radius fillets on the lone plate (parts/plate.nose_fillet); per edge (x1, x_e, r_e): radius PLATE_NOSE_R - gap
+# to x1, smoothstep to r_e at x_e, r_e beyond (into the grip). gap: the two fillets leave a 2 gap flat (a fillet of
+# exactly half the face is not buildable).
+PLATE_NOSE = dict(gap=0.01,
+                  front=dict(top=(58.0, 65.5, 0.15), bottom=(58.0, 64.0, FRONT_ROUND)),
+                  # rear bottom: a radius that changes along the blend's underside edges (x > 60) fails to build
+                  # (t_fillet.py: (58, 64, 0.5/1.0) fail; constant along x > 60 builds), so it fades by x 60
+                  # rear top: r 0.15 at the grip (x 66.3) left 14 open STL edges at the cusp (build 1): 0.5
+                  rear=dict(top=(58.0, 66.0, 0.5), bottom=(55.0, 60.0, 0.3)),
+                  sides=("front", "rear"),
+                  # run 3: these sides' TOP edges are rounded after the fuse, one contour on along the grip's
+                  # tangent edges (parts/plate.nose_post_fillet): (r, x1, x_e, r_e, l_end, r_tip). Empty = build 2's
+                  # laws (run 3 fallback): rear (2.24, 58, 66, 1.0, 3.0, 0.3) built valid but its STL has folded facets
+                  # (179.7 deg, 479 edges at (72, 78, -12)); front not buildable. See audit/plate/fix_report.md
+                  post=dict())
 
 # plate built into the grip end (pass 1, S2): boxes for the flat plate, a lofted blend for the junction
 BLEND_XS = 60.0            # main slab x 0..60; the blend loft is trimmed at x >= 60 (both planes)

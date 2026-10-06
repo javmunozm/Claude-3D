@@ -29,6 +29,12 @@ def feature_boxes(C):
         r = getattr(C, "OPEN_END_R", 0.0) or 0.0
         out += mirror_boxes([(66.2, C.OPEN_X_END + 0.15 + r, -14.0 - (2.5 if r else 0.0), -8.5, C.FLOOR_Z - 0.15,
                               9.0 + (1.0 if r else 0.0))])
+    if getattr(C, "PLATE_NOSE_R", 0.0):
+        # pass plate: the rear band (whole width; the nose fades out by x 65.5)
+        if "rear" in C.PLATE_NOSE["sides"]:
+            out.append((-72.0, 72.0, 76.2, 78.6, C.PLATE_Z0 - 1.0, C.FLOOR_Z + 0.1))
+        if "front" in C.PLATE_NOSE["sides"]:
+            out.append((-72.0, 72.0, -11.3, -8.9, C.PLATE_Z0 - 1.0, C.FLOOR_Z + 0.1))
     if C.WINDOW_ON:
         out.append((-C.WINDOW_W / 2 - 1.0, C.WINDOW_W / 2 + 1.0, C.WIN_Y0 - 1.0, C.WIN_Y1 + 1.0, -14.0, C.FLOOR_Z + 0.1))
     if C.CAMERA_ON:
@@ -39,7 +45,7 @@ def feature_boxes(C):
 
 def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, y_pocket=-9.0,
                cols=(66.76, 67.0, 67.25, 67.41, 67.5, 68.0), sides=(1, -1), graze_tx=0.3, z_graze=8.4, ero_max=None,
-               ero_r=1.5):
+               ero_r=1.5, ero_tx=None):
     """S8 gate (the method that found S8, r16's OPEN_WALL rule): the wall in y at fixed x in front of the pocket's bottom
     end. On each z section, along the line x = s * x (y -40..0.5), the material interval with the highest top below
     y 0.4 (front face -> pocket wall); an interval whose top is not at the pocket (top < y_pocket - 0.5) is no wall
@@ -51,7 +57,8 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
     Pass edge: with ero_max set, a band chord is excluded by measurement instead: its front end lies within ero_max of
     the z-section eroded by ero_r (a 2 ero_r body is right there; an exact 90 deg convex corner reads 2.121 at ero_r
     1.5, a feather far more). The closed-end round's top end meets the pocket wall y -9 in such a corner, at |t_x|
-    0.39 (x 67.51, z 9.46, chord 0.0195, erosion distance 2.14). Below the band every chord still counts."""
+    0.39 (x 67.51, z 9.46, chord 0.0195, erosion distance 2.14). Below the band every chord still counts.
+    G1 (pass plate): with ero_tx set, the erosion rule also needs |t_x| < ero_tx (0.5: the corner chord is 0.39)."""
     if str(tools_dir) not in sys.path:
         sys.path.insert(0, str(tools_dir))
     from form_sweep import zsection
@@ -71,7 +78,7 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
         if not ero_max:
             return w[1] < graze_tx
         d = float(ero[z].distance(Point(x, w[2])))
-        ok = d <= ero_max
+        ok = d <= ero_max and (ero_tx is None or w[1] < ero_tx)
         if ok:
             ero_seen.append(d)
         return ok
@@ -107,12 +114,14 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
         colmin = np.nanmin(np.where(np.isnan(W), np.inf, W), axis=0)
         if np.isfinite(Wg).any():
             gi, gj = np.unravel_index(np.nanargmin(Wg), Wg.shape)
-            graze = dict(n=int(np.isfinite(Wg).sum()), min=(round(float(Wg[gi, gj]), 4), float(xs[gj]), zs[gi]),
+            graze = dict(n=int(np.isfinite(Wg).sum()), n_under_3p0=int(np.sum(np.nan_to_num(Wg, nan=1e9) < 3.0)),
+                         min=(round(float(Wg[gi, gj]), 4), float(xs[gj]), zs[gi]),
                          z_lowest=min(zs[k] for k in range(len(zs)) if np.isfinite(Wg[k]).any()))
         else:
             graze = dict(n=0)
         if ero_max:
-            graze["rule"] = "erosion distance <= %.2f at r %.1f" % (ero_max, ero_r)
+            graze["rule"] = "erosion distance <= %.2f at r %.1f" % (ero_max, ero_r) + \
+                ("" if ero_tx is None else " and |t_x| < %.2f" % ero_tx)
             graze["erosion_max"] = round(max(ero_seen), 3) if ero_seen else None
             ero_seen.clear()
         exact = {}
@@ -135,7 +144,8 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
     # S8 gate: wall in y at fixed x in front of the pocket's bottom end, x OPEN_X_END..72, z -8.8..11.4, both sides
     G["end_wall_y"] = end_wall_y(m, C.OPEN_X_END, C.PROJECT_DIR.parents[1] / "tools", y_pocket=C.POCKET_Y_BOTTOM,
                                  z_graze=C.TOP_Z - C.ROUND_R,
-                                 ero_max=2.2 if getattr(C, "OPEN_END_R", 0.0) else None)
+                                 ero_max=2.2 if getattr(C, "OPEN_END_R", 0.0) else None,
+                                 ero_tx=0.5 if getattr(C, "OPEN_END_R", 0.0) else None)
     log("p2 end wall in y at fixed x (x %.2f..72, z -8.79..11.39; min (t, x, z), first x >= 3.0 / 3.15): %s"
         % (C.OPEN_X_END, G["end_wall_y"]))
     p2_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_p2.stl"
@@ -236,4 +246,20 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
     G["vs_corner"] = checks.change_vs(m, corner, {"outside the p2 feature boxes": (fb, False),
                                                    "inside the p2 feature boxes": (fb, True)})
     log("p2 change vs corner: %s" % G["vs_corner"])
+    edge_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_edge.stl"
+    if getattr(C, "PLATE_NOSE_R", 0.0) and edge_stl.exists():
+        # declared boxes: both plate bands (into the grip to |x| 72) and the corner web box (re-solved on the new front)
+        pb = [(-72.0, 72.0, 76.2, 78.6, -15.0, -8.7), (-72.0, 72.0, -11.3, -8.9, -15.0, -8.7)]
+        pb += [(sx * a, sx * b, y0, y1, z0, z1) if sx > 0 else (-b, -a, y0, y1, z0, z1)
+               for sx in (1, -1) for (a, b, y0, y1, z0, z1) in [C.CORNER_BOX]]
+        G["vs_edge"] = checks.change_vs(m, trimesh.load(str(edge_stl), force="mesh"),
+                                        {"outside the plate boxes": (pb, False), "inside the plate boxes": (pb, True)})
+        G["nose_dihedral"] = {k: checks.box_dihedral(m, b, deg=8.0) for k, b in (
+            ("rear main x0..55", (0.0, 55.0, 76.0, 78.7, -13.5, -8.6)),
+            ("rear transition R x55..67", (55.0, 67.0, 76.0, 78.7, -14.5, -8.6)),
+            ("rear transition L x-67..-55", (-67.0, -55.0, 76.0, 78.7, -14.5, -8.6)),
+            ("front main x0..55", (0.0, 55.0, -11.3, -8.8, -13.5, -8.6)),
+            ("front transition R x55..67", (55.0, 67.0, -11.3, -8.8, -14.5, -8.6)),
+            ("front transition L x-67..-55", (-67.0, -55.0, -11.3, -8.8, -14.5, -8.6)))}
+        log("plate: change vs edge %s; nose dihedral (> 8 deg) %s" % (G["vs_edge"], G["nose_dihedral"]))
     return G
