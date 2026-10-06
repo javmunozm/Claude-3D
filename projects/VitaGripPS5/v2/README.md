@@ -135,6 +135,8 @@ fused into the half, not a fillet. `CORNER_ROUND = 1.0` (0 = pass front: the has
 material over `CORNER_ROUND_SINK`; the web is trimmed at the floor plane. Open: the web's B-rep radius dips locally to 0.32 where the plate
 front turns into the front round (median 1.005); details in `audit/corner/fix_report.md`.
 
+**Pass latch (2026-10-06, outputs `*_latch.*`, not baked).** `LATCH_X2 = True` doubles the 4 snap fingers (root 3.6 / tip 1.8, root fillet r 2.0; lip line, overhang 1.5, lead 30, gap 2.5, ROOT_Z unchanged); the extra thickness and the pit face (u 4.3 -> 6.1) go outward. False = pass plate, STL byte-identical (SHA-256 `293FD06B…7E33`); `--latch-x2 0|1` overrides. Must be printed on its side (interlayer SF 1.01). Details: `audit/latch/fix_report.md`. Review `audit/latch/review.md`: ACCEPT WITH LISTED ARTIFACTS; S10 (slot-side root fillet cut short, sharp slot-wall foot; `audit/latch/root_check.md`: in-layer SF 3.25 for the fillet, 1.77–3.25 with the foot) and S11 (0.065 mm facets in the latch profiles) accepted by the user, 2026-10-06; the slot is to be checked on the print.
+
 **Pass plate (2026-10-06, outputs `*_plate.*`, not baked).** The plate's front (y -11.2) and rear (y 78.55) edges are
 half-rounds, `PLATE_NOSE_R = 2.25` (0 = pass edge, STL byte-identical, SHA-256 `71A8050F…5A91D`, re-hashed run 3).
 Bottom edges and the front top: variable-radius OCC fillets on the lone plate before the fuse (`parts/plate.nose_fillet`).

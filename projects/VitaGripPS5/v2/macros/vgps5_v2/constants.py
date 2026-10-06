@@ -34,6 +34,11 @@ LIP_LEAD_DEG = 30.0
 LIP_RET_DEG = 127.0
 LIP_FLAT = 0.5
 LIP_LAND = 0.8
+# pass latch (user, 2026-10-06; audit/latch/sizing.md, x2.00 / OH 1.5): double-thickness fingers, root fillet scaled
+# with the root (Kt 1.3). The finger's inner face (u 0) and the lip stay; the extra thickness and the pit's outer
+# face (u FINGER_T_ROOT + FINGER_GAP) go outward. The main applies LATCH_X2_VALS when on (False = pass plate).
+LATCH_X2 = True
+LATCH_X2_VALS = dict(FINGER_T_ROOT=3.6, FINGER_T_TIP=1.8, FINGER_ROOT_R=2.0)
 # right upper finger station and outline normal (r16 build log)
 FINGER_P = (90.61, 46.20)
 FINGER_N = (0.986, 0.164)

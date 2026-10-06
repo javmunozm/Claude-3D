@@ -32,9 +32,10 @@ def main():
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_plate.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_plate.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "plate" / "plate_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_latch.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_latch.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "latch" / "latch_results.json"))
+    ap.add_argument("--latch-x2", type=int, default=None, help="override LATCH_X2 (0 = pass plate)")
     ap.add_argument("--plate-nose-r", type=float, default=None, help="override PLATE_NOSE_R (0 = pass edge)")
     ap.add_argument("--plate-brep", default=None, help="write the lone plate (boxes + blend) before the noses; stop")
     ap.add_argument("--pre-post-brep", default=None, help="write the half before the post-fuse nose fillets; stop")
@@ -52,6 +53,11 @@ def main():
         C.OPEN_END_R = args.open_end_r
     if args.plate_nose_r is not None:
         C.PLATE_NOSE_R = args.plate_nose_r
+    if args.latch_x2 is not None:
+        C.LATCH_X2 = bool(args.latch_x2)
+    if C.LATCH_X2:
+        for k, v in C.LATCH_X2_VALS.items():
+            setattr(C, k, v)
     p2_switches = ("LOWER_LIP_ON", "WINDOW_ON", "CAMERA_ON", "BOTTOM_OPEN_ON")
     for k in (p2_switches if args.off == "all" else [s for s in args.off.split(",") if s]):
         if k not in p2_switches:
@@ -253,6 +259,10 @@ def main():
                                 C.LIP_LEAD_DEG, C.LIP_RET_DEG, C.LIP_FLAT, C.LIP_LAND, C.FINGER_INNER_SLOT,
                                 C.FINGER_GAP, C.FINGER_ROOT_R)
     R["finger"] = {k: round(float(v), 4) for k, v in info.items()}
+    R["finger"].update(latch_x2=bool(C.LATCH_X2), t_root=C.FINGER_T_ROOT, t_tip=C.FINGER_T_TIP,
+                       root_r=C.FINGER_ROOT_R, gap=C.FINGER_GAP, pit_u=C.FINGER_T_ROOT + C.FINGER_GAP)
+    log("finger: LATCH_X2 %s, t %.2f / %.2f, root r %.2f, gap %.2f, pit face u %.2f"
+        % (C.LATCH_X2, C.FINGER_T_ROOT, C.FINGER_T_TIP, C.FINGER_ROOT_R, C.FINGER_GAP, C.FINGER_T_ROOT + C.FINGER_GAP))
     pit = build_pit(C.FINGER_P, n, pit_profile(C.FINGER_W, C.FINGER_SLOT, C.FINGER_INNER_SLOT, C.FINGER_T_ROOT,
                                                 C.FINGER_GAP, C.PIT_CORNER_R), C.ROOT_Z, C.TOP_Z + 10.0)
     if args.half_brep:

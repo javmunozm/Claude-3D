@@ -43,6 +43,34 @@ def feature_boxes(C):
     return out
 
 
+def latch_boxes(C):
+    """Pass latch: change boxes around the 4 fingers and pits (u -2.5..8, |t| <= 10, z -16..11.5), axis-aligned."""
+    out = []
+    for p, n in ((C.FINGER_P, C.FINGER_N), (C.FINGER_P_LO, C.FINGER_N_LO)):
+        p, n = np.asarray(p, float), np.asarray(n, float) / np.linalg.norm(n)
+        t = np.array([-n[1], n[0]])
+        q = np.array([p + u * n + s * t for u in (-2.5, 8.0) for s in (-10.0, 10.0)])
+        out.append((q[:, 0].min(), q[:, 0].max(), q[:, 1].min(), q[:, 1].max(), -16.0, 11.5))
+    return mirror_boxes(out)
+
+
+def latch_regions(C, src, dst):
+    """Pass latch: regions.json with the pit footprints replaced by v2's own pits (from pit_profile, at the 4 v2
+    stations, in the file's order L up, L lo, R up, R lo); everything else as in src."""
+    from .parts.lip import pit_profile
+    cfg = json.loads(Path(src).read_text(encoding="utf-8"))
+    prof = pit_profile(C.FINGER_W, C.FINGER_SLOT, C.FINGER_INNER_SLOT, C.FINGER_T_ROOT, C.FINGER_GAP, C.PIT_CORNER_R)
+    pits = []
+    for p, n in ((C.FINGER_P, C.FINGER_N), (C.FINGER_P_LO, C.FINGER_N_LO)):
+        p, n = np.asarray(p, float), np.asarray(n, float) / np.linalg.norm(n)
+        t = np.array([-n[1], n[0]])
+        pits.append(p + np.outer(prof[:, 0], n) + np.outer(prof[:, 1], t))
+    pits = [q * [-1.0, 1.0] for q in pits] + pits
+    cfg["pits"] = [q.tolist() for q in pits]
+    Path(dst).write_text(json.dumps(cfg, indent=1), encoding="utf-8")
+    return Path(dst)
+
+
 def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, y_pocket=-9.0,
                cols=(66.76, 67.0, 67.25, 67.41, 67.5, 68.0), sides=(1, -1), graze_tx=0.3, z_graze=8.4, ero_max=None,
                ero_r=1.5, ero_tx=None):
@@ -164,6 +192,11 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
     sky_boxes["window edge x40..56.5"] = (40.0, 56.5, 1.5, 61.5, -13.0, -9.0)
     sky_boxes["camera"] = (-7.5, 7.5, 61.5, 74.5, -13.0, -9.0)
     sky_boxes["control: pit R upper (pass corner)"] = (86.5, 97.0, 2 * C.YC - 30.0, 2 * C.YC - 10.5, -12.5, 11.0)
+    if getattr(C, "LATCH_X2", False):
+        # pass latch: all 4 pits, boxes grown to the moved pit face (u 6.1 -> x up to about 98.2)
+        for nm, (a, b, y0, y1, z0, z1) in zip(("pit R upper", "pit R lower"), latch_boxes(C)[:2]):
+            for side, bx in (("", (a, b, y0, y1, -14.5, 11.0)), (" (L)", (-b, -a, y0, y1, -14.5, 11.0))):
+                sky_boxes["latch " + nm + side] = bx
     G["sky"] = checks.sealed_air(m, sky_boxes)
     for k, v in G["sky"].items():
         log("p2 sky test %s: %s" % (k, v))
@@ -172,6 +205,10 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
     sw = out_dir / "sweep"
     tool = C.PROJECT_DIR.parents[1] / "tools" / "form_sweep.py"
     regions = C.PROJECT_DIR / "audit" / "regions.json"
+    if getattr(C, "LATCH_X2", False):
+        # pass latch: the pits moved outward; r16's pit outlines would put the old pit ring inside the new pit's air
+        regions = latch_regions(C, regions, out_dir / "regions_latch.json")
+        log("p2 walls: pit outlines from v2's pit_profile, %s" % regions)
     p = subprocess.run([sys.executable, str(tool), str(stl_path), "--regions", str(regions), "--out", str(sw),
                         "--tag", "p2", "--stages", "hf,walls"], capture_output=True, text=True, timeout=600)
     (sw / "sweep_p2.log").write_text(p.stdout + p.stderr)
@@ -262,4 +299,11 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
             ("front transition R x55..67", (55.0, 67.0, -11.3, -8.8, -14.5, -8.6)),
             ("front transition L x-67..-55", (-67.0, -55.0, -11.3, -8.8, -14.5, -8.6)))}
         log("plate: change vs edge %s; nose dihedral (> 8 deg) %s" % (G["vs_edge"], G["nose_dihedral"]))
+    plate_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_plate.stl"
+    if getattr(C, "LATCH_X2", False) and plate_stl.exists():
+        lb = latch_boxes(C)
+        G["latch_boxes"] = [tuple(round(float(v), 2) for v in b) for b in lb]
+        G["vs_plate"] = checks.change_vs(m, trimesh.load(str(plate_stl), force="mesh"),
+                                         {"outside the latch boxes": (lb, False), "inside the latch boxes": (lb, True)})
+        log("latch: boxes %s; change vs plate %s" % (G["latch_boxes"], G["vs_plate"]))
     return G
