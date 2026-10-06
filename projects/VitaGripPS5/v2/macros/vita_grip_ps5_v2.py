@@ -31,9 +31,10 @@ def main():
     from vgps5_v2 import checks
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_s8.step"))
-    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_s8.stl"))
-    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "s8" / "s8_results.json"))
+    ap.add_argument("--out-step", default=str(C.V2_DIR / "step" / "VitaGripPS5_v2_edge.step"))
+    ap.add_argument("--out-stl", default=str(C.V2_DIR / "stl" / "VitaGripPS5_v2_edge.stl"))
+    ap.add_argument("--results", default=str(C.V2_DIR / "audit" / "edge" / "edge_results.json"))
+    ap.add_argument("--open-end-r", type=float, default=None, help="override OPEN_END_R (0 = pass s8)")
     ap.add_argument("--corner-round", type=float, default=None, help="override CORNER_ROUND (0 = pass front)")
     ap.add_argument("--off", default="", help="comma list of pass-2 switches to turn off, or 'all' (= pass corner)")
     ap.add_argument("--sections-only", action="store_true")
@@ -43,6 +44,8 @@ def main():
     args = ap.parse_args()
     if args.corner_round is not None:
         C.CORNER_ROUND = args.corner_round
+    if args.open_end_r is not None:
+        C.OPEN_END_R = args.open_end_r
     p2_switches = ("LOWER_LIP_ON", "WINDOW_ON", "CAMERA_ON", "BOTTOM_OPEN_ON")
     for k in (p2_switches if args.off == "all" else [s for s in args.off.split(",") if s]):
         if k not in p2_switches:
@@ -180,6 +183,23 @@ def main():
                                      [round(v, 3) for v in tuple(s.bounding_box().max)]) for s in rms]
         half = one_solid(half.cut(oc), "bottom opening cut")
         log("bottom opening x < %.2f: removed %s" % (C.OPEN_X_END, R["bottom_open_removed"]))
+        if C.OPEN_END_R:
+            # pass edge: round the closed end's edge to the grip (the end face's edge that is on neither the floor
+            # plane nor the pocket wall y POCKET_Y_BOTTOM)
+            def on_end(e):
+                b = e.bounding_box()
+                return abs(b.min.X - C.OPEN_X_END) < 1e-3 and abs(b.max.X - C.OPEN_X_END) < 1e-3 and \
+                    b.max.Y - b.min.Y > 0.01 and b.max.Z - b.min.Z > 0.01 and b.max.Y < 0.0
+            ee = [e for e in half.edges() if on_end(e)]
+            R["open_end_edges"] = [(round(e.length, 3), e.geom_type.name, [round(v, 3) for v in tuple(e.bounding_box().min)],
+                                    [round(v, 3) for v in tuple(e.bounding_box().max)]) for e in ee]
+            log("closed-end edge(s) to round: %s" % R["open_end_edges"])
+            if len(ee) != 1:
+                raise RuntimeError("expected one closed-end edge, found %d" % len(ee))
+            radii = [C.OPEN_END_R] + [r for r in C.OPEN_END_R_FALLBACK if r < C.OPEN_END_R]
+            R["open_end_r_applied"], half = try_fillet(half, ee, radii, "closed-end edge", log)
+            if R["open_end_r_applied"] is None:
+                raise RuntimeError("closed-end round failed at %s" % radii)
 
     n = np.array(C.FINGER_N) / np.linalg.norm(C.FINGER_N)
     prof, info = finger_profile(C.LIP_U, C.LIP_TOP_Z, C.ROOT_Z, C.FINGER_T_ROOT, C.FINGER_T_TIP, C.LIP_OVERHANG,

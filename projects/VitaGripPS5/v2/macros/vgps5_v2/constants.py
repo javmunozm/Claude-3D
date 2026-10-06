@@ -208,3 +208,5 @@ HOLE_Z1 = FLOOR_Z + 2.0                                       # ... into the poc
 BOTTOM_OPEN_ON = True
 OPEN_X_END = 67.4                                             # pass s8: 66.75 left a 1.43 mm y-wall (S8); r16 OPEN_WALL rule
 OPEN_Y_LO = -25.0                                             # r16: no material at x < 66.75, y -25..-9.3, z >= -8.8
+OPEN_END_R = 1.2                                              # pass edge: round on the closed end / grip edge (0 = s8)
+OPEN_END_R_FALLBACK = (1.0,)                                  # tried in order if OPEN_END_R fails

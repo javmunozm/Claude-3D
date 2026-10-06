@@ -24,7 +24,11 @@ def feature_boxes(C):
     if C.LOWER_LIP_ON:
         out += mirror_boxes([(86.0, 97.5, 10.0, 31.0, -16.0, 12.0)])
     if C.BOTTOM_OPEN_ON:
-        out += mirror_boxes([(66.2, C.OPEN_X_END + 0.15, -14.0, -8.5, C.FLOOR_Z - 0.15, 9.0)])
+        # pass edge: the closed-end round reaches past the end face (r tan(turn / 2) <= 0.37 at r 1.2); the box grows
+        # by OPEN_END_R in x and up to the top round's end of the edge (z 9.34)
+        r = getattr(C, "OPEN_END_R", 0.0) or 0.0
+        out += mirror_boxes([(66.2, C.OPEN_X_END + 0.15 + r, -14.0 - (2.5 if r else 0.0), -8.5, C.FLOOR_Z - 0.15,
+                              9.0 + (1.0 if r else 0.0))])
     if C.WINDOW_ON:
         out.append((-C.WINDOW_W / 2 - 1.0, C.WINDOW_W / 2 + 1.0, C.WIN_Y0 - 1.0, C.WIN_Y1 + 1.0, -14.0, C.FLOOR_Z + 0.1))
     if C.CAMERA_ON:
@@ -34,7 +38,8 @@ def feature_boxes(C):
 
 
 def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, y_pocket=-9.0,
-               cols=(66.76, 67.0, 67.25, 67.41, 67.5, 68.0), sides=(1, -1), graze_tx=0.3, z_graze=8.4):
+               cols=(66.76, 67.0, 67.25, 67.41, 67.5, 68.0), sides=(1, -1), graze_tx=0.3, z_graze=8.4, ero_max=None,
+               ero_r=1.5):
     """S8 gate (the method that found S8, r16's OPEN_WALL rule): the wall in y at fixed x in front of the pocket's bottom
     end. On each z section, along the line x = s * x (y -40..0.5), the material interval with the highest top below
     y 0.4 (front face -> pocket wall); an interval whose top is not at the pocket (top < y_pocket - 0.5) is no wall
@@ -42,7 +47,11 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
     (z > z_graze = TOP_Z - ROUND_R) a chord whose front end lies on a face running within 17 deg of the line
     (|t_x| < graze_tx: the flank's top round, edge-on in plan; on p2 0.06 at x 68.51, z 10.71) measures a convex corner,
     not a wall. Below the band every chord counts. Per side: min (wall, x, z), the first x from which every wall >= 3.0
-    / 3.15, and (wall, |t_x|) at z0 in the columns cols."""
+    / 3.15, and (wall, |t_x|) at z0 in the columns cols.
+    Pass edge: with ero_max set, a band chord is excluded by measurement instead: its front end lies within ero_max of
+    the z-section eroded by ero_r (a 2 ero_r body is right there; an exact 90 deg convex corner reads 2.121 at ero_r
+    1.5, a feather far more). The closed-end round's top end meets the pocket wall y -9 in such a corner, at |t_x|
+    0.39 (x 67.51, z 9.46, chord 0.0195, erosion distance 2.14). Below the band every chord still counts."""
     if str(tools_dir) not in sys.path:
         sys.path.insert(0, str(tools_dir))
     from form_sweep import zsection
@@ -53,6 +62,19 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
 
     from shapely.geometry import Point
     bnd = {z: [g for g in getattr(secs[z].boundary, "geoms", [secs[z].boundary])] for z in zs}
+    ero = {z: secs[z].buffer(-ero_r) for z in zs if z > z_graze} if ero_max else {}
+    ero_seen = []
+
+    def grazing(z, x, w):
+        if z <= z_graze:
+            return False
+        if not ero_max:
+            return w[1] < graze_tx
+        d = float(ero[z].distance(Point(x, w[2])))
+        ok = d <= ero_max
+        if ok:
+            ero_seen.append(d)
+        return ok
 
     def wall(z, x):
         """(wall, |t_x| of the boundary at the chord's front end): |t_x| < graze_tx means the front end lies on a face
@@ -70,7 +92,7 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
         b = min(bnd[z], key=lambda L: L.distance(p))
         d = b.project(p)
         t = np.subtract(b.interpolate(d + 0.05).coords[0], b.interpolate(max(d - 0.05, 0.0)).coords[0])
-        return float(q.max() - q.min()), float(abs(t[0]) / max(np.hypot(*t), 1e-12))
+        return float(q.max() - q.min()), float(abs(t[0]) / max(np.hypot(*t), 1e-12)), float(q.min())
 
     out = {}
     for s in sides:
@@ -80,7 +102,7 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
             for j, x in enumerate(xs):
                 w = wall(z, s * x)
                 if w is not None:
-                    (Wg if (w[1] < graze_tx and z > z_graze) else W)[i, j] = w[0]
+                    (Wg if grazing(z, s * x, w) else W)[i, j] = w[0]
         i, j = np.unravel_index(np.nanargmin(W), W.shape)
         colmin = np.nanmin(np.where(np.isnan(W), np.inf, W), axis=0)
         if np.isfinite(Wg).any():
@@ -89,6 +111,10 @@ def end_wall_y(m, x0, tools_dir, x1=72.0, z0=-8.79, z1=11.39, dx=0.05, dz=0.25, 
                          z_lowest=min(zs[k] for k in range(len(zs)) if np.isfinite(Wg[k]).any()))
         else:
             graze = dict(n=0)
+        if ero_max:
+            graze["rule"] = "erosion distance <= %.2f at r %.1f" % (ero_max, ero_r)
+            graze["erosion_max"] = round(max(ero_seen), 3) if ero_seen else None
+            ero_seen.clear()
         exact = {}
         for c in cols:
             w = wall(zs[0], s * c) if c > x0 else None
@@ -108,7 +134,8 @@ def run(m, r16, corner, C, out_dir, stl_path, log):
     G = {}
     # S8 gate: wall in y at fixed x in front of the pocket's bottom end, x OPEN_X_END..72, z -8.8..11.4, both sides
     G["end_wall_y"] = end_wall_y(m, C.OPEN_X_END, C.PROJECT_DIR.parents[1] / "tools", y_pocket=C.POCKET_Y_BOTTOM,
-                                 z_graze=C.TOP_Z - C.ROUND_R)
+                                 z_graze=C.TOP_Z - C.ROUND_R,
+                                 ero_max=2.2 if getattr(C, "OPEN_END_R", 0.0) else None)
     log("p2 end wall in y at fixed x (x %.2f..72, z -8.79..11.39; min (t, x, z), first x >= 3.0 / 3.15): %s"
         % (C.OPEN_X_END, G["end_wall_y"]))
     p2_stl = C.V2_DIR / "stl" / "VitaGripPS5_v2_p2.stl"
