@@ -26,7 +26,8 @@ import surgical_drill_guide as sdg  # noqa: E402  (guarded: importing does not e
 
 from build123d import import_step  # noqa: E402
 
-D, TRAVEL, CHAN, TEETH, BORE, THREAD, BOSS, PAWL = sdg.parameters()
+D, TRAVEL, CHAN, TEETH, BORE, COUP, PAWL = sdg.parameters()
+LUG, HEAD, SOCK, FIN, HOOK, NOTCH, BAR = (COUP[k] for k in ("lug", "head", "socket", "finger", "hook", "notch", "bar"))
 WY = D["wire_y"]
 ZM = sdg.Z_MID
 PIN = D["pin"]
@@ -200,28 +201,11 @@ for x, lab in ((65.0, "riser"), (100.0, "top bar"), (136.5, "crown")):
     yy = 20.0 if lab == "riser" else 54.5
     zz = 30.0 - hits_along(sl, np.array([x, yy, 30.0]), [0, 0, -1])
     print(f"  slider Z at {lab:7s} (X {x}, Y {yy}): surfaces Z {np.round(zz, 3).tolist()}")
-for x in (100.0, 122.311, 140.0):
-    zz = 30.0 - hits_along(fr, np.array([x, -4.0, 30.0]), [0, 0, -1])
-    print(f"  frame Z at bar X {x:7.3f} (Y -4): surfaces Z {np.round(zz, 3).tolist()}")
-# Boss-pad taper (round 3 gate): per-face Z excess along X on vertical Z rays at Y -5, fitted on the taper
-for yy in (-1.0, -5.0, -8.5):
-    res = []
-    for side, xa, xb in (("-X", BOSS["pad_x0"] - 0.6, BOSS["pad_x0"] + BOSS["pad_blend"] + 0.6),
-                         ("+X", BOSS["pad_x1"] - BOSS["pad_blend"] - 0.6, BOSS["pad_x1"] + 0.6)):
-        P = []
-        for x in np.arange(xa, xb, 0.02):
-            h = hits_along(fr, np.array([x, yy, -30.0]), [0, 0, 1])
-            if len(h):
-                P.append((x, -(-30.0 + h[0])))
-        P = np.array(P)
-        e_max = (BOSS["od"] - sdg.T_Z) / 2.0
-        m_ = (P[:, 1] > 0.3) & (P[:, 1] < e_max - 0.3)
-        k_, c_ = np.polyfit(P[m_, 0], P[m_, 1], 1)
-        x0_, x1_ = -c_ / k_, (e_max - c_) / k_
-        res.append(f"{side}: slope {abs(k_):.3f} ({math.degrees(math.atan(abs(k_))):.1f}°), Z-face at X {x0_:.3f}, full at "
-                   f"X {x1_:.3f}, length {abs(x1_ - x0_):.3f}")
-    print(f"  BOSS PAD taper (Y {yy}): " + "; ".join(res) + f"  [constants: {BOSS['pad_blend']} mm, "
-          f"{BOSS['taper_deg']:.1f}°, from X {BOSS['pad_x0']:.3f} / to {BOSS['pad_x1']:.3f}]")
+for x, yy, lab in ((100.0, -4.0, "bar"), (COUP["hx"], -4.0, "bar"), (140.0, -4.0, "bar"), (140.0, 5.0, "raised bar"),
+                   (COUP["hx"], 0.5 * (LUG["y_end"] - 9.0), "lug"), (0.5 * (FIN["x0"] + FIN["x1"]), -15.0, "finger")):
+    zz = 30.0 - hits_along(fr, np.array([x, yy, 30.0]), [0, 0, -1])
+    print(f"  frame Z at {lab:10s} X {x:7.3f} Y {yy:7.3f}: surfaces Z {np.round(zz, 3).tolist()}")
+print(f"  ROUND 6 uniform Z: frame STL Z {fr.bounds[0][2]:.4f}..{fr.bounds[1][2]:.4f} (T_Z {sdg.T_Z})")
 
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
@@ -254,9 +238,11 @@ yc = 0.5 * (CHAN["y0"] + CHAN["y1"])
 h = hits_along(sl, np.array([D["collar_x0"] - 5, yc, ZM]), [1, 0, 0])
 h = h[(h > 0) & (h < D["carriage_x1"] - D["collar_x0"] + 10)]
 print(f"  rack channel (Y {yc:.2f}, Z {ZM}) along +X through the slider: hits {len(h)}")
-o = np.array([D["handle_axis_x"], D["ferrule_top_y"] - 15, ZM])
-hy = first_hit(fr, o, [0, 1, 0])
-print(f"  female thread hole: ray up the axis: first frame hit at Y {o[1] + hy:.3f} (mouth {D['ferrule_top_y']:.3f})")
+o = np.array([COUP["hx"], 0.0, ZM])
+hs_ = hits_along(hd, o, [0, -1, 0])
+o2 = np.array([COUP["hx"], -60.0, ZM])
+print(f"  handle socket: ray down the axis from Y 0: first handle hit Y {-hs_[0]:.3f} (socket floor; head top "
+      f"{hd.bounds[1][1]:.3f}); lug end on the frame STL (ray up from Y -60) Y {o2[1] + first_hit(fr, o2, [0, 1, 0]):.3f}")
 hz = hits_along(fr, np.array([PIN["x"], PIN["y"], -10.0]), [0, 0, 1])
 hz = hz[hz < 30]
 print(f"  pin hole: axis ray along +Z through the frame: {len(hz)} hits; rays at r {PIN['d'] / 2:.2f} (pin surface): "
@@ -268,15 +254,122 @@ print("GATE 3: traced outline survives (section vs DXF ring). Excluded zones = d
 yb = lambda x: sdg.rack_bottom_y(D, x)
 fr_ring = ring_poly("frame")
 teeth_zone = box2(TEETH["x0"] - 0.5, TEETH["x1"] + 0.5, -12, yb(TEETH["x1"]) + TEETH["depth"] + 0.3)
-boss_zone = box2(D["handle_axis_x"] - BOSS["od"] / 2 - 0.5, D["handle_axis_x"] + BOSS["od"] / 2 + 0.5, -25, D["bar_bottom_at_axis"] + 0.3)
+boss_zone = unary_union([box2(LUG["x0"] - LUG["r"] - 0.5, FIN["x1"] + FIN["r"] + 0.5, LUG["y_end"] - 1.0,
+                               D["bar_bottom_at_axis"] + 0.3),                       # round 6 lug + finger
+                          box2(BAR["x0"] - 0.05, BAR["x_hook"] + 2 * BAR["blend_r"], -1.0, BAR["y_top"] + 3 * BAR["blend_r"])])
 pad_zone = box2(CT["x_entry"] - 0.3, CT["x_exit"] + 0.3, WY - CT["half_h"] - CT["blend_r"] - 1, WY + CT["half_h"] + CT["blend_r"] + 1)
 bore_zone = box2(BORE["ctip_x0"], BORE["ctip_x1"], WY - sdg.BORE_D / 2 - 0.3, WY + sdg.BORE_D / 2 + 0.3)
 bx0 = D["rack_bottom_line"][0]
 ext_zone = box2(D["rack_tip_x"] - 1.0, bx0 + 0.6, -12, 1.0)
+HO = D["hook_outer"]
+hook_reg = sdg.hook_outer_region(D, HO)                                   # round 6 pass 2 (designed region)
+hook_zone = hook_reg.buffer(0.3)
 for z in (1.0, ZM):
     sec = section_poly(fr, z)
     outline_survival(f"main_frame  Z={z}", fr_ring, sec,
-                     [teeth_zone, boss_zone, pad_zone, ext_zone] + ([bore_zone] if z == ZM else []))
+                     [teeth_zone, boss_zone, pad_zone, ext_zone, hook_zone] + ([bore_zone] if z == ZM else []))
+# HOOK OUTER OFFSET = allowed, documented deviation (round 6 pass 2): measured on the STL sections; the designed
+# region is used only as the window (grown 0.3 so the measured material is fully inside it)
+for z in (0.2, ZM, 9.8):
+    sec = section_poly(fr, z)
+    addh = sec.intersection(hook_zone).difference(fr_ring)
+    addh = unary_union([g for g in getattr(addh, "geoms", [addh]) if g.area > 1e-3])
+    offh = [p.distance(fr_ring) for p in boundary_samples(addh, 0.05)]
+    lost = fr_ring.intersection(hook_zone).difference(sec).area
+    far = sec.intersection(box2(CT["x_exit"] + 1e-3, 400, -100, 200))
+    print(f"  HOOK OUTER deviation (STL Z={z} vs ring): added {addh.area:.2f} mm2 in {len(getattr(addh, 'geoms', [addh]))}"
+          f" region(s) (designed {hook_reg.area:.2f}), max offset from the traced outline {max(offh):.3f} mm "
+          f"(designed {HO['d_full']}); traced material removed {lost:.4f} mm2; STL X max {sec.bounds[2]:.3f}; wire axis "
+          f"-> frame material beyond the bore exit X {CT['x_exit']:.3f}: {far.distance(shapely.LineString([(CT['x_exit'] + 1e-3, WY), (400, WY)])):.3f}"
+          f" (designed region alone {HO['wire_clear']:.3f}; hold 3.6 ends at s {HO['s_hold_end']}, 0 at s {HO['s_hold_end'] + HO['end_len']})")
+
+
+def outer_smoothness(sec, ring, p_start, p_end, step=1.0, end_ext=3.0, fillet_zone=8.0, dev=0.05, r_flat=100.0,
+                     stop=None):
+    """Round 6 pass 3: smoothness of the frame's outer boundary over the hook band, on an STL section.
+    Walks the section's outer boundary from the projection of p_start to p_end (+ end_ext past it), on the arc
+    through the larger X, resampled every `step` mm. Each 3-point window (i-1, i, i+1) gives a circumradius; it is
+    concave when the chord midpoint (i-1, i+1) lies outside the section. A concave run = consecutive concave
+    windows with R < r_flat (R >= r_flat is read as straight). The band's two junctions are the first / last
+    samples more than `dev` off the traced ring; a run centred within `fillet_zone` (arc mm) of one is an intended
+    end fillet. PASS = min R >= 3.0 over every window and no concave run outside the fillet zones."""
+    poly = max(getattr(sec, "geoms", [sec]), key=lambda g: g.area)
+    ext, inside = poly.exterior, poly.buffer(-1e-6)
+    L = ext.length
+    a, b = ext.project(Point(p_start)), ext.project(Point(p_end))
+
+    def arc(u, v):
+        v = v + L if v < u else v
+        return u, v
+    cand = []
+    for u, v, sg in ((a, b + end_ext, 1), (b - end_ext, a, -1)):
+        u, v = arc(u, v)
+        n = int(round((v - u) / step))
+        P = np.array([ext.interpolate((u + (v - u) * k / n) % L).coords[0] for k in range(n + 1)])
+        cand.append(P if sg == 1 else P[::-1])
+    P = max(cand, key=lambda q: q[:, 0].max())
+    corner = None
+    if stop is not None:   # end the walk one step before the outline reaches `stop` (the C-tip pad); the corner
+        on = np.where(np.array([Point(q).distance(stop) for q in P]) < step)[0]   # there is reported, not filleted
+        on = on[on > len(P) // 2]
+        if len(on):
+            c, a0, a1 = P[on[0]], P[on[0] - 1], P[min(on[0] + 1, len(P) - 1)]
+            u, v = a0 - c, a1 - c
+            ang = math.degrees(math.acos(np.clip(u @ v / (np.linalg.norm(u) * np.linalg.norm(v)), -1, 1)))
+            corner = (c, ang, not inside.contains(Point(0.5 * (a0 + a1))))
+            P = P[:on[0]]
+        ring = ring.union(stop)
+    S = np.arange(len(P)) * float(np.mean(np.linalg.norm(np.diff(P, axis=0), axis=1)))
+    R, cc = np.full(len(P), np.inf), np.zeros(len(P), bool)
+    for i in range(1, len(P) - 1):
+        p0, p1, p2 = P[i - 1], P[i], P[i + 1]
+        A2 = abs((p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]))
+        la, lb, lc = np.linalg.norm(p1 - p0), np.linalg.norm(p2 - p1), np.linalg.norm(p2 - p0)
+        R[i] = la * lb * lc / (2 * A2) if A2 > 1e-12 else np.inf
+        cc[i] = not inside.contains(Point(0.5 * (p0 + p2)))
+    off = np.array([Point(q).distance(ring) for q in P])
+    j = np.where(off > dev)[0]
+    junc = (S[j[0]], S[j[-1]]) if len(j) else ()
+    runs, i = [], 1
+    while i < len(P) - 1:
+        if cc[i] and R[i] < r_flat:
+            k = i
+            while k + 1 < len(P) - 1 and cc[k + 1] and R[k + 1] < r_flat:
+                k += 1
+            seg = P[max(i - 1, 0):k + 2]
+            c0, c1 = seg[0], seg[-1]
+            t = (c1 - c0) / max(np.linalg.norm(c1 - c0), 1e-9)
+            depth = float(np.max(np.abs((seg - c0) @ np.array([-t[1], t[0]]))))
+            sm = 0.5 * (S[i] + S[k])
+            intended = any(abs(sm - q) <= fillet_zone for q in junc)
+            runs.append((S[i], S[k], float(R[i:k + 1].min()), P[(i + k) // 2], depth, intended))
+            i = k + 1
+        else:
+            i += 1
+    imin = int(np.argmin(R))
+    bad = [r for r in runs if not r[5]]
+    ok = R[imin] >= 3.0 and not bad
+    return {"P": P, "S": S, "R": R, "imin": imin, "junc": junc, "runs": runs, "pass": ok, "corner": corner}
+
+
+from sdg_model.parts.main_frame import ctip_pad_region, hook_outer_edge  # noqa: E402
+_st = {q[0]: q for q in sdg.HOOK_STATIONS}
+_pad = ctip_pad_region(D, CT)[1]
+_sm = outer_smoothness(section_poly(fr, ZM), fr_ring, hook_outer_edge(fr_ring, _st[10])[0].coords[0],
+                       hook_outer_edge(fr_ring, _st[66])[0].coords[0], stop=_pad)
+_P, _R, _im = _sm["P"], _sm["R"], _sm["imin"]
+print(f"  HOOK OUTER smoothness (STL Z={ZM}, outer boundary s 10 -> s 66 + 3 mm, stopped at the C-tip pad (walk "
+      f"end X {_P[-1][0]:.2f} Y {_P[-1][1]:.2f}), {len(_P)} samples at "
+      f"{_sm['S'][1]:.3f} mm): min radius {_R[_im]:.3f} at X {_P[_im][0]:.2f} Y {_P[_im][1]:.2f} (need >= 3.0); band "
+      f"junctions at arc {', '.join(f'{q:.1f}' for q in _sm['junc'])}; concave runs (R < 100) {len(_sm['runs'])}:")
+for s0, s1, rmin, pc, dep, intd in _sm["runs"]:
+    print(f"    arc {s0:6.1f}..{s1:6.1f}  min R {rmin:7.3f}  at X {pc[0]:.2f} Y {pc[1]:.2f}  depth {dep:.3f} mm  "
+          f"{'intended end fillet' if intd else 'UNINTENDED (dent)'}")
+if _sm["corner"] is not None:
+    _c = _sm["corner"]
+    print(f"    end corner where the band meets the C-tip pad (not part of the walk): X {_c[0][0]:.2f} Y {_c[0][1]:.2f}, "
+          f"3-point angle {_c[1]:.1f}° ({'concave' if _c[2] else 'convex'})")
+print(f"  HOOK OUTER smoothness: {'PASS' if _sm['pass'] else 'FAIL'}")
 # RACK EXTENSION = allowed, documented deviation: measured on the STL section at Z 5 (teeth band excluded by
 # comparing above the notch-apex line) and the free-end X extent
 secx = section_poly(fr, ZM).intersection(box2(-20, 6, -8.0, 1.0))
@@ -296,7 +389,7 @@ print(f"  entry-ledge trough (traced material in front of the jaw face removed b
 # C-tip pad = allowed, documented deviation: measure it on the STL section (Z 1, below the bore)
 sec1f = section_poly(fr, 1.0)
 win = box2(140, 175, 38, 62)
-added = sec1f.intersection(win).difference(fr_ring)
+added = sec1f.intersection(win).difference(fr_ring).difference(hook_zone)   # the hook offset is reported above
 added = unary_union([g for g in getattr(added, "geoms", [added]) if g.area > 1e-3])
 offs = [p.distance(fr_ring) for p in boundary_samples(added, 0.05)]
 removed = fr_ring.intersection(win).difference(sec1f).area
@@ -367,32 +460,31 @@ outline_survival("CONTROL: Z=1 vs AS-IMAGED L ring", la_img, upper, [junction_zo
 gh, fh = ring_poly("grip_half"), ring_poly("ferrule_half")
 ax = D["handle_axis_x"]
 silh = unary_union([gh, affinity.scale(gh, -1, 1, origin=(ax, 0)), fh, affinity.scale(fh, -1, 1, origin=(ax, 0))])
-rT = THREAD["r_crest"]
-thread_zone = box2(ax - rT - 1, ax + rT + 1, D["ferrule_top_y"] - 0.2, D["ferrule_top_y"] + sdg.THREAD_ENGAGE + 1)
-core_zone = box2(ax - rT - 0.5, ax + rT + 0.5, D["grip_top_y"] - sdg.HANDLE_CORE_GRIP_DEPTH - 0.5, D["ferrule_top_y"] + 0.2)
+rT = HEAD["core_r"]
+y_cone = HEAD["y_bot"] - (math.hypot(sdg.HEAD_W_X / 2, sdg.HEAD_W_Z / 2) + 0.05 - (rT - 1.0)) / math.tan(math.radians(HEAD["cone_deg"]))
+head_zone = box2(HEAD["x0"] - 5.0, HEAD["x1"] + 5.0, y_cone - 0.5, 0.0)
+core_zone = box2(ax - rT - 0.5, ax + rT + 0.5, D["grip_top_y"] - sdg.HANDLE_CORE_GRIP_DEPTH - 0.5, y_cone)
 butt_zone = box2(ax - 8, ax + 8, -150, hd.bounds[0][1] + 0.1)
-SEAT = THREAD["seat"]
-y_c1 = D["ferrule_top_y"] - SEAT["collar_t"] - (SEAT["collar_r"] - SEAT["taper_r"])
-collar_zone = box2(ax - SEAT["collar_r"] - 0.5, ax + SEAT["collar_r"] + 0.5, y_c1 - 0.5, D["ferrule_top_y"] + 0.2)
 secH = section_poly(hd, ZM)
-outline_survival("handle Z=5 (axis plane) vs halves+mirror", silh, secH, [thread_zone, core_zone, butt_zone,
-                                                                          collar_zone])
-# HANDLE COLLAR (round 4, user decision, deviation): section width at the face and under it, vs the trace
-addcol = secH.intersection(collar_zone).difference(silh)
-cw = [(y, sdg.horizontal_chord(secH, y)) for y in (D["ferrule_top_y"] - 0.02, D["ferrule_top_y"] - SEAT["collar_t"] + 0.02,
-                                                    D["ferrule_top_y"] - SEAT["collar_t"] - 2.0, y_c1 - 0.3)]
-print(f"  HANDLE COLLAR deviation (STL Z=5): added {addcol.area:.2f} mm2 over the traced silhouette; radius at "
-      + "; ".join(f"Y {y:.2f}: {(c[1] - c[0]) / 2:.3f}" for y, c in cw if c))
-# HANDLE CORE (round 3, deviation): the Ø(major) core replaces the traced ferrule + Ø8 neck bridge
+outline_survival("handle Z=5 (axis plane) vs halves+mirror", silh, secH, [head_zone, core_zone, butt_zone])
+# HANDLE HEAD (round 6): section widths on the STL at Z 5 (X) and at the axis (Z, Y-normal sections)
+hw = [(y, sdg.horizontal_chord(secH, y)) for y in (HEAD["y_top"] - 0.02, HEAD["y_top"] - 3.0, HEAD["y_bot"] + 0.02,
+                                                    HEAD["y_bot"] - 4.0, y_cone + 0.5)]
+print(f"  HANDLE HEAD (STL Z=5): X extent at " + "; ".join(f"Y {y:.2f}: {c[0]:.3f}..{c[1]:.3f}" for y, c in hw if c))
+for yy in (HEAD["y_top"] - 5.0, HEAD["y_bot"] + 1.0):
+    s_ = section_y_xz(hd, yy)
+    print(f"  HANDLE HEAD Y-section at Y {yy:.2f}: X {s_.bounds[0]:.3f}..{s_.bounds[2]:.3f}, Z {s_.bounds[1]:.3f}..{s_.bounds[3]:.3f}"
+          f", area {s_.area:.2f} mm2, holes {sum(len(g.interiors) for g in getattr(s_, 'geoms', [s_]))}")
+# HANDLE CORE (round 3, deviation): Ø16 core from inside the grip up into the head cone (traced ferrule inside it)
 addh = secH.intersection(core_zone).difference(silh)
 addh = unary_union([g for g in getattr(addh, "geoms", [addh]) if g.area > 1e-4])
 offh = [p.distance(silh) for p in boundary_samples(addh, 0.05)]
 fer = [sdg.horizontal_chord(fh, y) for y in np.linspace(D["ferrule_bot_y"] + 0.5, D["ferrule_top_y"] - 0.5, 40)]
 fer_r = [c[1] - ax for c in fer if c]
-secr = [sdg.horizontal_chord(secH, y) for y in np.linspace(D["grip_top_y"] - 0.5, D["ferrule_top_y"] - 0.2, 60)]
-print(f"  HANDLE CORE deviation (STL Z=5): traced ferrule r {min(fer_r):.3f}..{max(fer_r):.3f}; STL radius from the grip"
-      f" top to the shoulder min {min((c[1] - c[0]) / 2 for c in secr if c):.3f}; added {addh.area:.2f} mm2, max offset"
-      f" {max(offh):.3f} mm from the traced silhouette; traced removed {silh.intersection(core_zone).difference(secH).area:.4f} mm2")
+secr = [sdg.horizontal_chord(secH, y) for y in np.linspace(D["grip_top_y"] - 0.5, y_cone, 60)]
+print(f"  HANDLE CORE deviation (STL Z=5): traced ferrule r {min(fer_r):.3f}..{max(fer_r):.3f} (not built: inside the core);"
+      f" STL radius from the grip top to the head cone min {min((c[1] - c[0]) / 2 for c in secr if c):.3f}; added "
+      f"{addh.area:.2f} mm2, max offset {max(offh):.3f} mm from the traced silhouette")
 
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
@@ -472,6 +564,87 @@ def inter(a, b):
         return float(r.volume) if r is not None and len(r.faces) else 0.0
     except Exception as e:
         return f"ERR {e}"
+
+
+def moved(m, dx=0.0, dy=0.0):
+    c = m.copy()
+    c.apply_translation([dx, dy, 0.0])
+    return c
+
+
+def ray_gap(m_in, m_out, o, d, max_d=30.0):
+    """From a point inside m_in: distance to where the ray leaves m_in vs first hit on m_out (gap = out - in)."""
+    a, b = first_hit(m_in, np.asarray(o, float), d, max_d), first_hit(m_out, np.asarray(o, float), d, max_d)
+    return None if a is None or b is None else b - a
+
+
+def coupling_gates(frame_c, slider_c, handle_c, t):
+    """Round 6: every probe origin derived from the coupling bundle; every number measured on the STLs."""
+    hx = COUP["hx"]
+    # Carriage clearance: XY distance from slider sections to NEW frame material (section minus traced ring).
+    xe = D["carriage_end_x"] - t
+    win = box2(xe - 6, xe + 12, -40, 50)
+    nm = section_poly(frame_c, ZM).difference(D["frame_poly"].buffer(0.02)).intersection(win)
+    nm = unary_union([g for g in getattr(nm, "geoms", [nm]) if g.area > 1e-3])
+    dmin = min((section_poly(slider_c, zz).intersection(win).distance(nm), zz) for zz in (-3.0, 1.0, 5.0, 9.0, 13.0))
+    ctl = affinity.translate(section_poly(slider_c, ZM).intersection(win), 0.1, 0).distance(nm)
+    print(f"   carriage -> NEW frame material (XY, slider sections Z -3/1/5/9/13): min {dmin[0]:.4f} at Z {dmin[1]} "
+          f"(rule >= {sdg.COUPLING_CARRIAGE_CLEAR}); CONTROL slider +0.1 X: {ctl:.4f} (must read < rule)")
+    for xx in (120.0, 130.0, 135.5):
+        top = 20.0 - first_hit(frame_c, np.array([xx, 20.0, ZM]), [0, -1, 0])
+        und = 20.0 + first_hit(slider_c, np.array([xx, 20.0, ZM]), [0, 1, 0])
+        print(f"   THROAT at X {xx}: bar top Y {top:.3f} -> slider top-bar underside Y {und:.3f} = {und - top:.3f}; "
+              f"bar top -> wire line {WY - top:.3f}")
+
+    def lug_rays(h_mesh):
+        gx, gz = [], []
+        for yy in np.arange(SOCK["y_floor"] + 0.5, HEAD["y_top"] - SOCK["mouth_x"] - 0.2, 0.5):
+            for zz in (1.0, ZM, sdg.T_Z - 1.0):
+                gx += [ray_gap(frame_c, h_mesh, [hx, yy, zz], [s, 0, 0]) for s in (-1, 1)]
+            for xx in (LUG["x0"] + 1.0, hx, LUG["x1"] - 1.0):
+                gz += [ray_gap(frame_c, h_mesh, [xx, yy, ZM], [0, 0, s]) for s in (-1, 1)]
+        gx, gz = [g for g in gx if g is not None], [g for g in gz if g is not None]
+        return np.array(gx), np.array(gz)
+    gx, gz = lug_rays(handle_c)
+    cgx, _ = lug_rays(moved(handle_c, dx=0.3))
+    print(f"   LUG IN SOCKET (rays from inside the lug, Y {SOCK['y_floor'] + 0.5:.2f}..{HEAD['y_top'] - SOCK['mouth_x'] - 0.2:.2f}): "
+          f"X per side {gx.min():.4f}..{gx.max():.4f} ({len(gx)} rays), Z per side {gz.min():.4f}..{gz.max():.4f} ({len(gz)} rays);"
+          f" CONTROL handle +0.3 X: X min {cgx.min():.4f} (must be < 0)")
+    ends = [ray_gap(frame_c, handle_c, [xx, LUG["y_end"] + 3.0, zz], [0, -1, 0])
+            for xx in (LUG["x0"] + 1.0, hx, LUG["x1"] - 1.0) for zz in (1.0, ZM, sdg.T_Z - 1.0)]
+    print(f"   PUSH STOP lug end -> socket floor: {min(ends):.4f}..{max(ends):.4f} (9 rays; 0 = seated, D8)")
+    hb = [ray_gap(handle_c, frame_c, [xx, HEAD["y_top"] - 0.5, zz], [0, 1, 0])
+          for xx in (HEAD["x0"] + 0.3, HEAD["x0"] + 1.0, SOCK["x0"] - SOCK["mouth_x"] - 0.3,
+                     SOCK["x1"] + SOCK["mouth_x"] + 0.2, HEAD["x1"] - HEAD["top_chamfer"] - 0.2) for zz in (1.0, ZM, 9.0)]
+    print(f"   HEAD TOP -> BAR BOTTOM: {min(hb):.4f}..{max(hb):.4f} (15 rays up from inside the head walls)")
+    win2 = box2(HEAD["x0"] - 2, FIN["x1"] + 2, LUG["y_end"] + 0.5, -6.0)        # above the push-stop contact
+    for zz in (0.2, 1.0, ZM, 9.0, 9.8):
+        sf, sh = section_poly(frame_c, zz).intersection(win2), section_poly(handle_c, zz).intersection(win2)
+        print(f"   frame <-> handle 2D minimum gap in the section Z {zz}: {sf.distance(sh):.4f} "
+              f"(overlap area {sf.intersection(sh).area:.4f} mm2)")
+    # Snap: engagement, pull slack, hook to notch floor / sides, finger to head
+    face_x = 140.0 - first_hit(handle_c, np.array([140.0, -23.0, 0.5]), [-1, 0, 0])
+    tip_x = 131.0 + first_hit(frame_c, np.array([131.0, HOOK["ramp_y"][1] + 0.15, ZM]), [1, 0, 0])
+    xs_ = (tip_x + 0.05, 0.5 * (tip_x + face_x), face_x - 0.05)
+    sl_ = [ray_gap(frame_c, handle_c, [x_, -23.5, z_], [0, 1, 0]) for x_ in xs_ for z_ in (ZM - 0.5, ZM, ZM + 0.5)]
+    fl_ = [ray_gap(frame_c, handle_c, [x_, -23.5, ZM], [0, -1, 0]) for x_ in xs_]
+    sd_ = [ray_gap(frame_c, handle_c, [face_x - 0.3, -25.0, ZM], [0, 0, s]) for s in (-1, 1)]
+    print(f"   SNAP: head +X face X {face_x:.4f}, hook tip X {tip_x:.4f} -> ENGAGEMENT {face_x - tip_x:.4f}; pull slack "
+          f"(hook top -> notch roof) {min(sl_):.4f}..{max(sl_):.4f}; hook -> notch floor {min(fl_):.4f}..{max(fl_):.4f};"
+          f" hook -> notch sides -Z / +Z {sd_[0]:.4f} / {sd_[1]:.4f}")
+    fg = []
+    for yy in (-12.0, -18.0, -28.0):
+        for zz in (0.5, 9.5):
+            hf_ = hits_along(frame_c, np.array([140.0, yy, zz]), [-1, 0, 0])
+            hh_ = first_hit(handle_c, np.array([140.0, yy, zz]), [-1, 0, 0])
+            fg.append(hh_ - hf_[1])
+    print(f"   FINGER -> HEAD +X face: {min(fg):.4f}..{max(fg):.4f} (6 rays, Z 0.5 / 9.5)")
+    s_ = max(sl_)
+    for lab, dy in (("pull 0.10", -0.10), (f"pull slack+0.10 ({s_ + 0.1:.2f})", -(s_ + 0.1)), ("push 0.05", 0.05)):
+        print(f"   SNAP/STOP handle moved {lab} in Y: handle∩frame {inter(moved(handle_c, dy=dy), frame_c)} mm3")
+    dxc = -(face_x - tip_x + 0.05)
+    face_c = 140.0 - first_hit(moved(handle_c, dx=dxc), np.array([140.0, -23.0, 0.5]), [-1, 0, 0])
+    print(f"   CONTROL handle {dxc:.3f} X: measured engagement {face_c - tip_x:.4f} (must be < 0)")
 
 
 for pose, t in TRAVEL.items():
@@ -590,92 +763,7 @@ for pose, t in TRAVEL.items():
           f"ramp) {need['close +X']:.3f} -> margin {stop_gap - need['close +X']:.3f}")
 
     if pose == "min":
-        gp = []
-        for yy in (-1.0, -5.0, -8.0):
-            for zz in (-3.0, -2.0, -1.0, -0.35, 10.35, 11.0, 12.0, 13.0):
-                oo = np.array([100.0, yy, zz])
-                hs = hits_along(slider_c, oo, [1, 0, 0])
-                hf = hits_along(frame_c, oo, [1, 0, 0])
-                if len(hs) and len(hf) and hf[0] > hs[-1]:
-                    gp.append((hf[0] - hs[-1], yy, zz, 100 + hs[-1], 100 + hf[0]))
-        m_ = min(gp)
-        print(f"   carriage -> BOSS PAD gap (rays +X beside the rack): min {m_[0]:.3f} mm at Y {m_[1]}, Z {m_[2]} "
-              f"(carriage end X {m_[3]:.3f} -> pad X {m_[4]:.3f}); max {max(gp)[0]:.3f}")
-        oo = np.array([D["carriage_x1"] - 5.0, -11.0, ZM])
-        hs, hf = hits_along(slider_c, oo, [1, 0, 0]), hits_along(frame_c, oo, [1, 0, 0])
-        print(f"   carriage -> boss (Y -11, Z 5): {hf[0] - hs[-1]:.3f} mm")
-        # Round 5: TRUE 2D pad clearance on Y-normal sections every 0.25 from the leg bottom to Y 3 (form-auditor's
-        # method). Pad = frame at Z < -0.0005 or Z > T_Z - Z_pad (the rack in the channel is excluded); below the
-        # carriage floor (stop-leg rows) the whole frame counts. Local window X x_end-6 .. x_end+8.
-        xe = D["carriage_end_x"] - t
-        pad_keep = unary_union([box2(xe - 6, xe + 8, -50, -0.0005), box2(xe - 6, xe + 8, 10.0005, 50)])
-        win_s, win_f = box2(xe - 6, xe + 1, -50, 50), box2(xe - 1, xe + 8, -50, 50)
-        y_floor_ = CHAN["y0"] - sdg.CARRIAGE_FLOOR
-        best, best_leg = (1e9, None), (1e9, None)
-        for yy in np.arange(beam_bot - 0.95, 3.0, 0.25):
-            ps, pf = section_y_xz(slider_c, yy).intersection(win_s), section_y_xz(frame_c, yy)
-            pf = pf.intersection(win_f if yy < y_floor_ else pad_keep)
-            if ps.is_empty or pf.is_empty:
-                continue
-            dd = ps.distance(pf)
-            best = min(best, (dd, round(float(yy), 2)))
-            if yy < y_floor_:
-                best_leg = min(best_leg, (dd, round(float(yy), 2)))
-        print(f"   carriage -> BOSS PAD TRUE 2D minimum (Y sections every 0.25, Y {beam_bot - 0.95:.2f}..3): "
-              f"{best[0]:.4f} at Y {best[1]}; stop-leg rows (Y < {y_floor_:.2f}): "
-              + (f"{best_leg[0]:.4f} at Y {best_leg[1]}" if best_leg[1] is not None else "no frame material near"))
-        rm, rf = [], []
-        for yy in np.arange(D["ferrule_top_y"] + 2.0, D["ferrule_top_y"] + 6.0, 0.02):
-            for a in (0.0, 90.0, 180.0, 270.0):
-                dd = np.array([math.cos(math.radians(a)), 0, math.sin(math.radians(a))])
-                oo = np.array([D["handle_axis_x"], yy, ZM])
-                h1, h2 = first_hit(handle_c, oo, dd, 10), first_hit(frame_c, oo, dd, 10)
-                if h1 is not None and h2 is not None:
-                    rm.append(h1); rf.append(h2)
-        rm, rf = np.array(rm), np.array(rf)
-        print(f"   thread: male r {rm.min():.3f}..{rm.max():.3f}, female r {rf.min():.3f}..{rf.max():.3f}; engagement "
-              f"{rm.max() - rf.min():.3f}; min radial gap {np.min(rf - rm):.3f}")
-        # SEATING GATE (round 4, user decision (a)): on the assembly meshes, i.e. the same datum as the assembly.
-        # Every ray starts 1.5 below the boss face INSIDE the handle, runs +Y (into the hole), 24 angles.
-        yf, hx = D["ferrule_top_y"], D["handle_axis_x"]
-        angs = np.radians(np.arange(0.0, 360.0, 15.0))
-
-        def up(mesh, r, a, y0=yf - 1.5):
-            return first_hit(mesh, np.array([hx + r * math.cos(a), y0, ZM + r * math.sin(a)]), [0, 1, 0], 25.0)
-        contact, gaps_c = [], []
-        for r in np.arange(6.0, 11.3, 0.05):
-            g = [(up(frame_c, r, a), up(handle_c, r, a)) for a in angs]
-            if all(f is not None and h is not None for f, h in g):
-                d_ = [f - h for f, h in g]
-                if max(abs(x) for x in d_) < 0.02 and all(abs(h - 1.5) < 0.02 for _, h in g):
-                    contact.append(r); gaps_c += d_
-        tip = [(up(frame_c, r, a), up(handle_c, r, a)) for r in (0.0, 2.0, 4.0, 5.5) for a in angs]
-        tip_gap = min(f - h for f, h in tip)
-        # widest handle feature above the face: radial rays from the axis at 0.05 .. 1.0 above the face
-        rad = [first_hit(handle_c, np.array([hx, yy, ZM]), [math.cos(a), 0, math.sin(a)], 20.0)
-               for yy in (yf + 0.05, yf + 0.3, yf + 1.0) for a in angs]
-        fem0 = min(up(frame_c, 7.9, a) for a in angs) - 1.5          # first female material inside r 7.9
-        print(f"   SEATING: collar face -> boss face gap {min(gaps_c):+.4f}..{max(gaps_c):+.4f} mm over the contact "
-              f"annulus r {min(contact):.2f}..{max(contact):.2f} (width {max(contact) - min(contact) + 0.05:.2f}, 0.05 "
-              f"steps, 24 angles, flat: every contact ray exits the handle at the face)")
-        print(f"   SEATING: male tip -> hole floor {tip_gap:.3f} mm (> 0); handle max radius above the face "
-              f"{max(rad):.3f} (male crest; nothing wider enters the hole); first female material inside r 7.9 is "
-              f"{fem0:.3f} mm above the face (> 0); Ø16 core top {THREAD['pitch'] + 0.5:.1f} mm below the face, "
-              f"inside the collar")
-        for push in (0.02, 0.10):
-            hp_ = handle_c.copy()
-            hp_.apply_translation([0, push, 0])
-            try:
-                X_ = trimesh.boolean.intersection([hp_, frame_c], engine="manifold")
-                if X_ is not None and len(X_.faces):
-                    rr_ = np.hypot(X_.vertices[:, 0] - hx, X_.vertices[:, 2] - ZM)
-                    print(f"   SEATING push +{push:.2f} mm into the hole: handle∩frame {X_.volume:.3f} mm3 (annulus "
-                          f"π(r_o²-r_i²)·push = {math.pi * (max(contact) ** 2 - min(contact) ** 2) * push:.3f}), at Y "
-                          f"{X_.bounds[0][1]:.3f}..{X_.bounds[1][1]:.3f}, r {rr_.min():.3f}..{rr_.max():.3f}")
-                else:
-                    print(f"   SEATING push +{push:.2f}: NO intersection (collar is not in contact)")
-            except Exception as e:
-                print(f"   SEATING push +{push:.2f}: ERR {e}")
+        coupling_gates(frame_c, slider_c, handle_c, t)
         for tag, M in (("rotated +1.087 deg (as imaged)",
                         trimesh.transformations.rotation_matrix(math.radians(1.087), [0, 0, 1], [64.79, 6.587, 0])),
                        ("shifted +0.5 mm in Y", trimesh.transformations.translation_matrix([0, 0.5, 0]))):
@@ -703,5 +791,39 @@ for pose, t in TRAVEL.items():
             print(f"   pin -> collar at MAX (Y {PIN['y']:.3f}, Z {zz}): pin surface X {PIN['x'] + hp:.3f} -> collar face "
                   f"X {PIN['x'] + hs:.3f} = {hs - hp:.3f} mm centred, {hs - hp - slop:.3f} with the pin {slop:.2f} towards "
                   f"the collar; contact at travel {t + hs - hp:.3f} / {t + hs - hp - slop:.3f} mm")
+print("=" * 100)
+print("GATE 6: support-free check. Down-facing area (n < -0.70711 along the build axis), bed face excluded")
+
+
+def down_faces(m, axis):
+    n, A, c = m.face_normals[:, axis], m.area_faces, m.triangles_center
+    bed = (n < -0.999) & (c[:, axis] < m.bounds[0][axis] + 1e-3)
+    sel = np.where((n < -0.70711) & ~bed)[0]
+    adj = m.face_adjacency
+    keep = np.isin(adj[:, 0], sel) & np.isin(adj[:, 1], sel)
+    groups = trimesh.graph.connected_components(adj[keep], nodes=sel)
+    out = []
+    for g in groups:
+        g = np.asarray(g)
+        lo, hi = m.triangles[g].reshape(-1, 3).min(0), m.triangles[g].reshape(-1, 3).max(0)
+        out.append((A[g].sum(), float(n[g].min()), lo, hi, len(g)))
+    out.sort(key=lambda q: -q[0])
+    steep = A[sel][n[sel] < -0.7072].sum()
+    return A[sel].sum(), steep, A[bed].sum(), out
+
+
+for tag, m, ax_ in (("main_frame flat (-Z on the bed)", fr, 2), ("handle standing (butt on the bed, +Y up)", hd, 1)):
+    tot, steep, bed_a, cl = down_faces(m, ax_)
+    print(f"  {tag}: down-facing area {tot:.2f} mm2 ({len(cl)} clusters), of which with n < -0.7072 (clearly past 45°) {steep:.2f} mm2;"
+          f" bed face {bed_a:.2f} mm2")
+    for a, nmin, lo, hi, nf in cl[:8]:
+        print(f"    {a:8.2f} mm2  min n {nmin:.5f}  faces {nf:4d}  X {lo[0]:.2f}..{hi[0]:.2f} Y {lo[1]:.2f}..{hi[1]:.2f} "
+              f"Z {lo[2]:.2f}..{hi[2]:.2f}")
+# round 6 pass 2: the hook outer region on its own (frame flat): faces whose centre lies in the region (+0.3)
+_n, _c = fr.face_normals[:, 2], fr.triangles_center
+_in = shapely.contains_xy(hook_zone, _c[:, 0], _c[:, 1])
+_bed = (_n < -0.999) & (_c[:, 2] < fr.bounds[0][2] + 1e-3)
+print(f"  main_frame flat, hook outer region only: {int(_in.sum())} faces; down-facing (n < -0.70711, bed excluded) "
+      f"{fr.area_faces[_in & (_n < -0.70711) & ~_bed].sum():.2f} mm2; bed area there {fr.area_faces[_in & _bed].sum():.2f} mm2")
 print("=" * 100)
 print("done")

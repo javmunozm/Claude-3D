@@ -2,7 +2,7 @@
 
 A printable functional replica of a ratcheting K-wire / drill guide, rebuilt from photos. A Ø3 mm K-wire runs along the L-arm top bar and through the C-hook tip on one line. The L-arm slides on a toothed rack that is part of the main frame, and a flexure pawl with a hooked tooth locks it against opening. A threaded handle screws into a boss under the bar, and a removable pin stops the slider at maximum opening.
 
-**Status (2026-09-24): fix round 4 is built and gated (cad-designer).** Not yet re-checked by print-tolerance-expert or form-auditor.
+**Status (2026-10-17): fix round 6 is built (3 passes), gated and form-audited.** The threaded handle joint is replaced by a lug, a blind socket and a snap finger; the frame is a uniform 10 mm slab; the bar top is raised; the C-hook has an outer band. The user accepted the base design on 2026-10-17 ("está bien el diseño base"); the four form-audit entries R6-1…R6-4 are left as built (see "Fix round 6"). Nothing printed. Sections below "Fix round 6" that describe the boss, thread and collar are the rounds 3–5 record.
 - Round 4 implements the user decisions after the 25 N re-check (`docs/MECHANISM_STRATEGY.md`, "Round 3 re-check at 25 N"): a **Ø22 handle collar that seats on the boss face**, carriage **top wall 2.5** and carriage **floor 2.5**. See "Round 4" below.
 - All 11 export files were regenerated in round 4; every part was `is_valid` True (1 solid) before any file was written (the build now refuses to export otherwise). The gates below were run on those files.
 - Round 3 implemented hooked teeth, tab hard stop, Tr16×4 thread, Ø22 boss, Ø16 handle core, new clearances, `RACK_EXT` 4.6.
@@ -34,9 +34,9 @@ The frame mid-plane is Z 5.000. This departs on purpose from the repo's "origin 
 
 | Part | Files | Volume (STEP) | Bounding box (STL), mm | Solid fraction (STL vol / bbox) |
 |---|---|---|---|---|
-| main_frame: C-hook, bar, rack (+4.6 mm extension), Ø22 boss | `SurgicalDrillGuide_main_frame.step/.stl` | 25 996.96 mm³ | X −4.650…176.700, Y −19.003…57.643, Z −6.000…16.000 | 0.085 |
+| main_frame (round 6): C-hook with outer band, bar (raised to Y 7.5 on the hook side), rack (+4.6 mm extension), lug and snap finger, uniform Z 0…10 | `SurgicalDrillGuide_main_frame.step/.stl` | 30 784.77 mm³ | X −4.650…182.029, Y −29.850…57.643, Z 0.000…10.000 | not re-measured |
 | l_arm_slider: L, collar, carriage (2.5 top wall, 2.5 floor) and hooked pawl with tab stop, one slab | `SurgicalDrillGuide_l_arm_slider.step/.stl` | 26 298.14 mm³ | X 60.022…137.040, Y −31.000…56.705, Z −3.300…13.300 | 0.235 |
-| handle: grip, Ø16 core, Ø22 seating collar, male Tr16×4 | `SurgicalDrillGuide_handle.step/.stl` | 41 142.47 mm³ (STL 41 062.37) | X 109.276…135.363, Y −148.486…−11.003, Z −8.047…18.047 | 0.439 |
+| handle (round 6): grip (butt faced 1.5), Ø16 core, square head with lug socket and snap notch | `SurgicalDrillGuide_handle.step/.stl` | 46 153.53 mm³ | X 109.260…135.363, Y −147.046…−9.850, Z −8.051…18.051 | not re-measured |
 | end_stop_pin (separate, removable) | `SurgicalDrillGuide_end_stop_pin.step/.stl` | 117.34 mm³ | Ø3.0 × 16.6 at X −1.292, Y −4.152, Z −3.3…13.3 | 0.785 |
 | Assemblies at MIN / MID / MAX | `SurgicalDrillGuide_assembly_{min,mid,max}.stl` (4 parts each; see note) | | | |
 | Renders (round 4) | `*_front.png` and `*_iso.png` for slider and handle; `assembly_min_front.png`, `assembly_min_vs_reference.png`. Frame front/iso are round 3 (frame geometry unchanged: same volume 25 996.96) | | | |
@@ -102,9 +102,28 @@ Source and gates:
 2. **Stop leg flush with the squared carriage end.** The leg's +X face was `carriage_x1 − 0.1` = X 106.386 (from the traced max 106.486), a 0.089 step behind the squared end at 106.475 below the floor (form-auditor, Y −12.08…−31). The leg is now built 0.5 past the end and the whole end is trimmed at `carriage_end_x` in one cut. Gate 3 end-face rays now run from the beam bottom to the top wall (41 rows, Y −30.95…2.71, Z −3 / 12.9): **X 106.4755 on every ray, including the 16 leg rows below the floor; step 0.0000.** The gate was not re-run on the round-4 mesh (overwritten), so it has not been shown to catch the old step on a mesh. It does cast rays through Y −30.95…−12.2, where form-auditor measured the leg face at 106.386.
 3. **Pad clearance unchanged:** a new gate-5 check (Y-normal sections every 0.25 from Y −31.95 to 3, form-auditor's method) gives a true 2D minimum of **2.0581** at Y −9.2 at MIN. On the stop-leg rows (below the floor) the nearest frame material is 4.841 away. The earlier ray check still reads 2.199.
 
+**Fix round 6 (user decisions, 2026-10-17).** Sizing and reviews are in `attempts/coupling-review-2026-10-17/` (local only): `coupling_sizing.md`, `bar_and_snap.md`, `neck_audit.md`, `neck_sizing.md`; build reports `r6/build_report.md`, `r6/pass2_report.md`, `r6/pass3_report.md`; form audit `r6/review_register.md`. Structural check: `docs/mechanism_sizing.py` (rewritten for round 6 pass 3; its output is not recorded here).
+1. **Uniform Z 0…10, frame prints flat (−Z on the bed).** The boss, boss pad, Tr16×4 female, mouth cone, handle collar, male thread and ferrule are removed. Retired constants: `BOSS_*`, `THREAD_*`, `HANDLE_COLLAR_*`, `BOSS_MOUTH_*`, `BOSS_PAD_*`. The pad clearance check is replaced by `COUPLING_CARRIAGE_CLEAR` 2.0, applied to every new material at bar level (the build raises below it).
+2. **Coupling, concept D** (`coupling_sizing.md`, `bar_and_snap.md`):
+   - **Lug** on the frame: 14 × 10, X 115.311–129.311, from the bar bottom to Y −29.85; r 3 in-plane root fillets; 0.4 × 45° foot chamfer on the straight Z 0 edges.
+   - **Head** on the handle: 22.4 (X) × 22.0 (Z) × 23.0 (Y), Y −9.85…−32.85. Blind socket 14.4 × 10.4 × 20 (`SOCKET_CLEAR` 0.20 per side), floor 3.0. Mouth chamfer 2.0 × 45° on ±X (clears the lug root fillets: measured gap 0.160) and 0.5 on ±Z. 1.2 × 45° chamfer on the top +X edge. A 40° cone runs from the head into the Ø16 core.
+   - **Snap finger** on the frame: 1.6 × 10 plate at X 133.711–135.311, root r 1, tip Y −29.4. Hook Z 2–8, 0.9 deep, 30° insertion ramp, 45° gable retention face with a 10° back-cut, 0.9 × 0.95 under-chamfer. Notch in the head's +X face: depth 1.2, Z 1.7–8.3, floor Y −26.68, roof rising 10° toward −X.
+   - Measured (gates): lug-in-socket 0.2000 per side; push stop (lug end on floor) 0.0000; head top → bar bottom 0.485–0.799; hook engagement 0.700; pull slack 0.315; interference 0.0 mm³ for all pairs at MIN / MID / MAX.
+3. **Raised bar:** 45° ramp from X 108.475 (2.0 past the carriage end at MIN) to a flat top at Y 7.5, blended (r 3, adds only) into the hook's inner contour at X 166.5. Bar depth 16.3–16.7. **The throat to the slider top bar is now 39.0 (was 46.3)**; bar top to the wire line 44.3. Slider → new material at MIN 2.0081 in-plane.
+4. **C-hook outer band** (pass 2 sized by `neck_sizing.md` §4; pass 3 smoothed): outer contour offset 5.6 over s 18–32 (blend from 0 at s 12), 3.6 from s 36 to 63, to 0 at s 66; built as the convex hull of that disc sweep with an r 4 fillet at the bar bottom, ending on the traced corner at the C-tip pad's bore-exit face. Frame X max 176.700 → 182.029; added 287.15 mm². Wire-axis clearance beyond the bore exit 2.030 (limit 2.0). At s 64–66 the band is below print-tolerance-expert's X-mid requirement (the 2.0 wire clearance binds).
+5. **Handle butt faced 1.5 mm** (`BUTT_FLAT` 0.06 → 1.5, user decision): the traced 1.45 mm dome is removed; the handle prints standing on a 207.2 mm² flat.
+6. **Slider and pin:** byte-identical to round 5 (SHA-256).
+
+**Round 6 form audit (`r6/review_register.md`), left as built by user decision:**
+- R6-1: where the band leaves the bar bottom (X 156–172) the outline has a 1.11 mm wave (notch 1.555 below the hull).
+- R6-2: across the back, R 30 → a tight R 7.32 turn at (182.03, 13.54) → a 10.8 mm straight.
+- R6-3: the band ends against the C-tip pad in an unfilleted 97.8° corner (r5: 139°).
+- R6-4: both bar-ramp corners are sharp (designed polyline).
+
 ### Assembly and use
 
-- **Screw the handle fully home, until the collar seats on the boss face.** The joint is rated only with the collar seated. If it is backed off more than about 0.9 mm (0.93–1.38 mm, 84–124° of unscrewing), the thread jams before the collar touches and the joint goes back to the round-3 load path that failed. See `docs/MECHANISM_STRATEGY.md`, "Round 4 re-check at 25 N", row 1 "Loose handle" (user accepted this risk in round 5).
+- **Handle (round 6):** push the handle up onto the lug until the finger clicks into the notch; the lug end then rests on the socket floor. Under a pull the handle drops 0.315 before the hook bears on the notch roof. To remove: with the handle unloaded, lift the finger tip about 1 mm in +X and slide the handle off (−Y). There is no over-lift stop; do not lift more than about 1 mm (`bar_and_snap.md`: 2.45 % strain at 2 mm).
+- *(Rounds 4–5, retired)* The threaded handle had to be screwed fully home until the collar seated on the boss face.
 
 ## What was built
 
@@ -310,6 +329,15 @@ The silhouette fill (17.1 % vs 11.6 %) is not used as evidence.
 13. **Carried from the vectors:** the riser rebuilt vertical at 7.50 mm; the 0.41° rack-to-bar kink; the grip on the colour half level, about 2 % under the luminance edge.
 
 ## Open items and verification checklist
+
+Round 6:
+- [ ] print-tolerance-expert: confirm D3/D4 with the socket bearing starting 2.0 below the head top (mouth chamfer), and the hook band at s 64–66 with the built widths.
+- [ ] Snap coupon (`bar_and_snap.md`).
+- [ ] Handle standing: 0.43 mm² down-facing remains, a 0.01 mm ring at the butt-flat edge (cause not investigated).
+- [ ] User: the throat is now 39.0 to the slider top bar; the largest bone size is not given.
+- [ ] `mechanisms.py` still holds the unused thread code (`cam_thread`, `thread_radius_fn`).
+
+Rounds 3–5 (the boss/thread/collar items below are retired with round 6):
 
 - [ ] **Round 4 re-check, hand-off to print-tolerance-expert.** Values that changed and that `docs/mechanism_sizing.py` hard-codes:
   - top wall 2.5 (was 2.0); floor 2.5 outside the tongue (was 1.90 in the script; the traced floor actually measures 1.97–2.05 since `SLIDE_CLEAR_Y` moved the channel);

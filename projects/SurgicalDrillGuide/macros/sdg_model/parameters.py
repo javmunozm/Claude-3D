@@ -1,5 +1,6 @@
 """SurgicalDrillGuide stage 4: parameter bundles derived from the constants and the rings, plus the build-time
-arithmetic checks (MAX tip gap, collar seating, boss-pad clearance) that stop the build before any geometry."""
+arithmetic checks (MAX tip gap; round 6 coupling: carriage clearance, head-to-bar gap, fillet-in-mouth clearance,
+seating, snap engagement and slack) that stop the build before any geometry."""
 
 import math
 
@@ -70,37 +71,108 @@ def parameters():
     bore = {"d": BORE_D, "apex_dir": TEARDROP_APEX_DIR, "overrun": BORE_OVERRUN,
             "ctip_x0": min(cx) - BORE_OVERRUN, "ctip_x1": max(max(cx), ctip["x_exit"]) + BORE_OVERRUN,
             "ctip_chord": (min(cx), max(cx))}
-    r_crest = THREAD_MAJOR_D / 2.0
-    thread = {"pitch": THREAD_PITCH, "r_crest": r_crest, "r_root": r_crest - THREAD_H, "crest_w": THREAD_CREST_W,
-              "flank": THREAD_FLANK_DEG, "rclear": THREAD_RADIAL_CLEAR, "aclear": THREAD_AXIAL_CLEAR,
-              "engage": THREAD_ENGAGE, "chamfer": THREAD_TIP_CHAMFER, "n": THREAD_CAM_N}
-    hx = D["handle_axis_x"]
-    half = BOSS_OD / 2.0                     # flat band = the boss width (boss flush with the pad faces)
-    boss = {"od": BOSS_OD, "floor": BOSS_HOLE_FLOOR, "pad_blend": BOSS_PAD_BLEND, "half_len": half,
-            "mouth_r_face": r_crest + THREAD_RADIAL_CLEAR + BOSS_MOUTH_FACE_CLEAR, "mouth_depth": BOSS_MOUTH_DEPTH,
-            "pad_x0": hx - half - BOSS_PAD_BLEND, "pad_x1": hx + half + BOSS_PAD_BLEND,
-            "taper_deg": math.degrees(math.atan2((BOSS_OD - T_Z) / 2.0, BOSS_PAD_BLEND))}
-    # Seating arithmetic (round 4). The model is the seated pose: collar face = boss face = ferrule shoulder Y.
-    # Screwing in, the collar reaches the boss face first iff the male tip is still short of the hole floor and
-    # nothing of the handle wider than the male crest lies above the collar face (the Ø16 core ends inside it).
-    y_face = D["ferrule_top_y"]
-    seat = {"face_y": y_face, "collar_r": HANDLE_COLLAR_OD / 2.0, "collar_t": HANDLE_COLLAR_T,
-            "taper_r": HANDLE_COLLAR_TAPER_R,
-            "tip_to_floor": (D["bar_bottom_at_axis"] - BOSS_HOLE_FLOOR) - (y_face + THREAD_ENGAGE),
-            "annulus": (boss["mouth_r_face"], min(HANDLE_COLLAR_OD, BOSS_OD) / 2.0)}
-    seat["annulus_w"] = seat["annulus"][1] - seat["annulus"][0]
-    if seat["tip_to_floor"] <= 0.0 or seat["annulus_w"] <= 0.0 or HANDLE_COLLAR_OD > BOSS_OD:
-        raise RuntimeError(f"collar cannot seat first: tip->floor {seat['tip_to_floor']:.3f}, annulus "
-                           f"{seat['annulus_w']:.3f}, collar Ø{HANDLE_COLLAR_OD} vs boss Ø{BOSS_OD}")
-    thread["seat"] = seat
-    if boss["pad_x0"] < D["carriage_x1"] + BOSS_PAD_CARRIAGE_CLEAR:
-        raise RuntimeError(f"boss pad starts at X {boss['pad_x0']:.3f}, inside the carriage clearance at MIN "
-                           f"({D['carriage_x1']:.3f} + {BOSS_PAD_CARRIAGE_CLEAR})")
-    pawl = {"anchor_x": PAWL_ANCHOR_X, "free_x": PAWL_FREE_X, "slot_w": PAWL_SLOT_W,
+    coup = derive_coupling(D)
+    D["hook_outer"] = derive_hook_outer(D, ctip)
+    pawl ={"anchor_x": PAWL_ANCHOR_X, "free_x": PAWL_FREE_X, "slot_w": PAWL_SLOT_W,
             "window_top_y": PAWL_WINDOW_TOP_Y, "seat_clear": PAWL_SEAT_CLEAR, "tab_w": TAB_W,
             "tab_bottom_y": TAB_BOTTOM_Y, "pad_len": PAD_LEN, "pad_t": PAD_T, "hook": TOOTH_HOOK_DEG,
             "stop": {"drop": TAB_STOP_DROP, "leg_w": STOP_LEG_W, "beam_t": STOP_BEAM_T, "relief": STOP_RELIEF}}
-    return D, travel, chan, teeth, bore, thread, boss, pawl
+    return D, travel, chan, teeth, bore, coup, pawl
+
+
+def hook_wire_clear(D, region, x_exit):
+    """In-plane = 3D distance from the wire axis (Y wire_y, Z mid; the region spans Z 0..T_Z) to the added
+    region beyond the bore exit. None if the region has no material past x_exit."""
+    from shapely.geometry import LineString
+    part = region.intersection(sbox(x_exit, -100.0, 400.0, 200.0))
+    if part.is_empty:
+        return None
+    return part.distance(LineString([(x_exit, D["wire_y"]), (400.0, D["wire_y"])]))
+
+
+def derive_hook_outer(D, ctip):
+    """Round 6 pass 2 outer-offset bundle. The end taper always reaches 0 at the last station (s 66); the hold
+    end is the LARGEST s (0.5 steps, taper >= HOOK_OUT_END_MIN) at which the added region keeps
+    HOOK_OUT_WIRE_CLEAR from the wire axis beyond the bore exit; the build stops if none passes."""
+    from .parts.main_frame import hook_outer_region
+    ho = {"stations": HOOK_STATIONS, "d_full": HOOK_OUT_D, "d_hold": HOOK_OUT_HOLD, "s_blend": HOOK_OUT_S_BLEND,
+          "s_taper": HOOK_OUT_S_TAPER, "step": HOOK_OUT_STEP, "fillet_r": HOOK_OUT_FILLET_R,
+          "wire_min": HOOK_OUT_WIRE_CLEAR}
+    s_last = HOOK_STATIONS[-1][0]
+    s = s_last - HOOK_OUT_END_MIN
+    while s >= HOOK_OUT_S_TAPER[1]:
+        ho["s_hold_end"], ho["end_len"] = s, s_last - s
+        c = hook_wire_clear(D, hook_outer_region(D, ho), ctip["x_exit"])
+        if c is None or c >= HOOK_OUT_WIRE_CLEAR:
+            ho["wire_clear"] = c
+            return ho
+        s -= 0.5
+    raise RuntimeError("hook outer offset: no hold end keeps the wire clearance")
+
+
+def derive_coupling(D):
+    """Round 6 coupling bundle (lug, head + socket, snap finger + hook, notch, raised bar) and its build-time
+    arithmetic: carriage clearance, head-to-bar gap, fillet-in-mouth clearance, seating, hook engagement/slack."""
+    hx, zc = D["handle_axis_x"], Z_MID
+    fr = D["frame_poly"]
+    yb = lambda x: vertical_chord(fr, x)[0]                       # bar bottom (traced)
+    x_min = D["carriage_end_x"] + COUPLING_CARRIAGE_CLEAR         # nothing new at bar level left of this
+    k = math.tan(math.radians(HOOK_BACKCUT_DEG))
+    lug = {"x0": hx - LUG_W / 2, "x1": hx + LUG_W / 2, "y_end": LUG_END_Y, "r": LUG_ROOT_R, "foot": LUG_FOOT_CHAMFER}
+    head = {"x0": hx - HEAD_W_X / 2, "x1": hx + HEAD_W_X / 2, "z0": zc - HEAD_W_Z / 2, "z1": zc + HEAD_W_Z / 2,
+            "y_top": HEAD_TOP_Y, "y_bot": HEAD_TOP_Y - HEAD_H, "top_chamfer": HEAD_TOP_CHAMFER,
+            "cone_deg": HEAD_TRANSITION_DEG, "core_r": HANDLE_CORE_D / 2}
+    sock = {"x0": lug["x0"] - SOCKET_CLEAR, "x1": lug["x1"] + SOCKET_CLEAR, "z0": -SOCKET_CLEAR,
+            "z1": T_Z + SOCKET_CLEAR, "y_floor": HEAD_TOP_Y - SOCKET_DEPTH, "mouth_x": SOCKET_MOUTH_X,
+            "mouth_z": SOCKET_MOUTH_Z}
+    fx0 = head["x1"] + FINGER_GAP
+    fin = {"x0": fx0, "x1": fx0 + FINGER_T, "y_tip": FINGER_TIP_Y, "r": FINGER_ROOT_R, "tip_ch": FINGER_TIP_CHAMFER}
+    hook = {"z0": HOOK_Z[0], "z1": HOOK_Z[1], "depth": HOOK_DEPTH, "ramp_y": HOOK_RAMP_Y, "ridge_y": HOOK_RIDGE_Y,
+            "k": k, "under_z": HOOK_UNDER_CHAMFER_Z, "x_tip": fx0 - HOOK_DEPTH}
+    notch = {"x0": head["x1"] - NOTCH_DEPTH, "z0": NOTCH_Z[0], "z1": NOTCH_Z[1], "y_floor": NOTCH_FLOOR_Y,
+             "apex_y": NOTCH_APEX_Y, "k": k}
+    # Raised bar: the flat top meets the hook's inner contour where the traced ring crosses Y BAR_TOP_Y (X > 140).
+    hook_in = horizontal_chord(fr.intersection(sbox(140, -20, 200, 30)), BAR_TOP_Y)[0]
+    bar = {"x0": x_min, "x1": BAR_RAISE_X1, "y_top": BAR_TOP_Y, "y0": vertical_chord(fr, x_min)[1],
+           "ramp_deg": BAR_RAMP_DEG, "blend_r": BAR_BLEND_R, "x_hook": hook_in}
+    if hook_in < BAR_RAISE_X1:
+        raise RuntimeError(f"hook inner contour reaches Y {BAR_TOP_Y} at X {hook_in:.3f} < {BAR_RAISE_X1}")
+    # Carriage clearance: lug fillets, finger root fillets and the bar ramp all start at or right of x_min.
+    starts = {"lug fillet": lug["x0"] - lug["r"], "finger fillet": fin["x0"] - fin["r"], "bar ramp": bar["x0"]}
+    for what, x in starts.items():
+        if x < x_min - 1e-9:
+            raise RuntimeError(f"{what} starts at X {x:.3f}, inside the carriage clearance ({x_min:.3f})")
+    # Head top below the bar bottom over the whole head width (axial seating is the lug end on the floor).
+    hx_s = [head["x0"] + i * (head["x1"] - head["x0"]) / 40 for i in range(41)]
+    gaps = [yb(x) - head["y_top"] for x in hx_s]
+    if min(gaps) <= 0.0:
+        raise RuntimeError(f"head top Y {head['y_top']} touches the bar bottom (gap {min(gaps):.3f})")
+    # The r LUG_ROOT_R fillets reach below the head top: clearance to the socket mouth chamfer, per side.
+    mouth = {}
+    for side, xs, sgn in (("-X", lug["x0"], -1), ("+X", lug["x1"], +1)):
+        y_root = yb(xs)
+        worst = 1e9
+        for i in range(401):
+            dp = i * (lug["r"] + 1.0) / 400                           # depth below the head top
+            d = dp + (y_root - head["y_top"])                          # depth below the bar bottom
+            ext = lug["r"] - math.sqrt(max(0.0, lug["r"] ** 2 - (lug["r"] - d) ** 2)) if d < lug["r"] else 0.0
+            clear = SOCKET_CLEAR + max(0.0, sock["mouth_x"] - dp)
+            worst = min(worst, clear - ext)
+        mouth[side] = worst
+    if min(mouth.values()) < 0.05:
+        raise RuntimeError(f"lug root fillet clears the socket mouth by only {mouth}")
+    # Seating: lug end on the socket floor (push stop, D8); floor thickness; hook engagement and pull slack.
+    seat = {"lug_end_to_floor": lug["y_end"] - sock["y_floor"], "floor_t": sock["y_floor"] - head["y_bot"],
+            "head_bar_gap": (min(gaps), max(gaps)), "mouth_margin": mouth,
+            "hook_engage_x": head["x1"] - hook["x_tip"], "hook_to_notch_back": hook["x_tip"] - notch["x0"],
+            "pull_slack_tip": (notch["apex_y"] + k * (head["x1"] - hook["x_tip"]))
+                              - (hook["ridge_y"] + k * (fx0 - hook["x_tip"])),
+            "finger_L": yb(0.5 * (fin["x0"] + fin["x1"])) - 0.5 * (hook["ridge_y"] + hook["ramp_y"][1] + 0.3)}
+    if seat["lug_end_to_floor"] < -1e-9 or seat["hook_engage_x"] <= 0 or seat["hook_to_notch_back"] <= 0 \
+            or seat["pull_slack_tip"] <= 0:
+        raise RuntimeError(f"coupling arithmetic fails: {seat}")
+    return {"hx": hx, "x_min": x_min, "lug": lug, "head": head, "socket": sock, "finger": fin, "hook": hook,
+            "notch": notch, "bar": bar, "seat": seat}
 
 
 def seat_notch(a_list, pawl, D):

@@ -3,11 +3,13 @@
 Replaces the v1 macro (snapshot: attempts/v1-zbore-separate-parts/macros/). v1 bored the wire through the
 part THICKNESS (Z) and had no long bar; this rebuild follows the confirmed topology (docs/MEASUREMENTS.md §1-2):
 
-    main_frame    C-hook + long bottom bar + toothed rack, ONE part. Closed C-tip wire bore on the rectified
-                  wire line. Boss with a FEMALE thread under the bar for the handle.
+    main_frame    C-hook + long bottom bar + toothed rack, ONE part, uniform Z 0..10. Closed C-tip wire bore on
+                  the rectified wire line. Round 6: lug (tenon) under the bar for the handle, external snap
+                  finger beside it, bar top raised to a flat Y 7.5 on the hook side.
     l_arm_slider  riser + top bar + V crown (rectified L) + collar + carriage, ONE part. Slides on the rack.
                   Wire bore along the FULL top bar. Integral compliant (flexure) pawl + release tab.
-    handle        revolved grip + ferrule + MALE thread. Separate, removable, fully printed.
+    handle        revolved grip + Ø16 core + square head with a blind socket for the lug and a snap notch
+                  (round 6; the thread is gone). Separate, removable, prints standing.
 
 EVERY in-plane (XY) outline is imported at build time from vectors/import/*.dxf (vector-tracer 2026-09-23,
 accuracy-reviewed). No primitive stands in for a traced outline. Primitives are used only for DESIGNED features
@@ -56,7 +58,7 @@ from sdg_model.parameters import derive_pin, parameters, seat_notch  # noqa: E40
 from sdg_model.parts.end_stop_pin import build_pin  # noqa: E402
 from sdg_model.parts.handle import build_handle  # noqa: E402
 from sdg_model.parts.l_arm_slider import build_l_arm_slider  # noqa: E402
-from sdg_model.parts.main_frame import build_main_frame, ctip_pad_region  # noqa: E402
+from sdg_model.parts.main_frame import build_main_frame, ctip_pad_region, hook_outer_region  # noqa: E402
 from sdg_model.rings import (derive, derive_channel, horizontal_chord, rack_bottom_y, ring_face,  # noqa: E402,F401
                              ring_points, ring_points_file, vertical_chord)
 from sdg_model.shapes import (along_y, box, cone_y, cyl_y, extrude_z, one_solid, polygon_face,  # noqa: E402,F401
@@ -66,13 +68,13 @@ PART_NAMES = ("main_frame", "l_arm_slider", "handle", "end_stop_pin")
 
 
 def build_all():
-    D, travel, chan, teeth, bore, thread, boss, pawl = parameters()
-    frame, a_list = build_main_frame(D, T_Z, teeth, bore, boss, thread, D["ctip"], D["pin"])
+    D, travel, chan, teeth, bore, coup, pawl = parameters()
+    frame, a_list = build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])
     a_seat, k_seat = seat_notch(a_list, pawl, D)
     slider = build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, pawl, a_seat)
-    handle = build_handle(D, T_Z, thread)
+    handle = build_handle(D, T_Z, coup)
     pin = build_pin(D["pin"])
-    info = {"D": D, "travel": travel, "chan": chan, "teeth": teeth, "bore": bore, "thread": thread, "boss": boss,
+    info = {"D": D, "travel": travel, "chan": chan, "teeth": teeth, "bore": bore, "coup": coup,
             "pawl": pawl, "a_list": a_list, "a_seat": a_seat, "k_seat": k_seat}
     return {"main_frame": frame, "l_arm_slider": slider, "handle": handle, "end_stop_pin": pin}, info
 
@@ -86,14 +88,14 @@ def rack_notches(D, teeth):
 
 def build_one(name):
     """One part only (the others are not built). The slider's seat notch comes from rack_notches()."""
-    D, travel, chan, teeth, bore, thread, boss, pawl = parameters()
+    D, travel, chan, teeth, bore, coup, pawl = parameters()
     if name == "main_frame":
-        return build_main_frame(D, T_Z, teeth, bore, boss, thread, D["ctip"], D["pin"])[0]
+        return build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])[0]
     if name == "l_arm_slider":
         a_seat, _ = seat_notch(rack_notches(D, teeth), pawl, D)
         return build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, pawl, a_seat)
     if name == "handle":
-        return build_handle(D, T_Z, thread)
+        return build_handle(D, T_Z, coup)
     return build_pin(D["pin"])
 
 
@@ -140,10 +142,16 @@ def main_all():
     print(f"teeth: {len(info['a_list'])} notches X {info['a_list'][0]:.3f} .. {info['a_list'][-1] + TOOTH_PITCH:.3f};"
           f" pawl seated in notch {info['k_seat']} (a = {info['a_seat']:.3f}) at MIN")
     check_valid(parts)
-    st = info["thread"]["seat"]
-    print(f"seating (arithmetic): collar face = boss face Y {st['face_y']:.3f}; male tip -> hole floor "
-          f"{st['tip_to_floor']:.3f}; seating annulus r {st['annulus'][0]:.3f}..{st['annulus'][1]:.3f} "
-          f"(width {st['annulus_w']:.3f}); carriage end X {D['carriage_end_x']:.3f}")
+    cp = info["coup"]
+    st = cp["seat"]
+    print(f"coupling (arithmetic): lug end -> socket floor {st['lug_end_to_floor']:.3f} (push stop, seated); floor "
+          f"{st['floor_t']:.3f}; head top -> bar bottom {st['head_bar_gap'][0]:.3f}..{st['head_bar_gap'][1]:.3f}; "
+          f"fillet -> mouth chamfer min {st['mouth_margin']['-X']:.3f} / {st['mouth_margin']['+X']:.3f} (-X / +X)")
+    print(f"snap (arithmetic): hook engagement {st['hook_engage_x']:.3f} in X; tip -> notch back "
+          f"{st['hook_to_notch_back']:.3f}; pull slack at the hook tip {st['pull_slack_tip']:.3f}; finger L "
+          f"{st['finger_L']:.3f}; new material from X {cp['x_min']:.3f} (carriage end {D['carriage_end_x']:.3f} + "
+          f"{COUPLING_CARRIAGE_CLEAR}); bar top Y {cp['bar']['y_top']} from X {cp['bar']['x0']:.3f}, hook inner "
+          f"contour at X {cp['bar']['x_hook']:.3f}")
     for name, shp in parts.items():
         export_part(name, shp)
     pin = D["pin"]
@@ -151,11 +159,6 @@ def main_all():
     print(f"pin: X {pin['x']:.3f} Y {pin['y']:.3f} hole Ø{pin['hole_d']:.2f}; collar face {pin['collar_face']:.3f}; "
           f"travel to pin contact {pin['travel_stop_centred']:.3f} (pin centred) / {pin['travel_stop']:.3f} (pin c/2 "
           f"towards the collar); MAX = {pin['n_max']} teeth = {info['travel']['max']:.3f}; tip gap MAX {D['gap_max']:.3f}")
-    bs = info["boss"]
-    print(f"boss pad: flat X {D['handle_axis_x'] - bs['half_len']:.3f}..{D['handle_axis_x'] + bs['half_len']:.3f}, taper "
-          f"{bs['pad_blend']} mm at {bs['taper_deg']:.1f}° from X {bs['pad_x0']:.3f}; carriage end {D['carriage_end_x']:.3f} "
-          f"(squared; traced max {D['carriage_x1']:.3f}) -> taper start {bs['pad_x0'] - D['carriage_end_x']:.3f} "
-          f"(>= {BOSS_PAD_CARRIAGE_CLEAR}, checked against the traced max)")
     print(f"C-tip pad: X {D['ctip']['x_entry']:.3f}..{D['ctip']['x_exit']:.3f}, half-height {D['ctip']['half_h']:.2f}; "
           f"added to the traced outline {added.area:.2f} mm2")
     for pose, t in info["travel"].items():

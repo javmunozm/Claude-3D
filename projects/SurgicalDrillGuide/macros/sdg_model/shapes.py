@@ -53,6 +53,28 @@ def cyl_y(x, y0, y1, r, z):
     return along_y(Solid.make_cylinder(r, y1 - y0), x, y0, z)
 
 
+def keep_below(shape, point, normal, what):
+    """Half-space trim: keep the part of `shape` on the side of the plane (through `point`) AWAY from `normal`.
+    The kept side is checked with a probe point, so a flipped Keep convention raises instead of passing."""
+    from build123d import Keep, Plane
+    n = Vector(*normal).normalized()
+    out = one_solid(shape.split(Plane(origin=Vector(*point), z_dir=n), keep=Keep.BOTTOM), what)
+    c = out.center()
+    if (c - Vector(*point)).dot(n) > 1e-9:
+        raise RuntimeError(f"{what}: kept the wrong side of the plane")
+    return out
+
+
+def xz_prism_y(pts_xz, y0, y1):
+    """Polygon in XZ (at Y y0) extruded along +Y to y1."""
+    return Solid.extrude(Face(Wire.make_polygon([(x, y0, z) for x, z in pts_xz], close=True)), Vector(0, y1 - y0, 0))
+
+
+def yz_prism_x(pts_yz, x0, x1):
+    """Polygon in YZ (at X x0) extruded along +X to x1."""
+    return Solid.extrude(Face(Wire.make_polygon([(x0, y, z) for y, z in pts_yz], close=True)), Vector(x1 - x0, 0, 0))
+
+
 def shapely_faces(geom):
     """shapely (Multi)Polygon without holes -> list of build123d Faces."""
     out = []

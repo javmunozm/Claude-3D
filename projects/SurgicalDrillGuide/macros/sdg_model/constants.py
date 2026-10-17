@@ -49,11 +49,39 @@ CTIP_PAD_MARGIN = 0.3    # DESIGNED: extra wall above the requirement (sleeve ha
 CTIP_PAD_EXIT_MARGIN = 0.3  # DESIGNED: sleeve exit face this far past where the bore's lower edge leaves the ring
 CTIP_PAD_BLEND_R = 1.5   # DESIGNED: morphological-closing radius that fillets the pad into the traced hook
 
-# ── Boss pad (user decision: frame locally as thick as the boss, flush both faces, blended into the bar) ──
-# Round 3: boss Ø22 -> pad Z -6..16 (6 mm per face). The old 5 mm taper would start at X 106.311, 0.175 mm INSIDE
-# the carriage end at MIN (106.486); the taper is shortened/steepened instead of moving the carriage (user rule).
-BOSS_PAD_BLEND = 2.8     # DESIGNED: taper length each side, 22 -> 10 mm: 6 mm per face over 2.8 mm = 65.0°
-BOSS_PAD_CARRIAGE_CLEAR = 2.0  # DESIGNED: minimum X gap, carriage end at MIN -> start of the pad taper
+# ── Round 6 (user decision 2026-10-17): frame uniform Z 0..T_Z; no boss, pad or thread ───────────────────
+COUPLING_CARRIAGE_CLEAR = 2.0  # DESIGNED: min X gap, squared carriage end at MIN -> any new frame material at bar
+                               # level (lug fillets, finger, bar raise); the build raises an error below it
+
+# ── Raised bar (print-tolerance-expert, bar_and_snap.md 1c: interlaminar torsion SF 3.01 at X 153) ─────────
+BAR_TOP_Y = 7.5          # DESIGNED: flat bar top over BAR_RAISE_X1 back to the carriage clearance line
+BAR_RAISE_X1 = 153.0     # DESIGNED: full depth must exist up to here (hook start, MEASURED form audit)
+BAR_RAMP_DEG = 45.0      # DESIGNED: -X end ramps up from the traced bar top at this angle to X
+BAR_BLEND_R = 3.0        # DESIGNED: closing radius where the flat top meets the hook's inner contour (adds only)
+
+# ── Hook outer offset, round 6 pass 2 (user decision 2026-10-17; neck_sizing.md §4 proposal 2: X mid-grip, 100 %
+#    to the hook). Outer contour only, in-plane, Z 0..T_Z; the inner contour, throat and jaw face do not move. ──
+# Hook centreline stations (s, centroid X, Y, tangent ° from +X): MEASURED, neck_audit.md (r5 mesh; the outer
+# contour of the traced ring is unchanged since). The outer edge is found on the live ring along each normal.
+HOOK_STATIONS = ((8, 157.69, -3.58, 14), (10, 159.60, -3.00, 20), (12, 161.44, -2.20, 27),
+                 (14, 163.17, -1.20, 33), (16, 164.78, -0.02, 39), (18, 166.29, 1.29, 44),
+                 (20, 167.67, 2.73, 49), (22, 168.91, 4.30, 54), (24, 169.99, 5.98, 60),
+                 (26.5, 171.15, 8.20, 68), (28, 171.62, 9.62, 74), (30, 172.00, 11.58, 81),
+                 (32, 172.22, 13.57, 85), (34, 172.32, 15.57, 89), (36, 172.30, 17.57, 93),
+                 (38, 172.15, 19.56, 96), (40, 171.88, 21.54, 99), (42, 171.55, 23.51, 100),
+                 (44, 171.16, 25.48, 102), (46, 170.69, 27.42, 105), (48, 170.13, 29.34, 108),
+                 (50, 169.47, 31.22, 111), (52, 168.71, 33.07, 114), (54, 167.88, 34.89, 116),
+                 (56, 166.98, 36.68, 118), (58, 166.02, 38.43, 120), (60, 164.97, 40.14, 123),
+                 (62, 163.85, 41.79, 126), (64, 162.64, 43.39, 129), (66, 161.38, 44.93, 140))
+HOOK_OUT_D = 5.6         # PROPOSED (PTE): offset over HOOK_OUT_S_FULL
+HOOK_OUT_HOLD = 3.6      # PROPOSED (PTE): offset held from HOOK_OUT_S_TAPER[1] to the hold end
+HOOK_OUT_S_BLEND = (12.0, 18.0)   # DESIGNED (brief): smoothstep 0 -> HOOK_OUT_D into the bar bottom
+HOOK_OUT_S_TAPER = (32.0, 36.0)   # PROPOSED (PTE): smoothstep HOOK_OUT_D -> HOOK_OUT_HOLD
+HOOK_OUT_END_MIN = 3.0   # DESIGNED: shortest end taper; smoothstep HOOK_OUT_HOLD -> 0 from the hold end to the
+                         # last station (s 66, the C-tip pad end), G1, no step
+HOOK_OUT_WIRE_CLEAR = 2.0  # user/brief limit: new material >= this from the wire axis beyond the bore exit
+HOOK_OUT_STEP = 0.2      # DESIGNED: sampling step along the outer contour (variable-radius disc sweep)
+HOOK_OUT_FILLET_R = 4.0  # DESIGNED (pass 3; brief r >= 3): concave fillet where the band meets the bar bottom
 
 # ── Rack extension (user decision: extend the rack so the ~74 mm maximum opening is restored) ─────────────
 # The traced free end (end face + bottom chamfer) is moved RACK_EXT towards -X; the gap is filled with the rack
@@ -113,43 +141,54 @@ STOP_LEG_W = 2.5         # DESIGNED: leg width along X (right face flush with th
 STOP_BEAM_T = 2.5        # DESIGNED: beam thickness in Y
 STOP_RELIEF = 2.0        # DESIGNED: beam-to-pad gap away from the tab column
 
-# ── Handle boss + thread (user decision: FEMALE in a boss under the bar, MALE on the handle) ─────────────
-# Round 3 (user decision): Tr16x4 in a Ø22 boss replaces Tr10x2 in Ø16 (handle root Ø7.5 -> Ø11.5).
-THREAD_PITCH = 4.0       # DESIGNED (user decision): Tr16x4, ISO 2904 pitch for d = 16
-THREAD_MAJOR_D = 16.0    # DESIGNED (user decision): male major diameter
-THREAD_H = 2.25          # DESIGNED: male thread height (ISO h3 = 0.5P + ac, ac 0.25) -> male root Ø11.5
-THREAD_FLANK_DEG = 15.0  # DESIGNED: half flank angle (30° trapezoidal)
-THREAD_CREST_W = 0.366 * THREAD_PITCH  # DESIGNED: ISO crest flat 0.366P
-THREAD_RADIAL_CLEAR = 0.30  # PLACEHOLDER (print-tolerance-expert, round 3): female = male + this, radially
-THREAD_AXIAL_CLEAR = 0.15   # PLACEHOLDER (print-tolerance-expert, round 3): female groove wider by this per flank
+# ── Handle coupling, round 6 (concept D, coupling_sizing.md + bar_and_snap.md; all PROPOSED by
+#    print-tolerance-expert, user-approved round). Frame lug (tenon) in a blind square socket in the handle head,
+#    held by an external snap finger on the frame. Push stop = lug end on the socket floor (modelled seated pose);
+#    pull stop = the hook ridge on the notch roof after the axial slack. ──
+LUG_W = 14.0             # DESIGNED: lug width in X, centred on the handle axis; Z = 0..T_Z
+LUG_END_Y = -29.85       # DESIGNED: lug end (= socket floor in the seated pose)
+LUG_ROOT_R = 3.0         # DESIGNED: in-plane root fillets lug -> bar bottom (Kt 1.3 in D2)
+LUG_FOOT_CHAMFER = 0.4   # DESIGNED: 45° elephant's-foot chamfer on the lug's Z 0 edges (straight edges only)
+HEAD_W_X = 22.4          # DESIGNED: square head, X
+HEAD_W_Z = 22.0          # DESIGNED: square head, Z (centred on Z_MID: Z -6..16)
+HEAD_TOP_Y = -9.85       # DESIGNED: head top = socket mouth
+HEAD_H = 23.0            # DESIGNED: head height in Y (bottom Y -32.85)
+SOCKET_CLEAR = 0.20      # PLACEHOLDER (print-tolerance-expert): socket = lug + this per side (14.4 x 10.4)
+SOCKET_DEPTH = 20.0      # DESIGNED: blind socket depth from the head top (floor 3.0)
+SOCKET_MOUTH_X = 2.0     # DESIGNED (round 6 build): 45° mouth chamfer on the +-X socket edges. The head top is only
+                         # 0.53-0.82 below the bar bottom, so the r 3 lug root fillets enter the socket mouth; 2.0
+                         # leaves >= 0.17 to the fillet (1.5 would leave 0.05). Not in the sizing: see report.
+SOCKET_MOUTH_Z = 0.5     # DESIGNED: 45° lead-in on the +-Z socket edges (coupling_sizing.md)
+HEAD_TRANSITION_DEG = 40.0  # DESIGNED: head -> Ø16 core cone, angle from the axis (<= 45°: support-free standing).
+                            # Build 2 at 44°: STL triangles along the cone/flat-side intersection curves tilted to
+                            # 45.1-48.4° (55 mm2 over the support threshold); 40° leaves margin for the tessellation
+HANDLE_CORE_D = 16.0     # DESIGNED (round 3): Ø16 core from inside the grip up into the head
 HANDLE_CORE_GRIP_DEPTH = 2.0  # DESIGNED: the Ø16 handle core runs this far below the traced grip top, into the
                               # grip (where the grip radius is >= 12.4, measured on the ring at build time)
-THREAD_ENGAGE = 8.0      # DESIGNED: male thread length above the ferrule shoulder
-THREAD_TIP_CHAMFER = 1.0  # DESIGNED: 45° lead-in on the MALE tip only (the female mouth never was 45°; see below)
-# Female mouth (round 4: named as built; rounds 2-3 described it as the 45° chamfer above, which it never was).
-# The cutter ran from r = major + chamfer + 0.5 at 0.5 outside the face to r = MINOR at depth `chamfer`: slope 2.5
-# (68.2° from the axis), face radius 8.55, r 8.425 at 0.05 in (form-auditor measured 8.42). Kept: it clears the
-# male crest (8.0) at the face by 0.55, leaves full female ridges from depth 1.0, and leaves a 2.45 mm seating
-# annulus (8.55 -> 11.0) for the collar. A true 45° countersink to r 9.3 would cut it to 1.70 mm.
-BOSS_MOUTH_FACE_CLEAR = 0.25  # DESIGNED (round 4, = as built): mouth radius at the boss face = female major + this
-BOSS_MOUTH_DEPTH = 1.0        # DESIGNED (round 4, = as built): the mouth cone reaches the female minor at this depth
-# Handle collar (user decision, round 4, option (a) of MECHANISM_STRATEGY "Round 3 re-check at 25 N"): a Ø22
-# collar whose flat top face SEATS ON THE BOSS FACE, so side load puts the thread in tension instead of radial
-# bearing. DEVIATION from the traced ferrule (r 7.19-7.49), accepted by the user.
-HANDLE_COLLAR_OD = 22.0       # DESIGNED (user decision, round 4): = BOSS_OD, flush with the boss
-HANDLE_COLLAR_T = 3.0         # DESIGNED (round 4): cylindrical length of the collar below its seating face
-HANDLE_COLLAR_TAPER_R = 7.0   # DESIGNED (round 4): under the collar a 45° cone runs from r 11 down to this radius
-                              # (inside the Ø16 core), so the flange has no square root corner
-THREAD_CAM_N = 72        # DESIGNED: cam-section resolution (5° steps); see cam_thread()
-BOSS_OD = 22.0           # ASSUMED (user decision, round 3): boss diameter (reference post Ø4.85 + nut Ø9.8 are
-                         # replaced by this); the pad's flat band is +-BOSS_OD/2 about the handle axis
-BOSS_HOLE_FLOOR = 1.2    # DESIGNED: blind-hole floor left under the bar (hole never opens into the bar)
+# External snap finger (bar_and_snap.md Part 2): on the frame, beside the head's +X face; hook points -X.
+FINGER_GAP = 0.20        # PLACEHOLDER: finger -X face to the head +X face
+FINGER_T = 1.6           # DESIGNED: finger thickness in X (Z = 0..T_Z)
+FINGER_ROOT_R = 1.0      # DESIGNED: in-plane root fillets at the bar bottom
+FINGER_TIP_Y = -29.4     # DESIGNED: finger tip (thumb tab)
+FINGER_TIP_CHAMFER = 0.5  # DESIGNED: in-plane chamfer on both tip corners
+HOOK_Z = (2.0, 8.0)      # DESIGNED: hook width in Z
+HOOK_DEPTH = 0.9         # DESIGNED: hook depth in -X from the finger face
+HOOK_RAMP_Y = (-26.38, -24.82)  # DESIGNED: 30° insertion ramp, finger face -> hook tip
+HOOK_RIDGE_Y = -21.52    # DESIGNED: retention-face ridge at Z_MID (45° gable in Z, flanks to Y -24.52 at the hook Z ends)
+HOOK_BACKCUT_DEG = 10.0  # DESIGNED: retention face rises toward the hook tip (a pull pushes the hook in)
+HOOK_UNDER_CHAMFER_Z = 0.95  # DESIGNED: chamfer under the hook's Z 2 face, HOOK_DEPTH in X over this in Z (46.5° from
+                             # the bed; 0.9 x 45° would sit exactly on the support threshold)
+HEAD_TOP_CHAMFER = 1.2   # DESIGNED: 45° chamfer on the head top +X outer edge (hook lead-in)
+NOTCH_DEPTH = 1.2        # DESIGNED: blind notch in the head +X face (hook 0.9 + 0.3)
+NOTCH_Z = (1.7, 8.3)     # DESIGNED: hook + 0.3 per side
+NOTCH_FLOOR_Y = -26.68   # DESIGNED: flat notch floor (faces +Y = up when the handle stands)
+NOTCH_APEX_Y = -21.17    # DESIGNED: 45° gable roof apex at the outer face, rising HOOK_BACKCUT_DEG toward -X
 
 # ── Fusion (booleans only fuse where solids OVERLAP) ────────────────────────────
 FUSE_OVERLAP = 1.5       # DESIGNED: interpenetration of mating features (riser into collar, etc.)
-BUTT_FLAT = 0.06         # DESIGNED: the traced butt rises only 0.05 mm over its 4.45 mm radius; revolved, that
-                         # near-flat cone tessellated to a degenerate pole triangle (STL not watertight, measured
-                         # 2026-09-23). Facing the butt 0.06 mm makes it a plane (also a stable print face).
+BUTT_FLAT = 1.5          # USER DECISION (round 6 pass 3, deviation from the trace): face the butt 1.5 mm so the
+                         # traced 1.45 mm butt dome is removed and the handle stands on a plane (0.06 left 159.10 mm2
+                         # needing support standing). 0.06 was the earlier fix for a degenerate pole triangle.
 
 # ── Opening poses: travel in whole tooth pitches so the pawl is seated in every pose ─────────────────────
 # MIN = 0 (photographed pose). MAX = the last seated pose before the collar meets the end-stop pin (DERIVED in

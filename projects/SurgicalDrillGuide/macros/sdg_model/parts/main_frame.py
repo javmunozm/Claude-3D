@@ -1,13 +1,16 @@
-"""main_frame: C-hook + bar + rack (traced ring), teeth, C-tip bore and pad, threaded boss, end-stop pin hole."""
+"""main_frame: C-hook + bar + rack (traced ring), teeth, C-tip bore and pad, end-stop pin hole; round 6: uniform
+Z 0..T_Z, handle lug (tenon), external snap finger with hook, bar top raised to a flat Y BAR_TOP_Y."""
 
+import math
+
+from shapely.geometry import Polygon
 from shapely.geometry import box as sbox
+from shapely.ops import unary_union
 
-from build123d import Face, Pos, Solid, Vector, Wire
-
-from ..constants import FUSE_OVERLAP
-from ..mechanisms import cam_thread, sawtooth_cutter_face
-from ..rings import rack_bottom_y, ring_face
-from ..shapes import along_y, cone_y, cyl_y, extrude_z, one_solid, polygon_face, shapely_faces, teardrop_bore_x
+from ..mechanisms import sawtooth_cutter_face
+from ..rings import rack_bottom_y, ring_face, vertical_chord
+from ..shapes import extrude_z, keep_below, one_solid, polygon_face, shapely_faces, teardrop_bore_x, xz_prism_y, \
+    yz_prism_x
 
 
 def ctip_pad_region(D, ctip):
@@ -27,44 +30,181 @@ def ctip_pad_region(D, ctip):
     return added, region, sleeve
 
 
-def build_main_frame(D, t_z, teeth, bore, boss, thread, ctip, pin):
-    """C-hook + bar + rack (traced ring) + rack teeth + closed C-tip wire bore + C-tip pad + threaded handle
-    boss in a flush boss pad (as thick as the boss) + end-stop pin hole."""
+def coupling_region(D, coup):
+    """Round 6 in-plane additions to the traced outline: lug + r root fillets, snap finger + root fillets, raised
+    bar. Each fillet is a closing restricted to its own zone (a global closing would bridge lug and finger, and
+    would round the ramp root to the left of the carriage clearance line). Returns {name: added region}."""
+    ring = D["frame_poly"]
+    yb = lambda x: vertical_chord(ring, x)[0]
+    lug, fin, bar = coup["lug"], coup["finger"], coup["bar"]
+    y_hi = max(yb(lug["x0"]), yb(fin["x1"])) + 2.0                    # inside the bar
+    out = {}
+    r = lug["r"]
+    rect = sbox(lug["x0"], lug["y_end"], lug["x1"], y_hi)
+    closed = ring.union(rect).buffer(r, quad_segs=32).buffer(-r, quad_segs=32)
+    # fillets from the closing (root zone only); the lug body is the exact rectangle, so its end corners carry
+    # no closing micro-facets (build 2: 0.04 mm2 of >45° triangles where the foot chamfers met them)
+    root = closed.intersection(sbox(lug["x0"] - r - 0.5, yb(lug["x0"]) - r - 0.5, lug["x1"] + r + 0.5, y_hi))
+    out["lug"] = unary_union([root, rect]).difference(ring)
+    r, c = fin["r"], fin["tip_ch"]
+    fpoly = Polygon([(fin["x0"], y_hi), (fin["x0"], fin["y_tip"] + c), (fin["x0"] + c, fin["y_tip"]),
+                     (fin["x1"] - c, fin["y_tip"]), (fin["x1"], fin["y_tip"] + c), (fin["x1"], y_hi)])
+    closed = ring.union(fpoly).buffer(r, quad_segs=32).buffer(-r, quad_segs=32)
+    out["finger"] = closed.intersection(sbox(fin["x0"] - r - 0.5, fin["y_tip"] - 1, fin["x1"] + r + 0.5, y_hi)
+                                        ).difference(ring)
+    x0, y0, yt = bar["x0"], bar["y0"], bar["y_top"]
+    run = (yt - y0) / math.tan(math.radians(bar["ramp_deg"]))
+    xe = bar["x_hook"] + 1.0                                          # 1 mm into the hook column
+    bpoly = Polygon([(x0, y0 - 3.0), (x0, y0), (x0 + run, yt), (xe, yt), (xe, y0 - 3.0)])
+    rb = bar["blend_r"]
+    closed = ring.union(bpoly).buffer(rb, quad_segs=32).buffer(-rb, quad_segs=32)
+    blend = closed.intersection(sbox(bar["x_hook"] - 4 * rb, yt - 2 * rb, xe + rb, yt + 3 * rb))
+    out["bar"] = unary_union([bpoly, blend]).difference(ring)
+    return out
+
+
+def _smooth(t):
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def hook_outer_d(ho, s):
+    """Outer offset d(s): smoothstep 0 -> d_full over s_blend, d_full to s_taper[0], smoothstep to d_hold by
+    s_taper[1], d_hold to s_hold_end, smoothstep to 0 over end_len (every transition G1)."""
+    (b0, b1), (t0, t1), se = ho["s_blend"], ho["s_taper"], ho["s_hold_end"]
+    if s < b1:
+        return ho["d_full"] * _smooth((s - b0) / (b1 - b0))
+    if s < t0:
+        return ho["d_full"]
+    if s < t1:
+        return ho["d_full"] + (ho["d_hold"] - ho["d_full"]) * _smooth((s - t0) / (t1 - t0))
+    return ho["d_hold"] * (1.0 - _smooth((s - se) / ho["end_len"]))
+
+
+def hook_outer_edge(ring, st):
+    """Outer-edge point of one station: the first ring crossing from the centroid along the outward normal
+    (tangent rotated -90°, i.e. away from the C's throat)."""
+    from shapely.geometry import LineString, Point
+    s, xc, yc, a = st
+    n = (math.sin(math.radians(a)), -math.cos(math.radians(a)))
+    hit = ring.exterior.intersection(LineString([(xc, yc), (xc + 30 * n[0], yc + 30 * n[1])]))
+    pts = [Point(q) for g in getattr(hit, "geoms", [hit]) for q in g.coords]
+    return min(pts, key=lambda p: p.distance(Point(xc, yc))), n
+
+
+def hook_outer_region(D, ho):
+    """Round 6 pass 3: the hook band as ONE convex outer curve. The convex hull of the d(s) sweep (which fills the
+    sweep's dents and keeps every width it had) plus the traced ring's corner at the bore exit face, minus the ring;
+    only the component outside the hook is kept (the hull's chord across the throat is discarded). The top end runs
+    straight into that corner (a fillet there would come within 2.0 of the wire axis); the bar-bottom end is closed
+    with an r ho["fillet_r"] concave fillet, limited to a window round its junction. Returns the added region."""
+    from shapely.geometry import box as sbox
+    ring, ct, sts = D["frame_poly"], D["ctip"], ho["stations"]
+    sw = hook_outer_sweep(D, ho)
+    p_end = hook_outer_edge(ring, sts[-1])[0]
+    corner = ring.intersection(sbox(ct["x_exit"], p_end.y - 1.0, p_end.x + 1.0, D["wire_y"] - ho["wire_min"]))
+    cand = unary_union([sw, corner]).convex_hull.difference(ring)
+    band = unary_union([g for g in getattr(cand, "geoms", [cand]) if g.intersects(sw.buffer(-0.05))])
+    r = ho["fillet_r"]
+    p0 = hook_outer_edge(ring, min(sts, key=lambda q: abs(q[0] - ho["s_blend"][0])))[0]
+    closed = ring.union(band).buffer(r, quad_segs=32).buffer(-r, quad_segs=32)
+    fill = closed.intersection(p0.buffer(4 * r)).difference(ring).difference(band)
+    fill = [g for g in getattr(fill, "geoms", [fill]) if g.area > 0.01 and g.distance(band) < 1e-6]
+    return unary_union([band] + fill).simplify(0.005)
+
+
+def hook_outer_sweep(D, ho):
+    """Round 6 pass 2: material added OUTSIDE the C-hook's outer contour, d(s) wide (hook_outer_d). Built as a
+    variable-radius disc sweep (hull of consecutive discs) centred on the live ring's outer contour, minus the
+    ring, so the inner contour, throat, jaw face and bore region cannot move. Returns the added region."""
+    ring = D["frame_poly"]
+    ext = ring.exterior
+    L_ring = ext.length
+    sts = ho["stations"]
+    Ls = [ext.project(hook_outer_edge(ring, st)[0]) for st in sts]
+    for i in range(1, len(Ls)):                                     # unwrap: monotonic along the contour
+        while abs(Ls[i] - Ls[i - 1]) > 0.5 * L_ring:
+            Ls[i] += L_ring if Ls[i] < Ls[i - 1] else -L_ring
+    sgn = 1.0 if Ls[-1] > Ls[0] else -1.0
+    Lu = [sgn * q for q in Ls]                                      # increasing with s
+    ss = [st[0] for st in sts]
+
+    def s_of(L):
+        for i in range(1, len(Lu)):
+            if L <= Lu[i]:
+                return ss[i - 1] + (ss[i] - ss[i - 1]) * (L - Lu[i - 1]) / (Lu[i] - Lu[i - 1])
+        return ss[-1]
+
+    from shapely.geometry import Point
+    n = int(math.ceil((Lu[-1] - Lu[0]) / ho["step"]))
+    discs = []
+    for k in range(n + 1):
+        L = Lu[0] + (Lu[-1] - Lu[0]) * k / n
+        d = hook_outer_d(ho, s_of(L))
+        p = ext.interpolate((sgn * L) % L_ring)
+        discs.append(Point(p).buffer(d, quad_segs=24) if d > 0.01 else None)
+    hulls = [unary_union([a, b]).convex_hull for a, b in zip(discs, discs[1:]) if a is not None and b is not None]
+    return unary_union(hulls).difference(ring).simplify(0.005)
+
+
+def snap_hook(coup):
+    """Hook on the finger's -X face: XY profile (30° ramp, land, top) over Z z0..z1, trimmed by the 45° gable
+    retention planes with the back-cut, and by the under-chamfer at Z z0. Overlaps the finger by 0.5 in +X."""
+    fin, hk = coup["finger"], coup["hook"]
+    fx0, d, k = fin["x0"], hk["depth"], hk["k"]
+    (ya, yb_), zr = hk["ramp_y"], 0.5 * (hk["z0"] + hk["z1"])
+    slope = (yb_ - ya) / d                                            # ramp rise per mm in -X
+    pts = [(fx0 + 0.5, ya - 0.5 * slope), (fx0 - d, yb_), (fx0 - d, hk["ridge_y"] + 1.5),
+           (fx0 + 0.5, hk["ridge_y"] + 1.5)]
+    h = extrude_z(polygon_face(pts), hk["z0"], hk["z1"])
+    p = (fx0, hk["ridge_y"], zr)
+    h = keep_below(h, p, (k, 1, -1), "hook gable -Z flank")
+    h = keep_below(h, p, (k, 1, 1), "hook gable +Z flank")
+    a = d / hk["under_z"]
+    h = keep_below(h, (fx0, 0, hk["z0"]), (-1, 0, -a), "hook under-chamfer")
+    return h
+
+
+def lug_foot_cutters(D, coup, t_z):
+    """45° elephant's-foot cutters on the lug's Z 0 edges: both straight sides (up to where the root fillet
+    starts) and the end. The fillets themselves are not chamfered (they sit in the socket mouth relief)."""
+    lug = coup["lug"]
+    c, x0, x1, ye = lug["foot"], lug["x0"], lug["x1"], lug["y_end"]
+    yb = lambda x: vertical_chord(D["frame_poly"], x)[0]
+    cut = []
+    for xs, sgn in ((x0, +1), (x1, -1)):
+        y_fs = yb(xs) - lug["r"] - 0.05
+        tri = [(xs - sgn * 1.0, -1.0), (xs + sgn * (c + 1.0), -1.0), (xs - sgn * 1.0, c + 1.0)]
+        cut.append(xz_prism_y(tri, ye - 1.0, y_fs))
+    cut.append(yz_prism_x([(ye - 1.0, -1.0), (ye + c + 1.0, -1.0), (ye - 1.0, c + 1.0)], x0 - 1.0, x1 + 1.0))
+    return cut
+
+
+def build_main_frame(D, t_z, teeth, bore, coup, ctip, pin):
+    """C-hook + bar + rack (traced ring) + rack teeth + closed C-tip wire bore + C-tip pad + end-stop pin hole;
+    round 6: lug, snap finger + hook, raised bar (all uniform Z 0..t_z)."""
     frame = extrude_z(ring_face("frame"), 0.0, t_z)
     # Rack extension (user decision): the extruded extension region overlaps the traced rack by 0.5 mm.
     frame = one_solid(frame + extrude_z(polygon_face(list(D["rack_ext_poly"].exterior.coords)[:-1]), 0.0, t_z),
                       "frame + rack extension")
-    hx, zc = D["handle_axis_x"], t_z / 2.0
-
-    # Boss pad: the bar thickened to the boss Ø (flush with the boss on both Z faces), tapered back to T_Z.
-    # An XZ hexagon prism along Y, clipped to the traced bar outline (the in-plane outline is unchanged).
-    bz0, bz1 = zc - boss["od"] / 2.0, zc + boss["od"] / 2.0
-    px0, px1 = boss["pad_x0"], boss["pad_x1"]
-    bl = boss["pad_blend"]
-    y0, y1 = D["bar_bottom_at_axis"] - 3.0, 3.0
-    # The taper face runs from (px0, Z 0) to (px0 + bl, bz0) and is continued 0.5 mm INTO the bar (vertex at
-    # Z 0.5) along the SAME line, so it meets the bar face exactly at px0 over bl (round 2 put the vertex at
-    # (px0, 0.5): the face met Z 0 0.714 mm inboard, 4.286 mm long at 35°, not 5.0 at 31° - form-auditor R3).
-    xin = 0.5 * bl / (0.0 - bz0)
-    hexa = [(px0 - xin, 0.5), (px0 + bl, bz0), (px1 - bl, bz0), (px1 + xin, 0.5), (px1 + xin, t_z - 0.5),
-            (px1 - bl, bz1), (px0 + bl, bz1), (px0 - xin, t_z - 0.5)]
-    prism = Solid.extrude(Face(Wire.make_polygon([(x, y0, z) for x, z in hexa], close=True)),
-                          Vector(0, y1 - y0, 0))
-    pad = prism & extrude_z(ring_face("frame"), bz0 - 1.0, bz1 + 1.0)
-    frame = one_solid(frame + pad, "frame + boss pad")
-
-    # Boss under the bar, axis along -Y at the handle axis; runs FUSE_OVERLAP up into the pad (a real overlap).
-    y_top = D["bar_bottom_at_axis"]
-    y_bot = D["ferrule_top_y"]
-    boss_body = cyl_y(hx, y_bot, y_top + FUSE_OVERLAP, boss["od"] / 2.0, zc)
-    frame = one_solid(frame + boss_body, "frame + boss")
+    zc = t_z / 2.0
 
     # C-tip pad (before the bore, so the bore is cut through it).
     _, region, _ = ctip_pad_region(D, ctip)
     for f in shapely_faces(region):
         frame = one_solid(frame + extrude_z(f, 0.0, t_z), "frame + C-tip pad")
 
+    # Round 6 in-plane additions, grown 0.4 into the traced ring (a real overlap), clipped to the new outline.
+    add = unary_union(list(coupling_region(D, coup).values()) + [hook_outer_region(D, D["hook_outer"])])
+    outline = D["frame_poly"].union(add)
+    for f in shapely_faces(add.buffer(0.4, quad_segs=16).intersection(outline)):
+        frame = one_solid(frame + extrude_z(f, 0.0, t_z), "frame + lug/finger/bar/hook outer")
+    frame = one_solid(frame + snap_hook(coup), "frame + snap hook")
+    for cutter in lug_foot_cutters(D, coup, t_z):
+        frame = one_solid(frame - cutter, "frame - lug foot chamfer")
+
     # End-stop pin hole (Z) near the rack's free end, between the rack top and the notch apex line.
+    from build123d import Pos, Solid
     frame = one_solid(frame - (Pos(pin["x"], pin["y"], -1.0) * Solid.make_cylinder(pin["hole_d"] / 2.0, t_z + 2.0)),
                       "frame - pin hole")
 
@@ -78,18 +218,4 @@ def build_main_frame(D, t_z, teeth, bore, boss, thread, ctip, pin):
     # at the wire height), so it cannot touch the rest of the hook.
     frame = one_solid(frame - teardrop_bore_x(bore["ctip_x0"], bore["ctip_x1"], D["wire_y"], zc, bore["d"],
                                               bore["apex_dir"]), "frame - C-tip bore")
-
-    # Female thread: the male cam grown radially, phase-locked to the male (start Y differs by whole pitches).
-    th = thread
-    f_root = th["r_root"] + th["rclear"]
-    f_crest = th["r_crest"] + th["rclear"]
-    f_len = (y_top - boss["floor"]) - (y_bot - 2 * th["pitch"])
-    female = along_y(cam_thread(f_root, f_crest, th["crest_w"] + 2 * th["aclear"], th["pitch"], th["flank"],
-                                f_len, th["n"]), hx, y_bot - 2 * th["pitch"], zc)
-    # Mouth cone (named in round 4, geometry unchanged): r_face at the boss face -> f_root at depth mouth_depth,
-    # continued 0.5 outside the face along the same line (the cutter overruns the face; no coincident face).
-    r_face, m_d = boss["mouth_r_face"], boss["mouth_depth"]
-    slope = (r_face - f_root) / m_d
-    mouth = cone_y(hx, y_bot - 0.5, y_bot + m_d, r_face + 0.5 * slope, f_root, zc)
-    frame = one_solid(frame - female - mouth, "frame - female thread")
     return frame, a_list
