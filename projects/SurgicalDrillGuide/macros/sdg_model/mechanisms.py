@@ -1,45 +1,8 @@
-"""SurgicalDrillGuide stage 3b: mechanism profiles - trapezoidal thread cam, ratchet notch cutter, pawl tooth."""
+"""SurgicalDrillGuide stage 3b: mechanism profiles - ratchet notch cutter, pawl tooth."""
 
 import math
 
-from build123d import Face, Solid, Wire
-
 from .shapes import polygon_face
-
-
-def thread_radius_fn(r_root, r_crest, crest_w, pitch, flank_deg):
-    """Axial trapezoid profile r(z), periodic in pitch, crest centred on z = 0."""
-    t = math.tan(math.radians(flank_deg))
-    hc = crest_w / 2.0
-    h = r_crest - r_root
-
-    def f(z):
-        z = (z + pitch / 2.0) % pitch - pitch / 2.0
-        a = abs(z)
-        if a <= hc:
-            return r_crest
-        if a <= hc + h * t:
-            return r_crest - (a - hc) / t
-        return r_root
-    return f
-
-
-def cam_thread(r_root, r_crest, crest_w, pitch, flank_deg, length, n):
-    """Single-start right-hand trapezoidal thread INCLUDING its core, along +Z from z = 0.
-
-    The cross-section perpendicular to the axis of a single-start thread is a cam, r(theta) = profile(theta*P/2pi).
-    Extruding that cam with 360° of twist per pitch reproduces the helical thread exactly (verified in the
-    prototype: radius vs z matched the design to 0.001 mm). A helical sweep was tried first and REJECTED: the
-    swept ridge is a valid solid but OCC fuses it with a core cylinder into the ridge alone (core lost).
-    """
-    f = thread_radius_fn(r_root, r_crest, crest_w, pitch, flank_deg)
-    pts = []
-    for i in range(n):
-        th = 2.0 * math.pi * i / n
-        r = f(i / n * pitch)
-        pts.append((r * math.cos(th), r * math.sin(th), 0.0))
-    face = Face(Wire.make_polygon(pts, close=True))
-    return Solid.extrude_linear_with_rotation(face, (0, 0, 0), (0, 0, length), 360.0 * length / pitch)
 
 
 def sawtooth_cutter_face(yb, x_start, x_end, pitch, depth, land, eps, hook_deg=0.0, below=2.0):
@@ -70,6 +33,12 @@ def sawtooth_cutter_face(yb, x_start, x_end, pitch, depth, land, eps, hook_deg=0
 def _line_x(p, u, y):
     """x where the line through p with direction u crosses height y."""
     return p[0] + u[0] * (y - p[1]) / u[1]
+
+
+def tooth_face_x(pts, y):
+    """x of a pawl tooth's locking face (pts from pawl_tooth_pts: root point then apex) at height y."""
+    (xb, yr), (ax_, ay_) = pts[0], pts[1]
+    return xb + (y - yr) * (ax_ - xb) / (ay_ - yr)
 
 
 def pawl_tooth_pts(a, yb_a, pitch, depth, land, clear, y_root, hook_deg=0.0):

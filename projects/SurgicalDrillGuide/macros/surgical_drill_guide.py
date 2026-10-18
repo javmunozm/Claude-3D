@@ -31,7 +31,7 @@ to collide across projects in one process (the second project silently read the 
     sdg_model/constants.py        1  constants
     sdg_model/rings.py            2  traced-ring import and DERIVED values
     sdg_model/shapes.py           3a generic shape helpers
-    sdg_model/mechanisms.py       3b thread cam, ratchet notch cutter, pawl tooth
+    sdg_model/mechanisms.py       3b ratchet notch cutter, pawl tooth
     sdg_model/parts/<part>.py     3c one builder per part
     sdg_model/parameters.py       4  parameter bundles + build-time arithmetic checks
     surgical_drill_guide.py       5  this file: build, validate, export. Holds no geometry.
@@ -52,8 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build123d import Compound, Pos, Solid, export_step, export_stl  # noqa: E402,F401  (Solid: used by sdg_gates)
 
 from sdg_model.constants import *  # noqa: E402,F401,F403
-from sdg_model.mechanisms import (_line_x, cam_thread, pawl_tooth_pts, sawtooth_cutter_face,  # noqa: E402,F401
-                                  thread_radius_fn)
+from sdg_model.mechanisms import _line_x, pawl_tooth_pts, sawtooth_cutter_face, tooth_face_x  # noqa: E402,F401
 from sdg_model.parameters import derive_pin, parameters, seat_notch  # noqa: E402,F401
 from sdg_model.parts.end_stop_pin import build_pin  # noqa: E402
 from sdg_model.parts.handle import build_handle  # noqa: E402
@@ -140,7 +139,7 @@ def main_all():
     print(f"channel Y {chan['y0']:.3f} .. {chan['y1']:.3f} (frame envelope {chan['envelope'][0]:.3f} .. "
           f"{chan['envelope'][1]:.3f} over X {chan['envelope'][2]:.2f} .. {chan['envelope'][3]:.2f})")
     print(f"teeth: {len(info['a_list'])} notches X {info['a_list'][0]:.3f} .. {info['a_list'][-1] + TOOTH_PITCH:.3f};"
-          f" pawl seated in notch {info['k_seat']} (a = {info['a_seat']:.3f}) at MIN")
+          f" pawl teeth seated in notches {info['k_seat']} (inner a = {info['a_seat'][0]:.3f}) at MIN")
     check_valid(parts)
     cp = info["coup"]
     st = cp["seat"]

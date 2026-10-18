@@ -33,6 +33,14 @@ ZM = sdg.Z_MID
 PIN = D["pin"]
 CT = D["ctip"]
 PARTS = ["main_frame", "l_arm_slider", "handle", "end_stop_pin"]
+from sdg_model.parts.l_arm_slider import pawl_layout  # noqa: E402  (r7: the builder's own layout, probe origins only)
+from sdg_model.rings import rack_flat_poly  # noqa: E402
+A_LIST = sdg.rack_notches(D, TEETH)
+A_SEATS, K_SEATS = sdg.seat_notch(A_LIST, PAWL, D)
+LAY = pawl_layout(D, CHAN, PAWL, A_SEATS)
+Y0 = CHAN["y0"]
+PITCH = TEETH["pitch"]
+XF = HEAD["x0"]                                   # r7 handle flat plane = head -X face
 
 
 def load(name):
@@ -264,10 +272,26 @@ ext_zone = box2(D["rack_tip_x"] - 1.0, bx0 + 0.6, -12, 1.0)
 HO = D["hook_outer"]
 hook_reg = sdg.hook_outer_region(D, HO)                                   # round 6 pass 2 (designed region)
 hook_zone = hook_reg.buffer(0.3)
+# r7 flat rack underside: the designed wedge between the flat level and the traced line (same x_end rule as the
+# builder: inside the last notch), grown 0.3 as the exclusion window.
+_x_flat_end = A_LIST[-1] + 0.5 * (TEETH["depth"] * math.tan(math.radians(TEETH["hook"])) + PITCH - TEETH["land"])
+_wedge = rack_flat_poly(D, _x_flat_end)
+flat_zone = _wedge.buffer(0.3)
+_s1 = section_poly(fr, 1.0)
+_wadd = _s1.intersection(flat_zone).difference(fr_ring)
+_wadd = unary_union([g for g in getattr(_wadd, "geoms", [_wadd]) if g.area > 1e-4])
+_ys = [sdg.vertical_chord(_s1, x)[0] for x in np.arange(1.0, TEETH["x1"] - 0.5, 0.25)
+       if sdg.vertical_chord(_s1, x) is not None]
+print(f"  r7 FLAT RACK UNDERSIDE zone (excluded): X {flat_zone.bounds[0]:.3f}..{flat_zone.bounds[2]:.3f}, area "
+      f"{flat_zone.area:.2f} mm2 (designed wedge {_wedge.area:.2f}, incl. its 0.5 overlap up into the rack); STL Z=1 adds "
+      f"{_wadd.area:.2f} mm2 below the traced line there, max offset {max(p.distance(fr_ring) for p in boundary_samples(_wadd, 0.05)):.3f};"
+      f" rack bottom Y on vertical chords X 1..{TEETH['x1'] - 0.5:.1f}: {min(_ys):.4f}..{max(_ys):.4f} (min = the lands,"
+      f" max = notch roofs; flat level "
+      f"{sdg.rack_bottom_y(D, 0.0):.4f})")
 for z in (1.0, ZM):
     sec = section_poly(fr, z)
     outline_survival(f"main_frame  Z={z}", fr_ring, sec,
-                     [teeth_zone, boss_zone, pad_zone, ext_zone, hook_zone] + ([bore_zone] if z == ZM else []))
+                     [teeth_zone, flat_zone, boss_zone, pad_zone, ext_zone, hook_zone] + ([bore_zone] if z == ZM else []))
 # HOOK OUTER OFFSET = allowed, documented deviation (round 6 pass 2): measured on the STL sections; the designed
 # region is used only as the window (grown 0.3 so the measured material is fully inside it)
 for z in (0.2, ZM, 9.8):
@@ -399,8 +423,17 @@ print(f"  C-tip PAD deviation (STL Z=1 vs ring): added {added.area:.2f} mm2 in {
 la, co, ca = ring_poly("l_arm"), ring_poly("collar"), ring_poly("carriage")
 chan_zone = box2(D["collar_x0"] - 1, D["carriage_x1"] + 1, CHAN["y0"] - 0.3, CHAN["y1"] + 0.3)
 ST = PAWL["stop"]
-beam_bot = PAWL["tab_bottom_y"] - PAWL["pad_t"] + 0.5 - ST["relief"] - ST["beam_t"]
-pawl_zone = box2(PAWL["anchor_x"] - 0.5, D["carriage_x1"] + 0.5, beam_bot - 1.0, PAWL["window_top_y"] + 0.3)
+beam_bot = LAY["beam_top"] - ST["beam_t"]
+y_fl_ = CHAN["y0"] - sdg.CARRIAGE_FLOOR
+# r7 pawl zone: flexure, block, 4 teeth, tab, pad, two-point stop, and the 45° root bevel that reaches
+# (y_fb - y_floor) to the -X of the anchor into the traced carriage/collar corner.
+pawl_zone = box2(PAWL["anchor_x"] - (LAY["y_fb"] - y_fl_) - 0.5, max(D["carriage_x1"], LAY["leg_x1"]) + 0.5, beam_bot - 1.0,
+                 PAWL["window_top_y"] + 0.3)
+_sec5s = section_poly(sl, ZM)
+print(f"  r7 PAWL ZONE (excluded from the slider outline survival): X {pawl_zone.bounds[0]:.3f}..{pawl_zone.bounds[2]:.3f}"
+      f" Y {pawl_zone.bounds[1]:.3f}..{pawl_zone.bounds[3]:.3f}, area {pawl_zone.area:.2f} mm2; in it at Z 5 the STL "
+      f"adds {_sec5s.intersection(pawl_zone).difference(unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')])).area:.2f}"
+      f" mm2 and removes {unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')]).intersection(pawl_zone).difference(_sec5s).area:.2f} mm2 of traced material")
 ctop_zone = box2(D["carriage_x0"] - 0.5, D["carriage_x1"] + 0.5, D["carriage_y1"] - 1.2,
                  CHAN["y1"] + sdg.CARRIAGE_TOP_WALL + 0.3)
 slbore_zone = box2(D["wire_x0"] - 1, D["wire_x1"] + 1, WY - sdg.BORE_D / 2 - 0.3, WY + sdg.BORE_D / 2 + 0.3)
@@ -417,25 +450,36 @@ for z, ex in ((-2.0, [pawl_zone, junction_zone]), (1.0, [chan_zone, pawl_zone, j
                      ex + [ctop_zone, floor_zone, end_zone])
 # CARRIAGE FLOOR / END (round 4): wall below the channel floor on vertical rays at Z 5, and the end face X
 fl = []
-for x in (70.5, 72.0, 72.3, 73.0, 80.0, 90.0, 95.5, 100.0, 103.0, 106.0, 106.45):
+for x in (70.5, 72.0, 72.3, 73.0, 80.0, 90.0, 95.5, 100.0, 103.0, 106.0, 106.45, 107.0, 107.9):
     yy = 10.0 - hits_along(sl, np.array([x, 10.0, ZM]), [0, -1, 0])
     yy = yy[yy < CHAN["y0"] + 0.01]
     fl.append(f"X {x}: {yy[0] - yy[1]:.3f}" if len(yy) > 1 else f"X {x}: -")
 print(f"  carriage FLOOR under the channel (vertical rays, Z 5; tongue X {PAWL['anchor_x']}..{PAWL['free_x']}, leg "
-      f"~{D['carriage_end_x'] - ST['leg_w']:.1f}..{D['carriage_end_x']:.1f} continue down): " + "; ".join(fl))
+      f"{LAY['leg_x0']:.1f}..{LAY['leg_x1']:.1f} continue down): " + "; ".join(fl))
 # Round 5: rays cover the stop leg too (beam bottom up to the top wall), so a leg face behind the end shows.
-ends, ends_leg = [], []
+# r7 reinforce: rows above the floor underside must read the carriage end (lock), rows below it the leg's +X face.
 y_floor = CHAN["y0"] - sdg.CARRIAGE_FLOOR
-for yy in np.linspace(beam_bot + 0.05, CHAN["y1"] + sdg.CARRIAGE_TOP_WALL - 0.05, 41):
-    for zz in (-3.0, 12.9):
-        h = first_hit(sl, np.array([130.0, yy, zz]), [-1, 0, 0])
-        ends.append(130.0 - h)
-        if yy < y_floor:
-            ends_leg.append(130.0 - h)
+
+
+def end_rows(m):
+    up, lo = [], []
+    for yy in np.linspace(beam_bot + 0.05, CHAN["y1"] + sdg.CARRIAGE_TOP_WALL - 0.05, 41):
+        for zz in (-3.0, 12.9):
+            h = 130.0 - first_hit(m, np.array([130.0, yy, zz]), [-1, 0, 0])
+            (lo if yy < y_floor - 0.01 else up).append(h)
+    return np.array(up), np.array(lo)
+
+
+_up, _lo = end_rows(sl)
 print(f"  carriage +X END face (41 rows Y {beam_bot + 0.05:.2f}..{CHAN['y1'] + sdg.CARRIAGE_TOP_WALL - 0.05:.2f}, "
-      f"Z -3 / 12.9): X {min(ends):.4f}..{max(ends):.4f}; leg rows (Y < floor {y_floor:.2f}) "
-      f"X {min(ends_leg):.4f}..{max(ends_leg):.4f}; step {max(ends) - min(ends):.4f} "
-      f"(derived {D['carriage_end_x']:.4f}; traced max {D['carriage_x1']:.3f})")
+      f"Z -3 / 12.9): rows at/above the floor underside {y_floor:.3f} X {_up.min():.4f}..{_up.max():.4f} (lock "
+      f"{D['carriage_end_x']:.4f}; max dev {np.abs(_up - D['carriage_end_x']).max():.5f}); leg rows below it X "
+      f"{_lo.min():.4f}..{_lo.max():.4f} (design leg +X {LAY['leg_x1']:.4f}; traced max {D['carriage_x1']:.3f})")
+_slc = sl.copy()
+_slc.apply_translation([0.1, 0, 0])
+_cu, _ = end_rows(_slc)
+print(f"  CONTROL slider +0.1 X: end rows above the floor max dev from the lock {np.abs(_cu - D['carriage_end_x']).max():.5f}"
+      f" (must be > 1e-3)")
 # CARRIAGE TOP WALL (round 3, accepted deviation): added outline and the wall over the ceiling, on the STL
 secS = section_poly(sl, ZM)
 addc = secS.intersection(ctop_zone).difference(allL)
@@ -466,7 +510,11 @@ head_zone = box2(HEAD["x0"] - 5.0, HEAD["x1"] + 5.0, y_cone - 0.5, 0.0)
 core_zone = box2(ax - rT - 0.5, ax + rT + 0.5, D["grip_top_y"] - sdg.HANDLE_CORE_GRIP_DEPTH - 0.5, y_cone)
 butt_zone = box2(ax - 8, ax + 8, -150, hd.bounds[0][1] + 0.1)
 secH = section_poly(hd, ZM)
-outline_survival("handle Z=5 (axis plane) vs halves+mirror", silh, secH, [head_zone, core_zone, butt_zone])
+hflat_zone = box2(XF - 20.0, XF + 0.05, -200.0, 5.0)        # r7 -X flat (user decision): everything at X < XF
+print(f"  r7 HANDLE FLAT zone (excluded): X < {XF + 0.05:.3f}; traced silhouette removed there at Z 5 "
+      f"{silh.intersection(hflat_zone).difference(secH).area:.2f} mm2 (silhouette X min {silh.bounds[0]:.3f}); STL "
+      f"section X min {secH.bounds[0]:.4f} vs plane {XF:.4f}")
+outline_survival("handle Z=5 (axis plane) vs halves+mirror", silh, secH, [head_zone, core_zone, butt_zone, hflat_zone])
 # HANDLE HEAD (round 6): section widths on the STL at Z 5 (X) and at the axis (Z, Y-normal sections)
 hw = [(y, sdg.horizontal_chord(secH, y)) for y in (HEAD["y_top"] - 0.02, HEAD["y_top"] - 3.0, HEAD["y_bot"] + 0.02,
                                                     HEAD["y_bot"] - 4.0, y_cone + 0.5)]
@@ -485,6 +533,147 @@ secr = [sdg.horizontal_chord(secH, y) for y in np.linspace(D["grip_top_y"] - 0.5
 print(f"  HANDLE CORE deviation (STL Z=5): traced ferrule r {min(fer_r):.3f}..{max(fer_r):.3f} (not built: inside the core);"
       f" STL radius from the grip top to the head cone min {min((c[1] - c[0]) / 2 for c in secr if c):.3f}; added "
       f"{addh.area:.2f} mm2, max offset {max(offh):.3f} mm from the traced silhouette")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+def chord_iv(poly, x):
+    """All intervals (y0, y1) of a vertical line at x through poly, sorted by y."""
+    g = poly.intersection(shapely.LineString([(x, -300), (x, 300)]))
+    segs = [s for s in getattr(g, "geoms", [g]) if s.length > 0]
+    return sorted((min(c[1] for c in s.coords), max(c[1] for c in s.coords)) for s in segs)
+
+
+def first_hits_x(mesh, origins, d):
+    """Batched: X of the first hit for each ray (nan if none)."""
+    loc, ir, _ = mesh.ray.intersects_location(origins, np.tile(d, (len(origins), 1)), multiple_hits=False)
+    out = np.full(len(origins), np.nan)
+    out[ir] = loc[:, 0]
+    return out
+
+
+print("=" * 100)
+print("GATE 3b: r7 handle -X flat and pawl flexure (measured on the part STLs)")
+
+
+def flat_rays(h_mesh):
+    ys = np.arange(h_mesh.bounds[0][1] + 0.25, h_mesh.bounds[1][1] - 0.2, 0.5)
+    zs = np.linspace(ZM - 9.0, ZM + 9.0, 13)
+    O = np.array([[XF - 30.0, y, z] for y in ys for z in zs])
+    return O, first_hits_x(h_mesh, O, np.array([1.0, 0, 0]))
+
+
+O_, hx_ = flat_rays(hd)
+ok_ = ~np.isnan(hx_)
+on_ = ok_ & (np.abs(hx_ - XF) < 1e-3)
+print(f"  HANDLE FLAT rays +X from X {XF - 30:.1f} ({len(O_)} rays, Y every 0.5 over the whole length, Z {ZM - 9:.0f}..{ZM + 9:.0f}): "
+      f"{int(ok_.sum())} hit; first-hit X min {np.nanmin(hx_):.4f} (plane {XF:.4f} = head x0); hits on the plane (|dX| < 1e-3) "
+      f"{int(on_.sum())}, below the plane {int((ok_ & (hx_ < XF - 1e-3)).sum())}; Y of the on-plane rays "
+      f"{O_[on_, 1].min():.3f}..{O_[on_, 1].max():.3f}")
+_yon = np.unique(O_[on_, 1])
+_runs = np.split(_yon, np.where(np.diff(_yon) > 0.51)[0] + 1)
+print(f"  HANDLE FLAT on-plane Y runs (Z any): " + "; ".join(f"Y {r[0]:.2f}..{r[-1]:.2f}" for r in _runs))
+_hc = hd.copy()
+_hc.apply_translation([-0.3, 0, 0])
+_, chx = flat_rays(_hc)
+print(f"  CONTROL handle -0.3 X: first-hit X min {np.nanmin(chx):.4f}, rays below the plane "
+      f"{int((chx < XF - 1e-3).sum())} (must be > 0)")
+_n = hd.face_normals
+_sel = np.where((_n[:, 0] < -0.9999) & (np.abs(hd.triangles_center[:, 0] - XF) < 1e-3))[0]
+_vx = hd.triangles[_sel][:, :, 0]
+_g = trimesh.graph.connected_components(hd.face_adjacency[np.isin(hd.face_adjacency, _sel).all(axis=1)], nodes=_sel)
+_tri = hd.triangles[_sel].reshape(-1, 3)
+print(f"  HANDLE FLAT faces (normal -X within 0.8°, centre on the plane): {len(_sel)} triangles, area "
+      f"{hd.area_faces[_sel].sum():.2f} mm2; vertex X spread {_vx.min() - XF:+.5f}..{_vx.max() - XF:+.5f} (one plane); "
+      f"Y {_tri[:, 1].min():.3f}..{_tri[:, 1].max():.3f}, Z {_tri[:, 2].min():.3f}..{_tri[:, 2].max():.3f}; "
+      f"{len(_g)} connected region(s):")
+for g in sorted(_g, key=lambda q: -hd.area_faces[np.asarray(q)].sum()):
+    g = np.asarray(g)
+    tq = hd.triangles[g].reshape(-1, 3)
+    print(f"    area {hd.area_faces[g].sum():8.2f} mm2  Y {tq[:, 1].min():8.3f}..{tq[:, 1].max():8.3f}  "
+          f"Z {tq[:, 2].min():7.3f}..{tq[:, 2].max():7.3f}")
+
+# Flexure (unplaced slider STL, section Z 5): thickness on vertical chords, free length from the underside corners
+_ss = section_poly(sl, ZM)
+_ts = []
+for x in np.arange(PAWL["anchor_x"] + 0.5, LAY["xb"] - 0.4, 0.5):
+    c = [s for s in chord_iv(_ss, x) if abs(s[1] - Y0) < 0.01]
+    _ts.append(c[0][1] - c[0][0] if c else np.nan)
+_ts = np.array(_ts)
+_tm = float(np.nanmedian(_ts))
+_sv = np.array([q for g in getattr(_ss, "geoms", [_ss]) for q in g.exterior.coords])
+_cor = _sv[(np.abs(_sv[:, 1] - (Y0 - _tm)) < 1e-4) & (_sv[:, 0] > PAWL["anchor_x"] - 0.6) & (_sv[:, 0] < LAY["xb"] + 0.6)]
+print(f"  FLEXURE (slider STL Z 5): t {np.nanmin(_ts):.4f}..{np.nanmax(_ts):.4f} on {len(_ts)} chords X "
+      f"{PAWL['anchor_x'] + 0.5:.1f}..{LAY['xb'] - 0.5:.2f} (design {PAWL['flex_t']}); underside corners X "
+      + ", ".join(f"{q:.3f}" for q in sorted(set(np.round(_cor[:, 0], 3)))) +
+      f" -> free length {_cor[:, 0].max() - _cor[:, 0].min():.4f}")
+
+
+# r7 fixes D1 / 1h / D2 (slider STL, section Z 5). Concave-radius test = morphological closing at r - 0.01 (chord
+# sag of the tessellated arc): a concave corner of radius < r adds area. Each test has a control that rebuilds the
+# defect it guards against (the old 45° bevel V; a square beam-leg corner) and must add area.
+def hchord_iv(poly, y):
+    g = poly.intersection(shapely.LineString([(-300, y), (300, y)]))
+    segs = [s for s in getattr(g, "geoms", [g]) if s.length > 0]
+    return sorted((min(c[0] for c in s.coords), max(c[0] for c in s.coords)) for s in segs)
+
+
+def closing_added(poly, r):
+    return poly.buffer(r, quad_segs=64).buffer(-r, quad_segs=64).difference(poly).area
+
+
+_rf, _yfb, _px0 = LAY["root"], LAY["y_fb"], PAWL["anchor_x"]
+_wr = box2(_rf["wall"][0] - 1.0, _rf["x_end"] + 1.0, y_fl_ - 0.6, Y0 - 0.3)
+_ar = _ss.intersection(_wr)
+_old_v = shapely.Polygon([(_px0, _yfb), (_px0 + 1.0, _yfb), (_px0 + 1.0, y_fl_), (_px0 - (_yfb - y_fl_), y_fl_)])
+_rt = PAWL["root_r"] - 0.01
+_fe = [q[0] for q in _sv if abs(q[1] - _yfb) < 1e-4 and _px0 - 1.0 < q[0] < LAY["xb"] - 1.0]
+print(f"  FLEXURE ROOT (Z 5, window X {_wr.bounds[0]:.2f}..{_wr.bounds[2]:.2f} Y {_wr.bounds[1]:.2f}..{_wr.bounds[3]:.2f}):"
+      f" closing at r {_rt:.2f} adds {closing_added(_ar, _rt):.5f} mm2 (must be < 0.002); CONTROL old 45° bevel V: "
+      f"{closing_added(_ar.difference(_old_v), _rt):.5f} mm2 (must be > 0.002); underside ends at X {min(_fe):.3f} -> "
+      f"free length to the block X {LAY['xb']:.3f}: {LAY['xb'] - min(_fe):.4f} (design {LAY['free_len']:.4f}); no "
+      f"material at Y >= {Y0}: {_ss.intersection(box2(_wr.bounds[0], _wr.bounds[2], Y0 + 1e-3, Y0 + 0.3)).area:.5f} mm2")
+_lx0 = LAY["leg_x0"]
+_xm = 0.5 * (LAY["inner_x"] + LAY["outer_x"] - ST["block_w"])
+_bm = [s for s in chord_iv(_ss, _xm) if s[1] < LAY["beam_top"] + 0.01]
+_lg = {yy: [s for s in hchord_iv(_ss, yy) if s[1] > PAWL["pad_x1"] + 0.01] for yy in (LAY["pad_bot"] + 1.5,
+                                                                                         LAY["beam_top"] + 2.0)}
+_pd = [s for s in hchord_iv(_ss, LAY["pad_bot"] + 1.5) if LAY["inner_x"] - 5.0 < s[1] <= PAWL["pad_x1"] + 0.01]
+# window between the outer stop block's +X face and the leg (excludes the block's own square foot)
+_ws = box2(0.5 * (LAY["outer_x"] + _lx0 - ST["fillet_r"]), _lx0 + 1.0, beam_bot - 0.5, LAY["beam_top"] + 2.5)
+_as = _ss.intersection(_ws)
+_fr = ST["fillet_r"] - 0.01
+print(f"  STOP BEAM / LEG / PAD (Z 5): beam Y {_bm[-1][0]:.3f}..{_bm[-1][1]:.3f} at X {_xm:.2f} -> t {_bm[-1][1] - _bm[-1][0]:.4f}"
+      f" (design {ST['beam_t']}); leg X " + "; ".join(f"{v[-1][0]:.3f}..{v[-1][1]:.3f} = {v[-1][1] - v[-1][0]:.4f} at Y {k:.2f}"
+                                                   for k, v in _lg.items()) +
+      f" (design {ST['leg_w']}: X {LAY['leg_x0']:.3f}..{LAY['leg_x1']:.3f}; carriage end {D['carriage_end_x']:.4f}); pad X {_pd[0][0]:.3f}..{_pd[-1][1]:.3f} at Y "
+      f"{LAY['pad_bot'] + 1.5:.2f} (design {LAY['pad_x0']:.3f}..{PAWL['pad_x1']}; inner stop X {LAY['inner_x'] - ST['block_w']:.3f}"
+      f"..{LAY['inner_x']:.3f}); pad -> leg gap {_lg[LAY['pad_bot'] + 1.5][-1][0] - _pd[-1][1]:.4f}")
+print(f"  BEAM-LEG CORNER: closing at r {_fr:.2f} adds {closing_added(_as, _fr):.5f} mm2 (must be < 0.002); CONTROL square "
+      f"corner: {closing_added(_as.union(box2(_lx0 - ST['fillet_r'], _lx0 + 0.1, LAY['beam_top'] - 0.1, LAY['beam_top'] + ST['fillet_r'])), _fr):.5f}"
+      f" mm2 (must be > 0.002)")
+# r7 reinforce: leg-top fillet (leg -X face x floor underside) and the flexure root's top-side fillet (outer Z bands).
+_rl = ST["leg_top_r"]
+_wl = box2(_lx0 - _rl - 0.6, _lx0 + 0.8, y_fl_ - _rl - 1.0, y_fl_ + 0.8)
+_al = _ss.intersection(_wl)
+print(f"  LEG-TOP CORNER (Z 5, X {_wl.bounds[0]:.2f}..{_wl.bounds[2]:.2f} Y {_wl.bounds[1]:.2f}..{_wl.bounds[3]:.2f}): closing "
+      f"at r {_rl - 0.01:.2f} adds {closing_added(_al, _rl - 0.01):.5f} mm2 (must be < 0.002); CONTROL square corner: "
+      f"{closing_added(_al.union(box2(_lx0 - _rl, _lx0 + 0.1, y_fl_ - _rl, y_fl_ + 0.1)), _rl - 0.01):.5f} mm2 (must be > 0.002)"
+      f"; chord at Y {y_fl_ - 0.05:.3f}: X from {[s for s in hchord_iv(_ss, y_fl_ - 0.05) if s[1] > _lx0][0][0]:.3f}")
+_r2 = PAWL["root_top_r"]
+_zb = 0.5 * ((-sdg.SLIDE_CLEAR - sdg.WRAP_WALL_Z) - sdg.SLIDE_CLEAR)
+_wt = box2(_px0 - 0.7, _px0 + _r2 + 0.6, Y0 - 0.6, Y0 + _r2 + 0.7)
+for _z in (_zb, sdg.T_Z - _zb):
+    _sz = section_poly(sl, _z)
+    _at = _sz.intersection(_wt)
+    _tv = [q[0] for g in getattr(_at, "geoms", [_at]) for q in g.exterior.coords
+           if abs(q[1] - Y0) < 1e-4 and q[0] > _px0 - 0.01]
+    _sq = _at.difference(box2(_px0 + 1e-4, _px0 + _r2, Y0 + 1e-4, Y0 + _r2)).union(box2(_wt.bounds[0], _px0, Y0, _wt.bounds[3]))
+    print(f"  FLEXURE ROOT TOP (Z {_z:.2f}, outer band): closing at r {_r2 - 0.01:.2f} adds {closing_added(_at, _r2 - 0.01):.5f} mm2 "
+          f"(must be < 0.002); CONTROL square step: {closing_added(_sq, _r2 - 0.01):.5f} mm2 (must be > 0.002); top face starts at "
+          f"X {min(_tv):.3f} -> outer-band free length {LAY['xb'] - max(min(_tv), min(_fe)):.4f} (design {LAY['free_len_outer']:.4f})")
+_cz = section_poly(sl, ZM).intersection(_wt)
+print(f"  FLEXURE ROOT TOP centre band (Z {ZM}): material at Y >= {Y0:.3f} in the window {_cz.intersection(box2(_wt.bounds[0], _wt.bounds[2], Y0 + 1e-3, _wt.bounds[3])).area:.5f} mm2 "
+      f"(must be 0); below it {_cz.area:.4f} mm2 (full window strip {(_wt.bounds[2] - _wt.bounds[0]) * 0.6:.4f})")
 
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
@@ -554,8 +743,34 @@ print(f"  rack height at the pin X: {PIN['y_top'] - yb(PIN['x']):.3f} (top {PIN[
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
 print("GATE 5: assembly at MIN / MID / MAX (measured on the written assembly STLs)")
-a_list = sdg.sawtooth_cutter_face(yb, TEETH["x0"], TEETH["x1"], TEETH["pitch"], TEETH["depth"], TEETH["land"], TEETH["eps"])[1]
-a_seat = sdg.seat_notch(a_list, PAWL, D)[0]
+print(f"  r7 ratchet: {len(A_LIST)} notches, pitch {PITCH}; pawl teeth in notches {K_SEATS} at MIN (a "
+      + ", ".join(f"{a:.3f}" for a in A_SEATS) + f"); block start X {LAY['xb']:.3f}, inner tooth face {LAY['x_in']:.3f}")
+
+
+def pawl_teeth(sec_s, t):
+    """The pawl material above the tongue top (Y0) over the block, as separate tooth polygons sorted by X."""
+    g = sec_s.intersection(box2(LAY["xb"] - t - 0.1, PAWL["free_x"] - t + 0.1, Y0 + 1e-4, Y0 + 3.0))
+    return sorted([q for q in getattr(g, "geoms", [g]) if q.area > 1e-3], key=lambda q: q.bounds[0])
+
+
+def hline(poly, y, x0, x1):
+    g = poly.intersection(shapely.LineString([(x0, y), (x1, y)]))
+    return sorted((min(c[0] for c in s.coords), max(c[0] for c in s.coords))
+                  for s in getattr(g, "geoms", [g]) if s.length > 0)
+
+
+def swept_hit(teeth_u, rack_w, drop, sgn, n=131):
+    """Max overlap area of the teeth lowered by `drop` and moved sgn*X by s in 0..PITCH (+0.3) against the rack."""
+    return max(affinity.translate(teeth_u, sgn * s, -drop).intersection(rack_w).area
+               for s in np.linspace(0.0, PITCH + 0.3, n))
+
+
+def drop_needed(teeth_u, rack_w, sgn):
+    lo, hi = 0.0, 3.0
+    for _ in range(16):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if swept_hit(teeth_u, rack_w, mid, sgn) > 1e-7 else (lo, mid)
+    return hi
 
 
 def inter(a, b):
@@ -668,6 +883,19 @@ for pose, t in TRAVEL.items():
           f"   components {len(comps)} (frame {frame_c.volume:.1f}, slider {sum(c.volume for c in rest):.1f}, "
           f"handle {handle_c.volume:.1f}, pin {pin_c.volume:.1f})")
     slider_c = rest[0]
+    # r7 reinforce: the stop leg below the floor underside (placed slider sections) -> nearest frame / handle material,
+    # XY distance, sections Z -3/1/5/9/13; the leg's +X face from a -X ray at the leg mid-height.
+    _lw = box2(LAY["leg_x0"] - t - 0.01, LAY["leg_x1"] - t + 0.01, LAY["beam_top"] - ST["beam_t"] - 0.01, y_fl_ - 1e-3)
+    _lgd = []
+    for zz in (-3.0, 1.0, 5.0, 9.0, 13.0):
+        _lp = section_poly(slider_c, zz).intersection(_lw)
+        _fz, _hz = section_poly(frame_c, zz), section_poly(handle_c, zz)
+        _lgd.append((_lp.distance(_fz) if not _fz.is_empty else np.inf, _lp.distance(_hz) if not _hz.is_empty else np.inf, zz))
+    _lx = 130.0 - first_hit(slider_c, np.array([130.0 - t, 0.5 * (y_fl_ + LAY["beam_top"]), ZM]), [-1, 0, 0]) - t
+    _df, _dh = min(_lgd), min(_lgd, key=lambda q: q[1])
+    print(f"   STOP LEG +X face X {_lx:.4f} (ray at Y {0.5 * (y_fl_ + LAY['beam_top']):.2f}); leg (below the floor) -> frame "
+          f"{_df[0]:.4f} at Z {_df[2]}, -> handle {_dh[1]:.4f} at Z {_dh[2]} (head -X flat {XF:.4f} - leg +X "
+          f"{LAY['leg_x1'] - t:.4f} = {XF - LAY['leg_x1'] + t:.4f})")
 
     s_st = [x - t for x in (64.0, 80.0, 100.0, 120.0, 134.0)]
     c_st = list(np.linspace(CT["x_entry"] + 1.0, CT["x_exit"] - 1.0, 5))
@@ -708,59 +936,45 @@ for pose, t in TRAVEL.items():
         print(f"   tip gap at wire height (Z {zz}): crown X {oo[0] + hs[-1]:.3f} -> C-tip X {oo[0] + hf[hf > hs[-1]][0]:.3f} "
               f"= {hf[hf > hs[-1]][0] - hs[-1]:.3f} mm")
 
-    # Pawl (hooked, round 3). Profiles on vertical rays at Z 5: T(x) = slider top below Y -7 (tooth / tongue),
-    # F(x) = first frame surface from below (rack lower envelope, incl. the hooked lips).
-    a_now = a_seat - t
-    dx_ = 0.01
-    xg = np.arange(a_now - 2.6, a_now + 4.0, dx_)
-
-    def top_below(mesh, x):
-        ys = -40.0 + hits_along(mesh, np.array([x, -40.0, ZM]), [0, 1, 0])
-        ys = ys[ys < -7.0]
-        return ys.max() if len(ys) else np.nan
-
-    Fg = np.array([(-40.0 + hits_along(frame_c, np.array([x, -40.0, ZM]), [0, 1, 0]))[0] for x in xg])
-    it = (xg >= a_now - 0.6) & (xg <= a_now + 1.9)
-    xt = xg[it]
-    Tt = np.array([top_below(slider_c, x) for x in xt])
-    land_y = Fg[np.argmin(abs(xg - (a_now - 0.1)))]
-    apex_y = np.nanmax(Tt)
-    # hook angle and backlash: horizontal rays at two heights above the land
-    # Heights +0.10 / +0.40: the traced rack underside rises 0.145 mm from the MIN notch to the MAX notch, so the
-    # overlap falls 0.605 -> 0.461 and a ray at +0.55 passes over the tooth apex at MID/MAX (cad3 probe, 2026-09-23).
-    fx, wx = [], []
-    HG = (0.10, 0.40)
-    for hgt in HG:
-        yy = land_y + hgt
-        fx.append(a_now - 1.0 + first_hit(slider_c, np.array([a_now - 1.0, yy, ZM]), [1, 0, 0]))
-        wx.append(a_now + 0.2 - first_hit(frame_c, np.array([a_now + 0.2, yy, ZM]), [-1, 0, 0]))
-    hook_t = math.degrees(math.atan((fx[0] - fx[1]) / (HG[1] - HG[0])))
-    hook_w = math.degrees(math.atan((wx[0] - wx[1]) / (HG[1] - HG[0])))
-    # seat gap along the ramp part of the tooth
-    ir = (xt >= a_now + 0.5) & (xt <= a_now + 1.2)
-    sg = np.array([Fg[np.argmin(abs(xg - x))] for x in xt[ir]]) - Tt[ir]
-    # drop needed to move the tooth by s (rigid vertical drop, then X translation), max over the path
-    n_s = int(round((TEETH["pitch"] + 0.3) / dx_))
-    i0 = int(np.argmin(abs(xg - xt[0])))
-    need = {}
-    for lab, sgn in (("open -X", -1), ("close +X", +1)):
-        worst = -1e9
-        for k in range(1, n_s + 1):
-            j = i0 + sgn * k + np.arange(len(xt))
-            ok = (j >= 0) & (j < len(xg)) & ~np.isnan(Tt)
-            worst = max(worst, float(np.max(Tt[ok] - Fg[j[ok]])))
-        need[lab] = worst
-    # tab stop gap (under the tab column) and relief under the pad end, on the slider mesh
-    xs_tab = PAWL["free_x"] - PAWL["tab_w"] / 2 - t
-    hs_ = hits_along(slider_c, np.array([xs_tab, PAWL["tab_bottom_y"] - 1.0, ZM]), [0, -1, 0])
-    stop_gap = hs_[1] - hs_[0]
-    hs2 = hits_along(slider_c, np.array([PAWL["free_x"] + PAWL["pad_len"] - 0.5 - t, PAWL["tab_bottom_y"] - 1.0, ZM]), [0, -1, 0])
-    print(f"   pawl: hook tooth face {hook_t:.2f}°, rack wall {hook_w:.2f}°; horizontal backlash {fx[0] - wx[0]:.3f} / "
-          f"{fx[1] - wx[1]:.3f} (at land +{HG[0]:.2f} / +{HG[1]:.2f}); apex Y {apex_y:.3f}, land Y {land_y:.3f} -> OVERLAP {apex_y - land_y:.3f};"
-          f" seat gap on the ramp {sg.min():.3f}..{sg.max():.3f}")
-    print(f"   pawl stop: gap under the tab {stop_gap:.3f} (pad end relief {hs2[1] - hs2[0]:.3f}); drop needed to OPEN "
-          f"{need['open -X']:.3f} -> margin {stop_gap - need['open -X']:.3f}; drop needed to CLOSE (ratchet over the "
-          f"ramp) {need['close +X']:.3f} -> margin {stop_gap - need['close +X']:.3f}")
+    # r7 pawl, on the STL sections at Z 5 (every pawl feature is an in-plane profile over the full Z). Each tooth
+    # is found on the slider section; every probe height is derived from that tooth's own apex and the rack land.
+    secF, secS = section_poly(frame_c, ZM), section_poly(slider_c, ZM)
+    rack_w = secF.intersection(box2(LAY["xb"] - t - 6.0, PAWL["free_x"] - t + 6.0, -20.0, 1.0))
+    tl = pawl_teeth(secS, t)
+    rows = []
+    for k, g in enumerate(tl):
+        ax_, ay_ = max(g.exterior.coords, key=lambda q: q[1])
+        land = secF.intersection(box2(ax_ - PITCH, ax_ + PITCH, -20.0, Y0 + 3.0)).bounds[1]
+        ov = ay_ - land
+        hg = (land + 0.25 * ov, land + 0.75 * ov)
+        fx, wx = [], []
+        for yy in hg:
+            sg_ = [s for s in hline(g, yy, ax_ - 1.5, ax_ + 2.0)]
+            fx.append(sg_[0][0])
+            wx.append(max(e for _, e in hline(secF, yy, ax_ - 1.5, ax_ + 2.0) if e <= fx[-1] + 1e-6))
+        hk_t = math.degrees(math.atan((fx[0] - fx[1]) / (hg[1] - hg[0])))
+        hk_w = math.degrees(math.atan((wx[0] - wx[1]) / (hg[1] - hg[0])))
+        rows.append((k, ax_, ay_, land, ov, g.distance(secF), fx[0] - wx[0], fx[1] - wx[1], hk_t, hk_w))
+    print(f"   pawl: {len(tl)} teeth on the slider section (need {PAWL['n_teeth']})")
+    for k, ax_, ay_, land, ov, sg_, b0, b1, hk_t, hk_w in rows:
+        print(f"     tooth {k} apex X {ax_:.3f} Y {ay_:.4f}; rack land Y {land:.4f} -> OVERLAP {ov:.4f}; seat gap (2D min "
+              f"tooth->rack) {sg_:.4f}; horizontal gap at the locking face {b0:.4f} / {b1:.4f} (land +25 % / +75 % of the "
+              f"overlap); hook: pawl face {hk_t:.3f}°, rack wall {hk_w:.3f}°")
+    # Stops: pad bottom -> stop block top on vertical chords just -X of each block's +X contact edge
+    gaps = {}
+    for lab, xs_ in (("inner", LAY["inner_x"]), ("outer", LAY["outer_x"])):
+        c = [s for s in chord_iv(secS, xs_ - t - 0.05) if s[1] < -20.0]
+        gaps[lab] = c[-1][0] - c[-2][1]
+    teeth_u = unary_union(tl)
+    need = {lab: drop_needed(teeth_u, rack_w, sgn) for lab, sgn in (("open", -1), ("close", +1))}
+    print(f"   pawl stops (chords at X inner {LAY['inner_x'] - t - 0.05:.3f} / outer {LAY['outer_x'] - t - 0.05:.3f}): "
+          f"inner gap {gaps['inner']:.4f}, outer gap {gaps['outer']:.4f}; rigid drop of all 4 teeth needed to OPEN (-X one "
+          f"pitch) {need['open']:.4f} -> inner-stop margin {gaps['inner'] - need['open']:+.4f}; to CLOSE (+X over the "
+          f"ramp) {need['close']:.4f} -> margin {gaps['inner'] - need['close']:+.4f}")
+    lift = [(d_, swept_hit(teeth_u, rack_w, d_, -1)) for d_ in (gaps["inner"], min(r[4] for r in rows) - 0.05, 0.0)]
+    print(f"   LIFT: teeth lowered by the inner stop gap {lift[0][0]:.4f}, swept -X one pitch: max overlap {lift[0][1]:.6f} mm2"
+          f" (must be 0); CONTROL drop {lift[1][0]:.4f} (overlap - 0.05): {lift[1][1]:.4f} mm2, CONTROL drop 0: "
+          f"{lift[2][1]:.4f} mm2 (both must be > 0)")
 
     if pose == "min":
         coupling_gates(frame_c, slider_c, handle_c, t)

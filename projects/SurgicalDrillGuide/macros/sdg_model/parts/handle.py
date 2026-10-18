@@ -1,5 +1,6 @@
 """handle: revolved traced grip, Ø16 core, round 6 square head with a blind socket for the frame lug and a snap
-notch for the frame finger. Prints standing, butt down (+Y up)."""
+notch for the frame finger; r7: flat on the -X side, flush with the head's -X face. Prints standing, butt down
+(+Y up)."""
 
 import math
 
@@ -76,4 +77,10 @@ def build_handle(D, t_z, coup):
     y_butt = handle.bounding_box().min.Y
     handle = one_solid(handle - box(hx - 30, hx + 30, y_butt - 5, y_butt + BUTT_FLAT, zc - 30, zc + 30),
                        "handle butt flat")
+    # r7 (user decision 2026-10-17): one planar cut over the whole length on the -X side, flush with the head's -X
+    # face (opposite the +X snap notch). The head lies wholly at X >= x0, so only the grip is trimmed.
+    x_flat = coup["head"]["x0"]
+    bb = handle.bounding_box()
+    handle = one_solid(handle - box(bb.min.X - 5.0, x_flat, bb.min.Y - 5.0, bb.max.Y + 5.0, bb.min.Z - 5.0,
+                                    bb.max.Z + 5.0), "handle - X flat")
     return handle

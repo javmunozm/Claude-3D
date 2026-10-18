@@ -86,10 +86,8 @@ HOOK_OUT_FILLET_R = 4.0  # DESIGNED (pass 3; brief r >= 3): concave fillet where
 # ── Rack extension (user decision: extend the rack so the ~74 mm maximum opening is restored) ─────────────
 # The traced free end (end face + bottom chamfer) is moved RACK_EXT towards -X; the gap is filled with the rack
 # section (top edge Y 0, bottom = the traced bottom line extended); teeth continue in phase at TOOTH_PITCH.
-RACK_EXT = 4.6           # DESIGNED (user decision to extend; 4.5 -> 4.6 in round 3, user accepted): length added to
-                         # the traced rack at its free end. With PIN_FIT_CLEAR 0.20 and the pin's c/2 slop, 4.5
-                         # leaves a worst-case MAX->pin gap of 0.044 (< PIN_STOP_MIN_GAP 0.10): MAX falls to 36
-                         # teeth, tip gap 72.432, and the build refuses. 4.6 gives 0.144 worst / 0.244 centred.
+RACK_EXT = 4.8           # PROPOSED r7 (ratchet_sizing.md §6): length added to the traced rack at its free end.
+                         # With pitch 2.6, MAX = 23 teeth = 59.80, tip gap 74.272; pin spare 0.006 after the 0.10 gap.
 TARGET_MAX_GAP = 74.0    # user requirement: tip gap at wire height at the last pawl-seated pose (build asserts)
 
 # ── End-stop pin (user decision: removable printed pin through a Z hole near the rack tip) ─────────────────
@@ -109,37 +107,55 @@ TEARDROP_APEX_DIR = +1   # DESIGNED: teardrop point towards +Z (print with the -
 BORE_OVERRUN = 3.0       # DESIGNED: bore cutters run this far past each traced face (through-hole)
 
 # ── Rack teeth (bottom face, MEASUREMENTS §3b) ──────────────────────────────────
-TOOTH_PITCH = 1.61       # MEASURED (cd1 FFT, 3.443 px/mm; 1.58 at the ruler scale)
-TOOTH_DEPTH = 0.80       # ASSUMED: unresolved in the photos (upper bound 2.4 mm); chosen for FDM at 1.61 pitch
-TOOTH_LAND = 0.20        # DESIGNED: flat tip land between notches (a sharp tip does not print)
+TOOTH_PITCH = 2.6        # PROPOSED r7 (ratchet_sizing.md §1; was 1.61 MEASURED): opening step 2.6 mm, sized for a
+                         # flat-on-flat locking contact with a 0.4 nozzle
+TOOTH_DEPTH = 1.4        # PROPOSED r7 (rack net section 5a SF 3.14 with the flat underside)
+TOOTH_LAND = 0.50        # PROPOSED r7: cutter land (apex-to-ramp-end complement); rack tooth tip 0.875 ~ 2 lines
 TOOTH_CUT_EPS = 0.05     # DESIGNED: cutter lands sit this far below the envelope (no coincident faces)
-TEETH_START_MARGIN = 0.20  # DESIGNED: first notch starts this far right of the tip-chamfer end
+TEETH_START_MARGIN = 2.45  # PROPOSED r7b (phase +2.25 so the free length reaches 20.32): first notch offset from
+                           # the tip-chamfer end of the traced rack
 TEETH_X_END = 100.7      # DERIVED in MEASUREMENTS §3b (teeth end at the "30" graduation), ±1.5 mm
-TOOTH_HOOK_DEG = 10.0    # DESIGNED (user decision, round 3; MECHANISM_STRATEGY §3): the rack notch locking wall
-                         # and the pawl tooth locking face are undercut by this angle (apex leans -X), so tension
-                         # on the jaws pulls the tooth DEEPER into the notch. No-release condition >= 8.6°.
+TOOTH_HOOK_DEG = 15.0    # PROPOSED r7 (was 10): locking wall / pawl face undercut (≈6.6° after ±0.05 print error)
+RACK_FLAT_X1 = TEETH_X_END  # PROPOSED r7: rack underside flat at its traced Y at this X, for every X <= it (adds a
+                            # wedge <= 0.24 under the traced line; the overlap is then equal at every pose)
 
 # ── Compliant pawl (DESIGNED substitution: the reference pawl, pivot screw and lever are not photographed
-#    internally, U7). Tension tongue anchored at its -X end, tooth at its +X free end, release tab below. ──
-PAWL_ANCHOR_X = 72.5     # DESIGNED: tongue root (carriage bottom wall is intact left of this)
-PAWL_FREE_X = 94.0       # DESIGNED: tongue free end (tongue length = 21.5 mm)
+#    internally, U7). r7: a thin flexure from the anchor carries a RIGID tooth block with PAWL_TEETH teeth; the
+#    release tab hangs from the block's free end, the pad runs from the block start to PAD_X1. ──
+PAWL_ANCHOR_X = 70.5     # PROPOSED r7: flexure root (the window and the 45° floor chamfer start here)
+PAWL_ROOT_R = 0.5        # DESIGNED (r7 fix D1): concave fillet from the flexure underside onto the traced collar wall;
+                         # it replaces the bevel's V-groove, so the flexure's free length starts where the fillet ends
+PAWL_FREE_X = 101.6      # PROPOSED r7b: block free end (slot to 102.4, floor strip 4.08 at the carriage end)
+PAWL_TEETH = 4           # PROPOSED r7: teeth on the block (1 carries the load, ratchet_sizing.md §2)
+PAWL_FLEX_T = 1.759      # DESIGNED (user decision r7, 2026-10-17, variant B): flexure thickness; release ~5 N at
+                         # the pad centre, stop SF 2.69 accepted (variant A 1.576 gave SF 3.00 at 3.6 N)
+PAWL_BLOCK_GAP = 0.5     # PROPOSED r7: block start = inner tooth locking face at the tongue top minus this
+                         # (flexure free length = block start - PAWL_ANCHOR_X; 20.32 in r7b)
+PAWL_BLOCK_DEPTH = 5.0   # DESIGNED (coupon): block thickness below the tongue top (rigid vs the flexure: (5/1.576)^3 = 32x)
 PAWL_SLOT_W = 0.80       # DESIGNED: free-end slot, in-plane (prints as a vertical gap), >= 2 nozzle widths
 PAWL_WINDOW_TOP_Y = -7.5  # DESIGNED: side walls are cut back to this Y over the tongue so the tooth can pass
 PAWL_SEAT_CLEAR = 0.10   # PLACEHOLDER (print-tolerance-expert): tooth-to-notch clearance when seated
 PAWL_TOOTH_MARGIN = 0.50  # DESIGNED: tooth right face stays this far inside the tongue free end
 TAB_W = 3.0              # DESIGNED: release tab width along X (hangs from the tongue free end)
 TAB_BOTTOM_Y = -24.0     # DESIGNED: tab reaches ~24 mm below the rack top (reference lever ~27 mm, cd2)
-PAD_LEN = 9.0            # DESIGNED: thumb pad length along +X from the tab
+PAD_X1 = 103.4           # PROPOSED r7: thumb pad +X end (r7 fix D2: the pad starts at the inner stop block's -X edge)
 PAD_T = 3.0              # DESIGNED: thumb pad thickness in Y
-# Tab hard stop (user decision, round 3): a leg down from the carriage floor past the pad's +X end and a beam
-# under the pad. Only the block under the tab column touches (gap TAB_STOP_DROP); elsewhere the beam is
-# STOP_RELIEF below the pad, so a pad that rotates with the flexure does not land on its +X end first.
-TAB_STOP_DROP = 0.73     # DESIGNED (user decision round 5; was 0.80): max tooth drop. Release needs the worst tooth
-                         # overlap 0.630 + 0.10 margin; pawl tongue SF 3.29 at the stop (3.00 at 0.80), the stress
-                         # being displacement-set (print-tolerance-expert)
-STOP_LEG_W = 2.5         # DESIGNED: leg width along X (right face flush with the squared carriage end, round 5)
-STOP_BEAM_T = 2.5        # DESIGNED: beam thickness in Y
-STOP_RELIEF = 2.0        # DESIGNED: beam-to-pad gap away from the tab column
+# Two-point tab stop (r7): a leg down from the carriage floor past the pad's +X end, a beam under the pad, and two
+# 1.0-wide stop blocks on it. Each block's +X top edge is its contact point (the pad drops more towards +X).
+TAB_STOP_DROP = 1.30     # PROPOSED r7: inner stop gap = lift 1.170 + 0.125, at the inner tooth face X
+STOP_OUTER_GAP = 2.77    # PROPOSED r7b: outer stop gap (limits overpress)
+STOP_OUTER_X = 102.4     # PROPOSED r7: outer stop contact X (PAD_X1 - 1.0)
+STOP_BLOCK_W = 1.0       # DESIGNED: stop block width along X
+STOP_OUTER_H = 1.0       # DESIGNED: outer stop block height above the beam
+STOP_LEG_X0_IN = 2.5     # DESIGNED (round 5): leg -X face this far inside the squared carriage end (fixed: 0.5 guard
+                         # to the pad's +X end)
+STOP_LEG_W = 4.0         # DESIGNED (r7 reinforce d1, user-approved 2026-10-17): leg width along X BELOW the carriage
+                         # floor; grows +X past the carriage end (above the floor underside the end stays flush)
+STOP_BEAM_T = 3.62       # DESIGNED (r7 reinforce d1): beam thickness in Y (grows down; stop tops fixed)
+STOP_FILLET_R = 1.0      # DESIGNED (r7 fix 1h): fillet in the beam-leg inside corner
+STOP_LEG_TOP_R = 1.0     # DESIGNED (r7 reinforce d1): fillet where the leg's -X face meets the floor underside
+PAWL_ROOT_TOP_R = 0.5    # DESIGNED (r7 reinforce d1): fillet at the flexure root's top (tension) step in the outer Z
+                         # bands, where the collar side walls stop at PAWL_ANCHOR_X
 
 # ── Handle coupling, round 6 (concept D, coupling_sizing.md + bar_and_snap.md; all PROPOSED by
 #    print-tolerance-expert, user-approved round). Frame lug (tenon) in a blind square socket in the handle head,

@@ -7,7 +7,7 @@ from shapely.geometry import LineString, Polygon
 
 from build123d import Face, Wire, import_dxf
 
-from .constants import IMPORT_DIR, RACK_EXT, RING_FILES, SLIDE_CLEAR_Y
+from .constants import IMPORT_DIR, RACK_EXT, RACK_FLAT_X1, RING_FILES, SLIDE_CLEAR_Y
 
 
 def ring_face(name):
@@ -129,9 +129,35 @@ def derive():
     return d
 
 
-def rack_bottom_y(D, x):
+def rack_line_y(D, x):
+    """The traced rack bottom line (tooth-tip envelope of the photographed rack)."""
     bx0, by0, bx1, by1 = D["rack_bottom_line"]
     return by0 + (x - bx0) * (by1 - by0) / (bx1 - bx0)
+
+
+def rack_flat_y(D):
+    """r7: the flat underside level = the traced line's Y at RACK_FLAT_X1."""
+    return rack_line_y(D, RACK_FLAT_X1)
+
+
+def rack_bottom_y(D, x):
+    """r7: rack underside, flat at rack_flat_y for x <= RACK_FLAT_X1, the traced line beyond."""
+    return rack_flat_y(D) if x <= RACK_FLAT_X1 else rack_line_y(D, x)
+
+
+def rack_flat_poly(D, x_end):
+    """r7: wedge between the flat underside and the traced line, from the tip-chamfer end (45° run down to the flat,
+    so the chamfer is kept) to x_end, grown 0.5 up into the rack (overlap). x_end must lie inside a notch so the
+    sub-micron step left there is cut away with the teeth."""
+    # Full build r7: the wedge starts 0.3 inside the traced bottom run (not at the chamfer end, where the moved tip
+    # and the extension band already meet with a micro-step: a vertex there tessellated to a zero-length edge and
+    # an open STL). Its 45° edge starts 0.05 inside the rack, so it crosses the traced line cleanly.
+    bx0 = D["rack_bottom_line"][0]
+    xs = bx0 - RACK_EXT + 0.3
+    ys = vertical_chord(D["frame_poly"], xs)[0] + 0.05
+    yf = rack_flat_y(D)
+    return Polygon([(xs, ys + 0.45), (xs, ys), (xs + (ys - yf), yf), (x_end, yf),
+                    (x_end, rack_line_y(D, x_end) + 0.5)])
 
 
 def derive_channel(D, travel_max):

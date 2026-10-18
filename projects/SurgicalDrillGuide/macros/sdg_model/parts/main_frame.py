@@ -8,7 +8,7 @@ from shapely.geometry import box as sbox
 from shapely.ops import unary_union
 
 from ..mechanisms import sawtooth_cutter_face
-from ..rings import rack_bottom_y, ring_face, vertical_chord
+from ..rings import rack_bottom_y, rack_flat_poly, ring_face, vertical_chord
 from ..shapes import extrude_z, keep_below, one_solid, polygon_face, shapely_faces, teardrop_bore_x, xz_prism_y, \
     yz_prism_x
 
@@ -208,10 +208,15 @@ def build_main_frame(D, t_z, teeth, bore, coup, ctip, pin):
     frame = one_solid(frame - (Pos(pin["x"], pin["y"], -1.0) * Solid.make_cylinder(pin["hole_d"] / 2.0, t_z + 2.0)),
                       "frame - pin hole")
 
-    # Rack teeth (bottom face).
+    # Rack teeth (bottom face). r7: the underside is first made flat (rack_bottom_y) up to a point inside the last
+    # notch's bottom span, so the wedge's end step is removed with that notch.
     yb = lambda x: rack_bottom_y(D, x)
     cut_face, a_list = sawtooth_cutter_face(yb, teeth["x0"], teeth["x1"], teeth["pitch"], teeth["depth"],
                                             teeth["land"], teeth["eps"], teeth["hook"])
+    x_flat_end = a_list[-1] + 0.5 * (teeth["depth"] * math.tan(math.radians(teeth["hook"]))
+                                     + teeth["pitch"] - teeth["land"])
+    frame = one_solid(frame + extrude_z(polygon_face(list(rack_flat_poly(D, x_flat_end).exterior.coords)[:-1]),
+                                        0.0, t_z), "frame + flat rack underside")
     frame = one_solid(frame - extrude_z(cut_face, -1.0, t_z + 1.0), "frame - teeth")
 
     # Closed C-tip bore on the rectified wire line. The cutter spans only the C-tip (the only frame material

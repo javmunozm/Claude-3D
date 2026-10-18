@@ -2,7 +2,9 @@
 
 A printable functional replica of a ratcheting K-wire / drill guide, rebuilt from photos. A Ø3 mm K-wire runs along the L-arm top bar and through the C-hook tip on one line. The L-arm slides on a toothed rack that is part of the main frame, and a flexure pawl with a hooked tooth locks it against opening. A threaded handle screws into a boss under the bar, and a removable pin stops the slider at maximum opening.
 
-**Status (2026-10-17): fix round 6 is built (3 passes), gated and form-audited.** The threaded handle joint is replaced by a lug, a blind socket and a snap finger; the frame is a uniform 10 mm slab; the bar top is raised; the C-hook has an outer band. The user accepted the base design on 2026-10-17 ("está bien el diseño base"); the four form-audit entries R6-1…R6-4 are left as built (see "Fix round 6"). Nothing printed. Sections below "Fix round 6" that describe the boss, thread and collar are the rounds 3–5 record.
+**Status (2026-10-17, later): fix round 7 is built (build + 2 fix passes), gated, form-audited and structurally checked.** New ratchet for a 0.4 nozzle (pitch 2.6, depth 1.4, 4-tooth pawl, flexure variant B), reinforced release stops, and a flat on the handle's −X face. See "Fix round 7". Nothing printed.
+
+**Round 6 (2026-10-17): built (3 passes), gated and form-audited.** The threaded handle joint is replaced by a lug, a blind socket and a snap finger; the frame is a uniform 10 mm slab; the bar top is raised; the C-hook has an outer band. The user accepted the base design on 2026-10-17 ("está bien el diseño base"); the four form-audit entries R6-1…R6-4 are left as built (see "Fix round 6"). Nothing printed. Sections below "Fix round 6" that describe the boss, thread and collar are the rounds 3–5 record.
 - Round 4 implements the user decisions after the 25 N re-check (`docs/MECHANISM_STRATEGY.md`, "Round 3 re-check at 25 N"): a **Ø22 handle collar that seats on the boss face**, carriage **top wall 2.5** and carriage **floor 2.5**. See "Round 4" below.
 - All 11 export files were regenerated in round 4; every part was `is_valid` True (1 solid) before any file was written (the build now refuses to export otherwise). The gates below were run on those files.
 - Round 3 implemented hooked teeth, tab hard stop, Tr16×4 thread, Ø22 boss, Ø16 handle core, new clearances, `RACK_EXT` 4.6.
@@ -34,10 +36,10 @@ The frame mid-plane is Z 5.000. This departs on purpose from the repo's "origin 
 
 | Part | Files | Volume (STEP) | Bounding box (STL), mm | Solid fraction (STL vol / bbox) |
 |---|---|---|---|---|
-| main_frame (round 6): C-hook with outer band, bar (raised to Y 7.5 on the hook side), rack (+4.6 mm extension), lug and snap finger, uniform Z 0…10 | `SurgicalDrillGuide_main_frame.step/.stl` | 30 784.77 mm³ | X −4.650…182.029, Y −29.850…57.643, Z 0.000…10.000 | not re-measured |
-| l_arm_slider: L, collar, carriage (2.5 top wall, 2.5 floor) and hooked pawl with tab stop, one slab | `SurgicalDrillGuide_l_arm_slider.step/.stl` | 26 298.14 mm³ | X 60.022…137.040, Y −31.000…56.705, Z −3.300…13.300 | 0.235 |
-| handle (round 6): grip (butt faced 1.5), Ø16 core, square head with lug socket and snap notch | `SurgicalDrillGuide_handle.step/.stl` | 46 153.53 mm³ | X 109.260…135.363, Y −147.046…−9.850, Z −8.051…18.051 | not re-measured |
-| end_stop_pin (separate, removable) | `SurgicalDrillGuide_end_stop_pin.step/.stl` | 117.34 mm³ | Ø3.0 × 16.6 at X −1.292, Y −4.152, Z −3.3…13.3 | 0.785 |
+| main_frame (round 7): C-hook with outer band, bar (raised to Y 7.5 on the hook side), rack with r7 teeth and flat underside (+4.8 mm extension), lug and snap finger, uniform Z 0…10 | `SurgicalDrillGuide_main_frame.step/.stl` | 30 787.8 mm³ (STL) | X −4.850…182.029, Y −29.850…57.643, Z 0.000…10.000 | not re-measured |
+| l_arm_slider (round 7): L, collar, carriage (2.5 top wall, 2.5 floor), 4-tooth pawl on a 1.759 flexure, release pad, two-point stop on a reinforced beam and leg, one slab | `SurgicalDrillGuide_l_arm_slider.step/.stl` | 27 476.09 mm³ (STL) | X 60.022…137.040, Y −33.890…56.705, Z −3.300…13.300 | not re-measured |
+| handle (round 7): grip (butt faced 1.5) with a flat on the −X face at X 111.111, Ø16 core, square head with lug socket and snap notch | `SurgicalDrillGuide_handle.step/.stl` | 45 952.9 mm³ (STL) | X 111.111…135.347, Y −147.046…−9.850, Z −8.036…18.036 | not re-measured |
+| end_stop_pin (separate, removable) | `SurgicalDrillGuide_end_stop_pin.step/.stl` | 117.1 mm³ (STL) | Ø3.0 × 16.6 at X −1.484, Y −3.852 (round 7), Z −3.3…13.3 | 0.785 |
 | Assemblies at MIN / MID / MAX | `SurgicalDrillGuide_assembly_{min,mid,max}.stl` (4 parts each; see note) | | | |
 | Renders (round 4) | `*_front.png` and `*_iso.png` for slider and handle; `assembly_min_front.png`, `assembly_min_vs_reference.png`. Frame front/iso are round 3 (frame geometry unchanged: same volume 25 996.96) | | | |
 
@@ -120,7 +122,27 @@ Source and gates:
 - R6-3: the band ends against the C-tip pad in an unfilleted 97.8° corner (r5: 139°).
 - R6-4: both bar-ramp corners are sharp (designed polyline).
 
+**Fix round 7 (user decisions, 2026-10-17).** Files in `attempts/r7-ratchet-2026-10-17/` (local only): sizing `ratchet_sizing.md`; coupons `coupon/` (not printed: the user judged the fit from the slicer); build and fix reports `full/build_report.md`, `full/fix_report.md`, `full/reinforce_report.md`; form audit `full/review_register.md`; structural log `full/sizing_r7reinforce.log` (from `docs/mechanism_sizing.py`, reconciled strictly against the macro).
+1. **Why:** with a 0.4 nozzle the old teeth (pitch 1.61, depth 0.80) do not grip. Print-tolerance-expert's model: corner rounding of about half a line costs 0.656 of the 0.46–0.61 overlap, so the 10° hook is not reproduced. Not measured on a print.
+2. **Rack teeth:** pitch 2.6, depth 1.4, cutter land 0.5 (tooth tip 0.875), 15° undercut locking wall, ramp 33.69°. 38 notches. Rack underside flat at Y −9.351 to X 100.7 (deviation from the trace; it was sloped 0.145). `TEETH_START_MARGIN` 2.45, `RACK_EXT` 4.8. Poses: MID 12, MAX 23 teeth (travel 59.80, tip gap 74.272). The jaw now opens in 2.6 mm steps.
+3. **Pawl:** 4 teeth on a rigid 5 mm block (X 90.82–101.6). Uniform flexure, **t 1.759 (variant B, user decision: firmer release, stop SF 2.69 nominal accepted)**, anchor X 70.5; root is an r 0.5 fillet onto the collar wall (no V-groove), with an r 0.5 fillet at the top step in the outer Z bands. Free length 19.878 (centre band) / 19.820 (outer bands). Measured on the STL: overlap 1.1697 and seat gap 0.1000 for every tooth at MIN / MID / MAX; flat locking contact 1.184 in CAD (about 0.43 after the assumed print rounding).
+4. **Release:** pad X 90.32–103.4, full slider Z, Y −24 kept. Release force 4.3–5.6 N (sizing). Two-point stop: inner gap 1.30 at the inner tooth face, outer gap 2.77 at X 102.4. Pressed to the inner stop, the 4 teeth clear the rack (gate: lift check 0 mm², controls collide). Stop beam 3.62 thick with an r 1 beam-leg fillet; stop leg 4.0 below the floor underside (X 103.975–107.975), 2.5 where it joins the floor (the carriage end stays one plane at X 106.475 above the floor, the coupling clearance lock), r 1 fillet at its −X top corner.
+5. **Handle flat:** one plane on the −X side at the head's −X face (X 111.111, derived from the constants), over the whole length. It cuts only the two grip swells; the flat totals 832.04 mm² (head face 582.92, grip 170.55 + 78.58). No knife edge (smallest edge angle 106.9°).
+6. Round-6 interfaces (coupling, snap, raised bar, hook band) are unchanged and re-gated: interference 0.0 for all pairs at MIN / MID / MAX.
+
+**Round 7 structural check (25 N, PETG assumed, Kt values are assumed chart readings):**
+- Holding load through the teeth: SF 4.07 at the flexure root; teeth 8.4–17.2; no cam-out; rack net section 3.14.
+- **Below 3, accepted by the user:**
+  - Flexure at the stop: 2.69 nominal (user decision, variant B); 1.64–1.81 with Kt.
+  - Flexure root under a 25 N press on the pad: 1.60.
+  - Flexure → block square corner: 1.73.
+  - **Stop leg** where it joins the floor: 1.27 (−X, tension) and 1.21 (+X square corner, compression). It holds about 11 N of finger force on the pad at SF 3. The user's reasoning (2026-10-17): the stop is only a travel limit; the working load goes through the teeth.
+- Click stress with Kt 22.3 MPa vs an untested 10.6 MPa fatigue estimate.
+- Pin → collar at MAX 0.118: within FDM positional error. If the collar reaches the pin first, MAX seats at 22 teeth and the tip gap is 71.67.
+
 ### Assembly and use
+
+- **Release (round 7):** with the jaws unloaded, press the pad under the carriage with one finger (about 5 N) and slide. Do not lean on the pad: the stop holds about 11 N at full margin.
 
 - **Handle (round 6):** push the handle up onto the lug until the finger clicks into the notch; the lug end then rests on the socket floor. Under a pull the handle drops 0.315 before the hook bears on the notch roof. To remove: with the handle unloaded, lift the finger tip about 1 mm in +X and slide the handle off (−Y). There is no over-lift stop; do not lift more than about 1 mm (`bar_and_snap.md`: 2.45 % strain at 2 mm).
 - *(Rounds 4–5, retired)* The threaded handle had to be screwed fully home until the collar seated on the boss face.
@@ -329,6 +351,12 @@ The silhouette fill (17.1 % vs 11.6 %) is not used as evidence.
 13. **Carried from the vectors:** the riser rebuilt vertical at 7.50 mm; the 0.41° rack-to-bar kink; the grip on the colour half level, about 2 % under the luminance edge.
 
 ## Open items and verification checklist
+
+Round 7:
+- [ ] On the first print: flat locking contact on the teeth, release force at the pad, hold under load, and the pin → collar gap at MAX (0.118).
+- [ ] Click fatigue of the flexure (22.3 MPa with Kt vs an untested 10.6 MPa estimate).
+- [ ] The coupons in `attempts/r7-ratchet-2026-10-17/coupon/` predate the root and stop fixes.
+- [ ] Whole-form photo comparison (gate e) not re-run in round 7.
 
 Round 6:
 - [ ] print-tolerance-expert: confirm D3/D4 with the socket bearing starting 2.0 below the head top (mouth chamfer), and the hook band at s 64–66 with the built widths.

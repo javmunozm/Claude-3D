@@ -9,7 +9,7 @@ from shapely.geometry import box as sbox
 
 from .constants import *  # noqa: F401,F403  (this stage turns every constant into a bundle)
 from .mechanisms import pawl_tooth_pts
-from .rings import derive, derive_channel, horizontal_chord, rack_bottom_y, ring_points, vertical_chord
+from .rings import derive, derive_channel, horizontal_chord, rack_bottom_y, rack_line_y, ring_points, vertical_chord
 
 
 def derive_pin(D):
@@ -19,7 +19,9 @@ def derive_pin(D):
     x = 3.0 - RACK_EXT
     for _ in range(5):
         y_top = vertical_chord(fr, x)[1]
-        y_apex = rack_bottom_y(D, x) + TOOTH_DEPTH           # notch apex line (the teeth band's upper limit)
+        # notch apex line over the TRACED bottom line (the pin lies left of the first notch; r7 keeps the
+        # placement rule the ratchet sizing reconciled, so MAX = 23 teeth is the sizing's number)
+        y_apex = rack_line_y(D, x) + TOOTH_DEPTH
         y = 0.5 * (y_top + y_apex)
         x_tip = horizontal_chord(fr, y)[0]
         x = x_tip + PIN_TIP_WALL + r_hole
@@ -75,8 +77,12 @@ def parameters():
     D["hook_outer"] = derive_hook_outer(D, ctip)
     pawl ={"anchor_x": PAWL_ANCHOR_X, "free_x": PAWL_FREE_X, "slot_w": PAWL_SLOT_W,
             "window_top_y": PAWL_WINDOW_TOP_Y, "seat_clear": PAWL_SEAT_CLEAR, "tab_w": TAB_W,
-            "tab_bottom_y": TAB_BOTTOM_Y, "pad_len": PAD_LEN, "pad_t": PAD_T, "hook": TOOTH_HOOK_DEG,
-            "stop": {"drop": TAB_STOP_DROP, "leg_w": STOP_LEG_W, "beam_t": STOP_BEAM_T, "relief": STOP_RELIEF}}
+            "tab_bottom_y": TAB_BOTTOM_Y, "pad_x1": PAD_X1, "pad_t": PAD_T, "hook": TOOTH_HOOK_DEG,
+            "n_teeth": PAWL_TEETH, "flex_t": PAWL_FLEX_T, "block_gap": PAWL_BLOCK_GAP, "block_depth": PAWL_BLOCK_DEPTH,
+            "root_r": PAWL_ROOT_R, "root_top_r": PAWL_ROOT_TOP_R,
+            "stop": {"drop": TAB_STOP_DROP, "outer_gap": STOP_OUTER_GAP, "outer_x": STOP_OUTER_X,
+                     "block_w": STOP_BLOCK_W, "outer_h": STOP_OUTER_H, "leg_w": STOP_LEG_W, "beam_t": STOP_BEAM_T,
+                     "fillet_r": STOP_FILLET_R, "leg_x0_in": STOP_LEG_X0_IN, "leg_top_r": STOP_LEG_TOP_R}}
     return D, travel, chan, teeth, bore, coup, pawl
 
 
@@ -176,16 +182,18 @@ def derive_coupling(D):
 
 
 def seat_notch(a_list, pawl, D):
-    """The notch the pawl tooth sits in at MIN opening: the right-most one whose tooth fits in the tongue."""
-    best = None
-    for a in a_list:
+    """The notches the pawl teeth sit in at MIN opening (r7: the n_teeth right-most ones whose tooth fits on the
+    block), inner first. Returns (a list, k list)."""
+    fit = []
+    for k, a in enumerate(a_list):
         _, (xl, xr, _) = pawl_tooth_pts(a, rack_bottom_y(D, a), TOOTH_PITCH, TOOTH_DEPTH, TOOTH_LAND,
                                         pawl["seat_clear"], 0.0, pawl["hook"])
         if xl > pawl["anchor_x"] + 2.0 and xr <= pawl["free_x"] - PAWL_TOOTH_MARGIN:
-            best = a
-    if best is None:
-        raise RuntimeError("no rack notch lies under the pawl tongue")
-    k = a_list.index(best)
-    if k - max(D["pose_teeth"].values()) < 0:
-        raise RuntimeError("pawl would run off the toothed length at MAX opening")
-    return best, k
+            fit.append((a, k))
+    n = pawl["n_teeth"]
+    if len(fit) < n:
+        raise RuntimeError(f"only {len(fit)} rack notches lie under the pawl block (need {n})")
+    fit = fit[-n:]
+    if fit[0][1] - max(D["pose_teeth"].values()) < 0:
+        raise RuntimeError("inner pawl tooth would run off the toothed length at MAX opening")
+    return [a for a, _ in fit], [k for _, k in fit]
