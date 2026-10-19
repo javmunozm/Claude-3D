@@ -8,7 +8,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.geometry import box as sbox
 
 from .constants import *  # noqa: F401,F403  (this stage turns every constant into a bundle)
-from .mechanisms import pawl_tooth_pts
+from .mechanisms import pawl_tooth_pts, sawtooth_cutter_face
 from .rings import derive, derive_channel, horizontal_chord, rack_bottom_y, rack_line_y, ring_points, vertical_chord
 
 
@@ -38,7 +38,11 @@ def derive_pin(D):
             "z0": -PIN_PROTRUDE, "z1": T_Z + PIN_PROTRUDE}
 
 
-def parameters():
+def parameters(wire=WIRE_D):
+    """`wire` selects a WIRE_VARIANTS entry (bore drawn / reamed / output suffix); only the bores follow it."""
+    if wire not in WIRE_VARIANTS:
+        raise RuntimeError(f"wire Ø {wire} not in WIRE_VARIANTS {sorted(WIRE_VARIANTS)}")
+    bore_d, ream_d, suffix = WIRE_VARIANTS[wire]
     D = derive()
     pin = derive_pin(D)
     D["pin"] = pin
@@ -50,19 +54,23 @@ def parameters():
     # Round 4: squared carriage end = the traced end face at the channel mid-height (DERIVED).
     D["carriage_end_x"] = horizontal_chord(D["carriage_poly"], 0.5 * (ch_y0 + ch_y1))[1]
     bx0 = D["rack_bottom_line"][0]
-    # Teeth: the traced-rack phase (first wall bx0 + margin) continued -X, in whole pitches, into the extension.
+    # Teeth: the traced-rack phase (first wall bx0 + margin) continued -X, in whole pitches, into the extension, but
+    # never under the pin hole (r8 fix R8-12: the first notch wall stays at or +X of the hole's +X edge).
     x0_traced = bx0 + TEETH_START_MARGIN
-    m_ext = int(math.floor((x0_traced - (bx0 - RACK_EXT + TEETH_START_MARGIN)) / TOOTH_PITCH + 1e-9))
+    x_lim = max(bx0 - RACK_EXT + TEETH_START_MARGIN, pin["x"] + pin["hole_d"] / 2.0)
+    m_ext = int(math.floor((x0_traced - x_lim) / TOOTH_PITCH + 1e-9))
     teeth = {"x0": x0_traced - m_ext * TOOTH_PITCH, "x1": TEETH_X_END, "x0_traced": x0_traced, "n_ext": m_ext, "pitch": TOOTH_PITCH, "depth": TOOTH_DEPTH,
              "land": TOOTH_LAND, "eps": TOOTH_CUT_EPS, "hook": TOOTH_HOOK_DEG}
     # C-tip bore cutter: X range of the C-tip chord at the wire height, plus overrun.
     c = D["frame_poly"].intersection(LineString([(140.0, D["wire_y"]), (200.0, D["wire_y"])]))
     cx = [q[0] for g in getattr(c, "geoms", [c]) for q in g.coords]
     # C-tip pad: sleeve from the jaw face at the wire height to just past where the bore's lower edge leaves
-    # the traced arm on the outer (45°) edge.
-    lo = horizontal_chord(D["frame_poly"].intersection(sbox(140, 40, 200, 70)), D["wire_y"] - BORE_D / 2.0)
+    # the traced arm on the outer (45°) edge. Sized from the Ø WIRE_D bore for every variant (user 2026-10-18), so a
+    # variant frame differs from the Ø WIRE_D frame only in its bore.
+    pad_d = WIRE_VARIANTS[WIRE_D][0]
+    lo = horizontal_chord(D["frame_poly"].intersection(sbox(140, 40, 200, 70)), D["wire_y"] - pad_d / 2.0)
     ctip = {"x_entry": min(cx), "x_exit": lo[1] + CTIP_PAD_EXIT_MARGIN,
-            "half_h": BORE_D / 2.0 + CTIP_WALL_MIN + CTIP_PAD_MARGIN, "blend_r": CTIP_PAD_BLEND_R}
+            "half_h": pad_d / 2.0 + CTIP_WALL_MIN + CTIP_PAD_MARGIN, "blend_r": CTIP_PAD_BLEND_R}
     D["ctip"] = ctip
     # Tip gap at wire height = jaw face (x_entry) - crown face on the wire line; must reach TARGET_MAX_GAP at MAX.
     crown_x = horizontal_chord(Polygon(ring_points("l_arm")), D["wire_y"])[1]
@@ -70,20 +78,72 @@ def parameters():
     D["gap_max"] = D["gap_min"] + travel["max"]
     if D["gap_max"] < TARGET_MAX_GAP:
         raise RuntimeError(f"MAX tip gap {D['gap_max']:.3f} < {TARGET_MAX_GAP}: increase RACK_EXT")
-    bore = {"d": BORE_D, "apex_dir": TEARDROP_APEX_DIR, "overrun": BORE_OVERRUN,
+    bore = {"d": bore_d, "wire_d": wire, "ream_d": ream_d, "suffix": suffix,
+            "apex_dir": TEARDROP_APEX_DIR, "overrun": BORE_OVERRUN,
             "ctip_x0": min(cx) - BORE_OVERRUN, "ctip_x1": max(max(cx), ctip["x_exit"]) + BORE_OVERRUN,
             "ctip_chord": (min(cx), max(cx))}
     coup = derive_coupling(D)
     D["hook_outer"] = derive_hook_outer(D, ctip)
-    pawl ={"anchor_x": PAWL_ANCHOR_X, "free_x": PAWL_FREE_X, "slot_w": PAWL_SLOT_W,
-            "window_top_y": PAWL_WINDOW_TOP_Y, "seat_clear": PAWL_SEAT_CLEAR, "tab_w": TAB_W,
-            "tab_bottom_y": TAB_BOTTOM_Y, "pad_x1": PAD_X1, "pad_t": PAD_T, "hook": TOOTH_HOOK_DEG,
-            "n_teeth": PAWL_TEETH, "flex_t": PAWL_FLEX_T, "block_gap": PAWL_BLOCK_GAP, "block_depth": PAWL_BLOCK_DEPTH,
-            "root_r": PAWL_ROOT_R, "root_top_r": PAWL_ROOT_TOP_R,
-            "stop": {"drop": TAB_STOP_DROP, "outer_gap": STOP_OUTER_GAP, "outer_x": STOP_OUTER_X,
-                     "block_w": STOP_BLOCK_W, "outer_h": STOP_OUTER_H, "leg_w": STOP_LEG_W, "beam_t": STOP_BEAM_T,
-                     "fillet_r": STOP_FILLET_R, "leg_x0_in": STOP_LEG_X0_IN, "leg_top_r": STOP_LEG_TOP_R}}
-    return D, travel, chan, teeth, bore, coup, pawl
+    shoe = derive_shoe(D, chan, teeth)
+    return D, travel, chan, teeth, bore, coup, shoe
+
+
+def derive_shoe(D, chan, teeth):
+    """r8 rigid pawl (concept B): shoe, pocket, window, lower block, screw and nut stack, all in the MIN pose, and
+    the build-time arithmetic (flat lands, toothed length at MAX, travel, insertion, carriage end, jam stack)."""
+    _, a_list = sawtooth_cutter_face(lambda x: rack_bottom_y(D, x), teeth["x0"], teeth["x1"], teeth["pitch"],
+                                     teeth["depth"], teeth["land"], teeth["eps"], teeth["hook"])
+    n = PAWL_TEETH
+    k_seat = list(range(len(a_list) - n, len(a_list)))
+    a_seat = [a_list[k] for k in k_seat]
+    if k_seat[0] - D["pose_teeth"]["max"] < 0:
+        raise RuntimeError("inner shoe tooth would run off the toothed length at MAX opening")
+    ys = {round(rack_bottom_y(D, a + dx), 9) for a in a_seat for dx in (-0.5, 0.0, teeth["pitch"])}
+    if len(ys) != 1:
+        raise RuntimeError(f"rack lands under the shoe are not flat: {sorted(ys)}")
+    face = ys.pop()                                   # locked: shoe face on the rack lands, gap 0
+    p, dp, ld, cl = teeth["pitch"], teeth["depth"], teeth["land"], PAWL_SEAT_CLEAR
+    tooth = [pawl_tooth_pts(a, face, p, dp, ld, cl, face - 0.5, teeth["hook"]) for a in a_seat]
+    tooth_h = tooth[0][1][2] - face
+    x0, x1 = a_seat[0] - SHOE_END_MARGIN, a_seat[-1] + (p - ld) + SHOE_END_MARGIN
+    z0, z1 = -SLIDE_CLEAR + SHOE_CLEAR_Z, T_Z + SLIDE_CLEAR - SHOE_CLEAR_Z
+    y_bot = face - (SHOE_ROOF + SHOE_SLOT_Y + SHOE_FLOOR)
+    sx, sz = 0.5 * (x0 + x1), Z_MID
+    slot = {"x0": sx - SHOE_SLOT_X / 2, "x1": sx + SHOE_SLOT_X / 2, "y1": face - SHOE_ROOF,
+            "y0": face - SHOE_ROOF - SHOE_SLOT_Y}
+    travel = face + tooth_h - (chan["y0"] - SHOE_RELEASE_GAP)          # lock -> release, shoe moves -Y
+    pocket = {"x0": x0 - SHOE_CLEAR_X, "x1": x1 + SHOE_CLEAR_X, "z0": -SLIDE_CLEAR, "z1": T_Z + SLIDE_CLEAR,
+              "y0": y_bot - travel - POCKET_INSERT_MARGIN}
+    window = {"x0": pocket["x0"], "x1": pocket["x1"], "y0": pocket["y0"], "y1": chan["y0"] - WINDOW_TOP_BELOW_CHANNEL}
+    jam_top = y_bot - travel - JAM_GAP
+    floor_top = jam_top - NUT_M - WASHER_T
+    floor_bot = floor_top - BLOCK_FLOOR_T
+    head_top = floor_bot - SCREW_AXIAL_PLAY
+    block = {"x0": pocket["x0"] - BLOCK_WALL_X, "x1": pocket["x1"] + BLOCK_WALL_X, "y0": floor_bot}
+    screw = {"x": sx, "z": sz, "d": SCREW_D, "hole_d": SCREW_HOLE_D, "head_top": head_top, "tip": head_top + SCREW_L,
+             "head_d": SCREW_HEAD_D, "head_h": SCREW_HEAD_H}
+    jam = {"top": jam_top, "nut_bot": jam_top - NUT_M, "washer_bot": floor_top, "bore_d": JAM_BORE_D,
+           "bore_y0": floor_top, "bore_y1": max(pocket["y0"], jam_top + JAM_BORE_TOP_CLEAR)}
+    nut_lock = (slot["y1"] - NUT_M, slot["y1"])                       # drive nut on the slot roof (lock)
+    nut_rel = (slot["y0"] - travel, slot["y0"] - travel + NUT_M)       # on the slot floor (release)
+    S = {"a_seat": a_seat, "k_seat": k_seat, "a_list": a_list, "face": face, "teeth": [t[0] for t in tooth],
+         "tooth_h": tooth_h, "x0": x0, "x1": x1, "z0": z0, "z1": z1, "y_bot": y_bot, "slot": slot, "travel": travel,
+         "pocket": pocket, "window": window, "block": block, "screw": screw, "jam": jam, "nut_lock": nut_lock,
+         "nut_rel": nut_rel, "nut_s": NUT_S, "nut_e": NUT_E, "washer_d": WASHER_D, "seat_clear": cl,
+         "engage_lock": screw["tip"] - nut_lock[0], "engage_rel": screw["tip"] - nut_rel[0]}
+    # Arithmetic gates before any geometry.
+    h = (face + tooth_h) - y_bot
+    if h > window["y1"] - window["y0"]:
+        raise RuntimeError(f"shoe height {h:.3f} does not pass the window {window['y1'] - window['y0']:.3f}")
+    if block["x1"] >= D["carriage_end_x"]:
+        raise RuntimeError(f"lower block +X {block['x1']:.3f} passes the carriage end {D['carriage_end_x']:.4f}")
+    if not (0.0 < S["engage_lock"] <= NUT_M and S["engage_rel"] > S["engage_lock"]):
+        raise RuntimeError(f"screw engagement lock {S['engage_lock']:.3f} / release {S['engage_rel']:.3f}")
+    if screw["tip"] >= slot["y1"] - travel:
+        raise RuntimeError(f"screw tip {screw['tip']:.3f} reaches the released slot roof {slot['y1'] - travel:.3f}")
+    if NUT_E >= JAM_BORE_D or not (slot["x1"] - slot["x0"] > NUT_S):
+        raise RuntimeError("nut does not fit the jam bore / the shoe slot")
+    return S
 
 
 def hook_wire_clear(D, region, x_exit):
@@ -180,20 +240,3 @@ def derive_coupling(D):
     return {"hx": hx, "x_min": x_min, "lug": lug, "head": head, "socket": sock, "finger": fin, "hook": hook,
             "notch": notch, "bar": bar, "seat": seat}
 
-
-def seat_notch(a_list, pawl, D):
-    """The notches the pawl teeth sit in at MIN opening (r7: the n_teeth right-most ones whose tooth fits on the
-    block), inner first. Returns (a list, k list)."""
-    fit = []
-    for k, a in enumerate(a_list):
-        _, (xl, xr, _) = pawl_tooth_pts(a, rack_bottom_y(D, a), TOOTH_PITCH, TOOTH_DEPTH, TOOTH_LAND,
-                                        pawl["seat_clear"], 0.0, pawl["hook"])
-        if xl > pawl["anchor_x"] + 2.0 and xr <= pawl["free_x"] - PAWL_TOOTH_MARGIN:
-            fit.append((a, k))
-    n = pawl["n_teeth"]
-    if len(fit) < n:
-        raise RuntimeError(f"only {len(fit)} rack notches lie under the pawl block (need {n})")
-    fit = fit[-n:]
-    if fit[0][1] - max(D["pose_teeth"].values()) < 0:
-        raise RuntimeError("inner pawl tooth would run off the toothed length at MAX opening")
-    return [a for a, _ in fit], [k for _, k in fit]

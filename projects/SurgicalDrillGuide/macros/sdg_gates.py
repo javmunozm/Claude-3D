@@ -26,25 +26,41 @@ import surgical_drill_guide as sdg  # noqa: E402  (guarded: importing does not e
 
 from build123d import import_step  # noqa: E402
 
-D, TRAVEL, CHAN, TEETH, BORE, COUP, PAWL = sdg.parameters()
+import argparse  # noqa: E402
+
+_ap = argparse.ArgumentParser(description="SurgicalDrillGuide gates on the exported files of one wire variant.")
+_ap.add_argument("--wire", type=float, default=sdg.WIRE_D, choices=sorted(sdg.WIRE_VARIANTS),
+                 help="wire variant (default 3.0); the bored parts and assemblies are read with its suffix")
+WIRE = _ap.parse_args().wire
+D, TRAVEL, CHAN, TEETH, BORE, COUP, SHOE = sdg.parameters(WIRE)
+R_WIRE, R_REAM, R_DRAWN = BORE["wire_d"] / 2, BORE["ream_d"] / 2, BORE["d"] / 2
+R_CTRL = R_DRAWN + 0.15                           # control ray radius: outside the drawn bore (must hit)
+print(f"WIRE VARIANT Ø{WIRE}: bore drawn Ø{BORE['d']} reamed Ø{BORE['ream_d']}; files "
+      f"{sdg.part_path('main_frame', 'stl', sdg.variant_suffix('main_frame', WIRE)).name}, "
+      f"{sdg.part_path('l_arm_slider', 'stl', sdg.variant_suffix('l_arm_slider', WIRE)).name}, assemblies "
+      f"suffix '{sdg.variant_suffix('assembly_min', WIRE)}'")
+
+
+def ppath(name, ext):
+    return sdg.part_path(name, ext, sdg.variant_suffix(name, WIRE))
+
+
 LUG, HEAD, SOCK, FIN, HOOK, NOTCH, BAR = (COUP[k] for k in ("lug", "head", "socket", "finger", "hook", "notch", "bar"))
 WY = D["wire_y"]
 ZM = sdg.Z_MID
 PIN = D["pin"]
 CT = D["ctip"]
-PARTS = ["main_frame", "l_arm_slider", "handle", "end_stop_pin"]
-from sdg_model.parts.l_arm_slider import pawl_layout  # noqa: E402  (r7: the builder's own layout, probe origins only)
+PARTS = list(sdg.PART_NAMES)
 from sdg_model.rings import rack_flat_poly  # noqa: E402
 A_LIST = sdg.rack_notches(D, TEETH)
-A_SEATS, K_SEATS = sdg.seat_notch(A_LIST, PAWL, D)
-LAY = pawl_layout(D, CHAN, PAWL, A_SEATS)
+A_SEATS, K_SEATS = SHOE["a_seat"], SHOE["k_seat"]   # r8: probe origins only
 Y0 = CHAN["y0"]
 PITCH = TEETH["pitch"]
 XF = HEAD["x0"]                                   # r7 handle flat plane = head -X face
 
 
 def load(name):
-    return trimesh.load(str(sdg.part_path(name, "stl")), force="mesh")
+    return trimesh.load(str(ppath(name, "stl")), force="mesh")
 
 
 def hits_along(mesh, origin, direction):
@@ -173,11 +189,11 @@ def bore_wall(mesh, x_in, x_out, step=0.25, n_perim=48, y=None, z=None):
     z = ZM if z is None else z
     cen = mesh.triangles_center
     span = (cen[:, 0] > x_in + 1e-3) & (cen[:, 0] < x_out - 1e-3)
-    td = teardrop_poly(y, z, sdg.BORE_D, grow=0.02)
+    td = teardrop_poly(y, z, BORE["d"], grow=0.02)
     on_bore = shapely.contains_xy(td, cen[:, 1], cen[:, 2])
     idx = np.where(span & ~on_bore)[0]
     sub = mesh.submesh([idx], append=True)
-    per = teardrop_poly(y, z, sdg.BORE_D).exterior
+    per = teardrop_poly(y, z, BORE["d"]).exterior
     ring = [per.interpolate(per.length * k / n_perim) for k in range(n_perim)]
     xs = np.arange(x_in + step, x_out - step + 1e-9, step)
     pts = np.array([[x, p.x, p.y] for x in xs for p in ring])
@@ -191,7 +207,7 @@ print("=" * 100)
 print("GATE 1: per-part solid validity (STEP on disk) and STL topology")
 meshes = {}
 for name in PARTS:
-    st = import_step(str(sdg.part_path(name, "step")))
+    st = import_step(str(ppath(name, "step")))
     sols = st.solids()
     m = load(name)
     meshes[name] = m
@@ -202,7 +218,7 @@ for name in PARTS:
           f"(sealed voids {n_void}) vol {m.volume:10.2f} euler {m.euler_number} faces {len(m.faces)}")
     b = m.bounds
     print(f"  {'':13s} bbox X {b[0][0]:.3f}..{b[1][0]:.3f}  Y {b[0][1]:.3f}..{b[1][1]:.3f}  Z {b[0][2]:.3f}..{b[1][2]:.3f}")
-fr, sl, hd, pn = (meshes[k] for k in PARTS)
+fr, sl, hd, pn, sh = (meshes[k] for k in PARTS)
 
 # Z layout of the slider (user decision: one 16.6 slab)
 for x, lab in ((65.0, "riser"), (100.0, "top bar"), (136.5, "crown")):
@@ -237,11 +253,12 @@ for tag, mesh, xa, xb in (("slider wire bore", sl, D["wire_x0"] - 10, D["wire_x1
     for (x0, x1, lab) in ((xa, xb, "+X"), (xb, xa, "-X")):
         axis_hits = hits_along(mesh, np.array([x0, WY, ZM]), [np.sign(x1 - x0), 0, 0])
         axis_hits = axis_hits[(axis_hits > 0) & (axis_hits < abs(x1 - x0))]
-        r15, _ = wire_rays(mesh, x0, x1, sdg.WIRE_D / 2)
-        r16, _ = wire_rays(mesh, x0, x1, sdg.REAM_D / 2)
-        r17, per17 = wire_rays(mesh, x0, x1, 1.85)
-        print(f"  {tag:18s} dir {lab}: axis-ray hits {len(axis_hits)}; r 1.50 (Ø3.0) hits {r15}; r 1.60 (Ø3.2) hits {r16};"
-              f" control r 1.85 hits {r17} ({sum(1 for q in per17 if q)}/16 rays)")
+        r15, _ = wire_rays(mesh, x0, x1, R_WIRE)
+        r16, _ = wire_rays(mesh, x0, x1, R_REAM)
+        r17, per17 = wire_rays(mesh, x0, x1, R_CTRL)
+        print(f"  {tag:18s} dir {lab}: axis-ray hits {len(axis_hits)}; r {R_WIRE:.3f} (wire Ø{2 * R_WIRE:.1f}) hits {r15}; "
+              f"r {R_REAM:.3f} (reamed Ø{2 * R_REAM:.1f}) hits {r16}; control r {R_CTRL:.3f} (drawn r {R_DRAWN:.3f} + 0.15) "
+              f"hits {r17} ({sum(1 for q in per17 if q)}/16 rays)")
 yc = 0.5 * (CHAN["y0"] + CHAN["y1"])
 h = hits_along(sl, np.array([D["collar_x0"] - 5, yc, ZM]), [1, 0, 0])
 h = h[(h > 0) & (h < D["carriage_x1"] - D["collar_x0"] + 10)]
@@ -266,7 +283,7 @@ boss_zone = unary_union([box2(LUG["x0"] - LUG["r"] - 0.5, FIN["x1"] + FIN["r"] +
                                D["bar_bottom_at_axis"] + 0.3),                       # round 6 lug + finger
                           box2(BAR["x0"] - 0.05, BAR["x_hook"] + 2 * BAR["blend_r"], -1.0, BAR["y_top"] + 3 * BAR["blend_r"])])
 pad_zone = box2(CT["x_entry"] - 0.3, CT["x_exit"] + 0.3, WY - CT["half_h"] - CT["blend_r"] - 1, WY + CT["half_h"] + CT["blend_r"] + 1)
-bore_zone = box2(BORE["ctip_x0"], BORE["ctip_x1"], WY - sdg.BORE_D / 2 - 0.3, WY + sdg.BORE_D / 2 + 0.3)
+bore_zone = box2(BORE["ctip_x0"], BORE["ctip_x1"], WY - BORE["d"] / 2 - 0.3, WY + BORE["d"] / 2 + 0.3)
 bx0 = D["rack_bottom_line"][0]
 ext_zone = box2(D["rack_tip_x"] - 1.0, bx0 + 0.6, -12, 1.0)
 HO = D["hook_outer"]
@@ -422,21 +439,18 @@ print(f"  C-tip PAD deviation (STL Z=1 vs ring): added {added.area:.2f} mm2 in {
 
 la, co, ca = ring_poly("l_arm"), ring_poly("collar"), ring_poly("carriage")
 chan_zone = box2(D["collar_x0"] - 1, D["carriage_x1"] + 1, CHAN["y0"] - 0.3, CHAN["y1"] + 0.3)
-ST = PAWL["stop"]
-beam_bot = LAY["beam_top"] - ST["beam_t"]
 y_fl_ = CHAN["y0"] - sdg.CARRIAGE_FLOOR
-# r7 pawl zone: flexure, block, 4 teeth, tab, pad, two-point stop, and the 45° root bevel that reaches
-# (y_fb - y_floor) to the -X of the anchor into the traced carriage/collar corner.
-pawl_zone = box2(PAWL["anchor_x"] - (LAY["y_fb"] - y_fl_) - 0.5, max(D["carriage_x1"], LAY["leg_x1"]) + 0.5, beam_bot - 1.0,
-                 PAWL["window_top_y"] + 0.3)
+_BK = SHOE["block"]
+# r8 lower block zone: block, shoe pocket, window, jam bore and screw hole (all below the channel floor).
+shoe_zone = box2(_BK["x0"] - 0.5, _BK["x1"] + 0.5, _BK["y0"] - 0.5, CHAN["y0"] + 0.3)
 _sec5s = section_poly(sl, ZM)
-print(f"  r7 PAWL ZONE (excluded from the slider outline survival): X {pawl_zone.bounds[0]:.3f}..{pawl_zone.bounds[2]:.3f}"
-      f" Y {pawl_zone.bounds[1]:.3f}..{pawl_zone.bounds[3]:.3f}, area {pawl_zone.area:.2f} mm2; in it at Z 5 the STL "
-      f"adds {_sec5s.intersection(pawl_zone).difference(unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')])).area:.2f}"
-      f" mm2 and removes {unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')]).intersection(pawl_zone).difference(_sec5s).area:.2f} mm2 of traced material")
+print(f"  r8 BLOCK ZONE (excluded from the slider outline survival): X {shoe_zone.bounds[0]:.3f}..{shoe_zone.bounds[2]:.3f}"
+      f" Y {shoe_zone.bounds[1]:.3f}..{shoe_zone.bounds[3]:.3f}, area {shoe_zone.area:.2f} mm2; in it at Z 5 the STL "
+      f"adds {_sec5s.intersection(shoe_zone).difference(unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')])).area:.2f}"
+      f" mm2 and removes {unary_union([ring_poly('l_arm'), ring_poly('collar'), ring_poly('carriage')]).intersection(shoe_zone).difference(_sec5s).area:.2f} mm2 of traced material")
 ctop_zone = box2(D["carriage_x0"] - 0.5, D["carriage_x1"] + 0.5, D["carriage_y1"] - 1.2,
                  CHAN["y1"] + sdg.CARRIAGE_TOP_WALL + 0.3)
-slbore_zone = box2(D["wire_x0"] - 1, D["wire_x1"] + 1, WY - sdg.BORE_D / 2 - 0.3, WY + sdg.BORE_D / 2 + 0.3)
+slbore_zone = box2(D["wire_x0"] - 1, D["wire_x1"] + 1, WY - BORE["d"] / 2 - 0.3, WY + BORE["d"] / 2 + 0.3)
 junction_zone = box2(D["riser_x0"] - 1.5, D["riser_x1"] + 1.5, D["riser_base_y"] - 2, D["riser_base_y"] + 0.6)
 allL = unary_union([la, co, ca])
 # Round 4 designed zones: the thickened floor (CARRIAGE_FLOOR) and the squared/trimmed +X end.
@@ -444,8 +458,8 @@ floor_zone = box2(D["carriage_x0"] - 2.0, D["carriage_x1"] + 0.5, CHAN["y0"] - s
                   D["carriage_bottom_max"] + 0.3)
 end_zone = box2(D["carriage_end_x"] - 1.2, D["carriage_x1"] + 0.5, CHAN["y0"] - sdg.CARRIAGE_FLOOR - 0.3,
                 CHAN["y1"] + sdg.CARRIAGE_TOP_WALL + 0.3)
-for z, ex in ((-2.0, [pawl_zone, junction_zone]), (1.0, [chan_zone, pawl_zone, junction_zone]),
-              (ZM, [chan_zone, pawl_zone, junction_zone, slbore_zone]), (12.0, [pawl_zone, junction_zone])):
+for z, ex in ((-2.0, [shoe_zone, junction_zone]), (1.0, [chan_zone, shoe_zone, junction_zone]),
+              (ZM, [chan_zone, shoe_zone, junction_zone, slbore_zone]), (12.0, [shoe_zone, junction_zone])):
     outline_survival(f"l_arm_slider Z={z} vs L∪collar∪carriage", allL, section_poly(sl, z),
                      ex + [ctop_zone, floor_zone, end_zone])
 # CARRIAGE FLOOR / END (round 4): wall below the channel floor on vertical rays at Z 5, and the end face X
@@ -454,16 +468,15 @@ for x in (70.5, 72.0, 72.3, 73.0, 80.0, 90.0, 95.5, 100.0, 103.0, 106.0, 106.45,
     yy = 10.0 - hits_along(sl, np.array([x, 10.0, ZM]), [0, -1, 0])
     yy = yy[yy < CHAN["y0"] + 0.01]
     fl.append(f"X {x}: {yy[0] - yy[1]:.3f}" if len(yy) > 1 else f"X {x}: -")
-print(f"  carriage FLOOR under the channel (vertical rays, Z 5; tongue X {PAWL['anchor_x']}..{PAWL['free_x']}, leg "
-      f"{LAY['leg_x0']:.1f}..{LAY['leg_x1']:.1f} continue down): " + "; ".join(fl))
-# Round 5: rays cover the stop leg too (beam bottom up to the top wall), so a leg face behind the end shows.
-# r7 reinforce: rows above the floor underside must read the carriage end (lock), rows below it the leg's +X face.
-y_floor = CHAN["y0"] - sdg.CARRIAGE_FLOOR
+print(f"  carriage FLOOR under the channel (vertical rays, Z 5, first wall below the channel; the pocket X "
+      f"{SHOE['pocket']['x0']:.3f}..{SHOE['pocket']['x1']:.3f} reads the pocket bottom wall): " + "; ".join(fl))
+# Rows above the floor underside must read the carriage end (lock); rows below it the lower block's +X face.
+y_floor = y_fl_
 
 
 def end_rows(m):
     up, lo = [], []
-    for yy in np.linspace(beam_bot + 0.05, CHAN["y1"] + sdg.CARRIAGE_TOP_WALL - 0.05, 41):
+    for yy in np.linspace(_BK["y0"] + 0.05, CHAN["y1"] + sdg.CARRIAGE_TOP_WALL - 0.05, 41):
         for zz in (-3.0, 12.9):
             h = 130.0 - first_hit(m, np.array([130.0, yy, zz]), [-1, 0, 0])
             (lo if yy < y_floor - 0.01 else up).append(h)
@@ -471,10 +484,10 @@ def end_rows(m):
 
 
 _up, _lo = end_rows(sl)
-print(f"  carriage +X END face (41 rows Y {beam_bot + 0.05:.2f}..{CHAN['y1'] + sdg.CARRIAGE_TOP_WALL - 0.05:.2f}, "
+print(f"  carriage +X END face (41 rows Y {_BK['y0'] + 0.05:.2f}..{CHAN['y1'] + sdg.CARRIAGE_TOP_WALL - 0.05:.2f}, "
       f"Z -3 / 12.9): rows at/above the floor underside {y_floor:.3f} X {_up.min():.4f}..{_up.max():.4f} (lock "
-      f"{D['carriage_end_x']:.4f}; max dev {np.abs(_up - D['carriage_end_x']).max():.5f}); leg rows below it X "
-      f"{_lo.min():.4f}..{_lo.max():.4f} (design leg +X {LAY['leg_x1']:.4f}; traced max {D['carriage_x1']:.3f})")
+      f"{D['carriage_end_x']:.4f}; max dev {np.abs(_up - D['carriage_end_x']).max():.5f}); block rows below it X "
+      f"{_lo.min():.4f}..{_lo.max():.4f} (design block +X {_BK['x1']:.4f})")
 _slc = sl.copy()
 _slc.apply_translation([0.1, 0, 0])
 _cu, _ = end_rows(_slc)
@@ -552,7 +565,7 @@ def first_hits_x(mesh, origins, d):
 
 
 print("=" * 100)
-print("GATE 3b: r7 handle -X flat and pawl flexure (measured on the part STLs)")
+print("GATE 3b: r7 handle -X flat; r8 shoe, pocket, window and jam bore (measured on the part STLs)")
 
 
 def flat_rays(h_mesh):
@@ -592,88 +605,33 @@ for g in sorted(_g, key=lambda q: -hd.area_faces[np.asarray(q)].sum()):
     print(f"    area {hd.area_faces[g].sum():8.2f} mm2  Y {tq[:, 1].min():8.3f}..{tq[:, 1].max():8.3f}  "
           f"Z {tq[:, 2].min():7.3f}..{tq[:, 2].max():7.3f}")
 
-# Flexure (unplaced slider STL, section Z 5): thickness on vertical chords, free length from the underside corners
-_ss = section_poly(sl, ZM)
-_ts = []
-for x in np.arange(PAWL["anchor_x"] + 0.5, LAY["xb"] - 0.4, 0.5):
-    c = [s for s in chord_iv(_ss, x) if abs(s[1] - Y0) < 0.01]
-    _ts.append(c[0][1] - c[0][0] if c else np.nan)
-_ts = np.array(_ts)
-_tm = float(np.nanmedian(_ts))
-_sv = np.array([q for g in getattr(_ss, "geoms", [_ss]) for q in g.exterior.coords])
-_cor = _sv[(np.abs(_sv[:, 1] - (Y0 - _tm)) < 1e-4) & (_sv[:, 0] > PAWL["anchor_x"] - 0.6) & (_sv[:, 0] < LAY["xb"] + 0.6)]
-print(f"  FLEXURE (slider STL Z 5): t {np.nanmin(_ts):.4f}..{np.nanmax(_ts):.4f} on {len(_ts)} chords X "
-      f"{PAWL['anchor_x'] + 0.5:.1f}..{LAY['xb'] - 0.5:.2f} (design {PAWL['flex_t']}); underside corners X "
-      + ", ".join(f"{q:.3f}" for q in sorted(set(np.round(_cor[:, 0], 3)))) +
-      f" -> free length {_cor[:, 0].max() - _cor[:, 0].min():.4f}")
-
-
-# r7 fixes D1 / 1h / D2 (slider STL, section Z 5). Concave-radius test = morphological closing at r - 0.01 (chord
-# sag of the tessellated arc): a concave corner of radius < r adds area. Each test has a control that rebuilds the
-# defect it guards against (the old 45° bevel V; a square beam-leg corner) and must add area.
-def hchord_iv(poly, y):
-    g = poly.intersection(shapely.LineString([(-300, y), (300, y)]))
-    segs = [s for s in getattr(g, "geoms", [g]) if s.length > 0]
-    return sorted((min(c[0] for c in s.coords), max(c[0] for c in s.coords)) for s in segs)
-
-
-def closing_added(poly, r):
-    return poly.buffer(r, quad_segs=64).buffer(-r, quad_segs=64).difference(poly).area
-
-
-_rf, _yfb, _px0 = LAY["root"], LAY["y_fb"], PAWL["anchor_x"]
-_wr = box2(_rf["wall"][0] - 1.0, _rf["x_end"] + 1.0, y_fl_ - 0.6, Y0 - 0.3)
-_ar = _ss.intersection(_wr)
-_old_v = shapely.Polygon([(_px0, _yfb), (_px0 + 1.0, _yfb), (_px0 + 1.0, y_fl_), (_px0 - (_yfb - y_fl_), y_fl_)])
-_rt = PAWL["root_r"] - 0.01
-_fe = [q[0] for q in _sv if abs(q[1] - _yfb) < 1e-4 and _px0 - 1.0 < q[0] < LAY["xb"] - 1.0]
-print(f"  FLEXURE ROOT (Z 5, window X {_wr.bounds[0]:.2f}..{_wr.bounds[2]:.2f} Y {_wr.bounds[1]:.2f}..{_wr.bounds[3]:.2f}):"
-      f" closing at r {_rt:.2f} adds {closing_added(_ar, _rt):.5f} mm2 (must be < 0.002); CONTROL old 45° bevel V: "
-      f"{closing_added(_ar.difference(_old_v), _rt):.5f} mm2 (must be > 0.002); underside ends at X {min(_fe):.3f} -> "
-      f"free length to the block X {LAY['xb']:.3f}: {LAY['xb'] - min(_fe):.4f} (design {LAY['free_len']:.4f}); no "
-      f"material at Y >= {Y0}: {_ss.intersection(box2(_wr.bounds[0], _wr.bounds[2], Y0 + 1e-3, Y0 + 0.3)).area:.5f} mm2")
-_lx0 = LAY["leg_x0"]
-_xm = 0.5 * (LAY["inner_x"] + LAY["outer_x"] - ST["block_w"])
-_bm = [s for s in chord_iv(_ss, _xm) if s[1] < LAY["beam_top"] + 0.01]
-_lg = {yy: [s for s in hchord_iv(_ss, yy) if s[1] > PAWL["pad_x1"] + 0.01] for yy in (LAY["pad_bot"] + 1.5,
-                                                                                         LAY["beam_top"] + 2.0)}
-_pd = [s for s in hchord_iv(_ss, LAY["pad_bot"] + 1.5) if LAY["inner_x"] - 5.0 < s[1] <= PAWL["pad_x1"] + 0.01]
-# window between the outer stop block's +X face and the leg (excludes the block's own square foot)
-_ws = box2(0.5 * (LAY["outer_x"] + _lx0 - ST["fillet_r"]), _lx0 + 1.0, beam_bot - 0.5, LAY["beam_top"] + 2.5)
-_as = _ss.intersection(_ws)
-_fr = ST["fillet_r"] - 0.01
-print(f"  STOP BEAM / LEG / PAD (Z 5): beam Y {_bm[-1][0]:.3f}..{_bm[-1][1]:.3f} at X {_xm:.2f} -> t {_bm[-1][1] - _bm[-1][0]:.4f}"
-      f" (design {ST['beam_t']}); leg X " + "; ".join(f"{v[-1][0]:.3f}..{v[-1][1]:.3f} = {v[-1][1] - v[-1][0]:.4f} at Y {k:.2f}"
-                                                   for k, v in _lg.items()) +
-      f" (design {ST['leg_w']}: X {LAY['leg_x0']:.3f}..{LAY['leg_x1']:.3f}; carriage end {D['carriage_end_x']:.4f}); pad X {_pd[0][0]:.3f}..{_pd[-1][1]:.3f} at Y "
-      f"{LAY['pad_bot'] + 1.5:.2f} (design {LAY['pad_x0']:.3f}..{PAWL['pad_x1']}; inner stop X {LAY['inner_x'] - ST['block_w']:.3f}"
-      f"..{LAY['inner_x']:.3f}); pad -> leg gap {_lg[LAY['pad_bot'] + 1.5][-1][0] - _pd[-1][1]:.4f}")
-print(f"  BEAM-LEG CORNER: closing at r {_fr:.2f} adds {closing_added(_as, _fr):.5f} mm2 (must be < 0.002); CONTROL square "
-      f"corner: {closing_added(_as.union(box2(_lx0 - ST['fillet_r'], _lx0 + 0.1, LAY['beam_top'] - 0.1, LAY['beam_top'] + ST['fillet_r'])), _fr):.5f}"
-      f" mm2 (must be > 0.002)")
-# r7 reinforce: leg-top fillet (leg -X face x floor underside) and the flexure root's top-side fillet (outer Z bands).
-_rl = ST["leg_top_r"]
-_wl = box2(_lx0 - _rl - 0.6, _lx0 + 0.8, y_fl_ - _rl - 1.0, y_fl_ + 0.8)
-_al = _ss.intersection(_wl)
-print(f"  LEG-TOP CORNER (Z 5, X {_wl.bounds[0]:.2f}..{_wl.bounds[2]:.2f} Y {_wl.bounds[1]:.2f}..{_wl.bounds[3]:.2f}): closing "
-      f"at r {_rl - 0.01:.2f} adds {closing_added(_al, _rl - 0.01):.5f} mm2 (must be < 0.002); CONTROL square corner: "
-      f"{closing_added(_al.union(box2(_lx0 - _rl, _lx0 + 0.1, y_fl_ - _rl, y_fl_ + 0.1)), _rl - 0.01):.5f} mm2 (must be > 0.002)"
-      f"; chord at Y {y_fl_ - 0.05:.3f}: X from {[s for s in hchord_iv(_ss, y_fl_ - 0.05) if s[1] > _lx0][0][0]:.3f}")
-_r2 = PAWL["root_top_r"]
-_zb = 0.5 * ((-sdg.SLIDE_CLEAR - sdg.WRAP_WALL_Z) - sdg.SLIDE_CLEAR)
-_wt = box2(_px0 - 0.7, _px0 + _r2 + 0.6, Y0 - 0.6, Y0 + _r2 + 0.7)
-for _z in (_zb, sdg.T_Z - _zb):
-    _sz = section_poly(sl, _z)
-    _at = _sz.intersection(_wt)
-    _tv = [q[0] for g in getattr(_at, "geoms", [_at]) for q in g.exterior.coords
-           if abs(q[1] - Y0) < 1e-4 and q[0] > _px0 - 0.01]
-    _sq = _at.difference(box2(_px0 + 1e-4, _px0 + _r2, Y0 + 1e-4, Y0 + _r2)).union(box2(_wt.bounds[0], _px0, Y0, _wt.bounds[3]))
-    print(f"  FLEXURE ROOT TOP (Z {_z:.2f}, outer band): closing at r {_r2 - 0.01:.2f} adds {closing_added(_at, _r2 - 0.01):.5f} mm2 "
-          f"(must be < 0.002); CONTROL square step: {closing_added(_sq, _r2 - 0.01):.5f} mm2 (must be > 0.002); top face starts at "
-          f"X {min(_tv):.3f} -> outer-band free length {LAY['xb'] - max(min(_tv), min(_fe)):.4f} (design {LAY['free_len_outer']:.4f})")
-_cz = section_poly(sl, ZM).intersection(_wt)
-print(f"  FLEXURE ROOT TOP centre band (Z {ZM}): material at Y >= {Y0:.3f} in the window {_cz.intersection(box2(_wt.bounds[0], _wt.bounds[2], Y0 + 1e-3, _wt.bounds[3])).area:.5f} mm2 "
-      f"(must be 0); below it {_cz.area:.4f} mm2 (full window strip {(_wt.bounds[2] - _wt.bounds[0]) * 0.6:.4f})")
+# r8 shoe (STL): nut slot = the interior of the Z 5 section; screw hole on rays from inside it (teardrop apex +Z).
+_sh5 = section_poly(sh, ZM)
+_sx, _ym = SHOE["screw"]["x"], SHOE["y_bot"] + 0.5 * sdg.SHOE_FLOOR
+_sly = 0.5 * (SHOE["slot"]["y0"] + SHOE["slot"]["y1"])          # probe height only
+_slx = [s for s in sorted(
+    (min(c[0] for c in q.coords), max(c[0] for c in q.coords))
+    for q in getattr(_sh5.intersection(shapely.LineString([(0, _sly), (200, _sly)])), "geoms", []))]
+_sv = SHOE["y_bot"] - 5.0 + hits_along(sh, np.array([_sx + 4.0, SHOE["y_bot"] - 5.0, ZM]), [0, 1, 0])
+_hol = [box2(_slx[0][1], _slx[1][0], _sv[1], _sv[2])] if len(_slx) == 2 and len(_sv) == 4 else []
+_hy = SHOE["y_bot"] - 5.0
+_hh = _hy + hits_along(sh, np.array([_sx, _hy, ZM]), [0, 1, 0])
+_td = {lab: first_hit(sh, np.array([_sx, _ym, ZM]), d_) for lab, d_ in (("+Z", [0, 0, 1]), ("-Z", [0, 0, -1]),
+                                                                        ("+X", [1, 0, 0]), ("-X", [-1, 0, 0]))}
+print(f"  SHOE (STL): bbox X {sh.bounds[0][0]:.3f}..{sh.bounds[1][0]:.3f} Y {sh.bounds[0][1]:.4f}..{sh.bounds[1][1]:.4f} Z "
+      f"{sh.bounds[0][2]:.3f}..{sh.bounds[1][2]:.3f}; nut slot (Z 5 section interior) "
+      + ", ".join(f"X {p.bounds[0]:.3f}..{p.bounds[2]:.3f} ({p.bounds[2] - p.bounds[0]:.3f}) Y {p.bounds[1]:.3f}.."
+                  f"{p.bounds[3]:.3f} ({p.bounds[3] - p.bounds[1]:.3f})" for p in _hol)
+      + f"; axis ray (X {_sx:.3f}, Z 5) surfaces Y {np.round(_hh, 3).tolist()}; screw hole from its centre: "
+      + ", ".join(f"{k_} {v_:.3f}" for k_, v_ in _td.items()) + " (teardrop: +Z = r*sqrt2)")
+_sl5 = section_poly(sl, ZM)
+_pk = SHOE["pocket"]
+for _x in (0.5 * (_pk["x0"] + SHOE["x0"]), _sx + 5.0):
+    print(f"  SLIDER vertical rays X {_x:.3f} Z 5 (pocket, jam bore, floor): surfaces Y "
+          f"{np.round(-60.0 + hits_along(sl, np.array([_x, -60.0, ZM]), [0, 1, 0]), 3).tolist()[:8]}")
+for _y in (0.5 * (SHOE["window"]["y0"] + SHOE["window"]["y1"]), 0.5 * (SHOE["jam"]["bore_y0"] + SHOE["jam"]["bore_y1"])):
+    print(f"  SLIDER rays along -Z at Y {_y:.3f} (window / jam bore), X {_sx:.3f}: surfaces Z "
+          f"{np.round(30.0 - hits_along(sl, np.array([_sx, _y, 30.0]), [0, 0, -1]), 3).tolist()}")
 
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
@@ -743,13 +701,16 @@ print(f"  rack height at the pin X: {PIN['y_top'] - yb(PIN['x']):.3f} (top {PIN[
 # ═════════════════════════════════════════════════════════════════════════════
 print("=" * 100)
 print("GATE 5: assembly at MIN / MID / MAX (measured on the written assembly STLs)")
-print(f"  r7 ratchet: {len(A_LIST)} notches, pitch {PITCH}; pawl teeth in notches {K_SEATS} at MIN (a "
-      + ", ".join(f"{a:.3f}" for a in A_SEATS) + f"); block start X {LAY['xb']:.3f}, inner tooth face {LAY['x_in']:.3f}")
+print(f"  r8 shoe: {len(A_LIST)} notches, pitch {PITCH}; shoe teeth in notches {K_SEATS} at MIN (a "
+      + ", ".join(f"{a:.3f}" for a in A_SEATS) + f"); face Y {SHOE['face']:.4f}, release travel {SHOE['travel']:.4f}")
+HW = {k_: load(k_) for k_ in sdg.HW_NAMES}
+print("  hardware clearance volumes (STL): " + "; ".join(f"{k_} watertight {m_.is_watertight} vol {m_.volume:.1f}"
+                                                         for k_, m_ in HW.items()))
 
 
-def pawl_teeth(sec_s, t):
-    """The pawl material above the tongue top (Y0) over the block, as separate tooth polygons sorted by X."""
-    g = sec_s.intersection(box2(LAY["xb"] - t - 0.1, PAWL["free_x"] - t + 0.1, Y0 + 1e-4, Y0 + 3.0))
+def shoe_teeth(sec_h, face):
+    """The shoe material above its face (probe height from the bundle), as tooth polygons sorted by X."""
+    g = sec_h.intersection(box2(-300.0, 300.0, face + 1e-4, face + 3.0))
     return sorted([q for q in getattr(g, "geoms", [g]) if q.area > 1e-3], key=lambda q: q.bounds[0])
 
 
@@ -759,7 +720,7 @@ def hline(poly, y, x0, x1):
                   for s in getattr(g, "geoms", [g]) if s.length > 0)
 
 
-def swept_hit(teeth_u, rack_w, drop, sgn, n=131):
+def swept_hit(teeth_u, rack_w, drop, sgn, n=141):
     """Max overlap area of the teeth lowered by `drop` and moved sgn*X by s in 0..PITCH (+0.3) against the rack."""
     return max(affinity.translate(teeth_u, sgn * s, -drop).intersection(rack_w).area
                for s in np.linspace(0.0, PITCH + 0.3, n))
@@ -781,9 +742,13 @@ def inter(a, b):
         return f"ERR {e}"
 
 
-def moved(m, dx=0.0, dy=0.0):
+def fmt(v):
+    return v if isinstance(v, str) else f"{v:.6f}"
+
+
+def moved(m, dx=0.0, dy=0.0, dz=0.0):
     c = m.copy()
-    c.apply_translation([dx, dy, 0.0])
+    c.apply_translation([dx, dy, dz])
     return c
 
 
@@ -863,39 +828,42 @@ def coupling_gates(frame_c, slider_c, handle_c, t):
 
 
 for pose, t in TRAVEL.items():
-    A = trimesh.load(str(sdg.part_path(f"assembly_{pose}", "stl")), force="mesh")
+    A = trimesh.load(str(ppath(f"assembly_{pose}", "stl")), force="mesh")
     # Round 4: the seated collar shares its r 11 edge circle with the boss face, so loading the assembly STL merges
     # frame and handle vertices there and split() can no longer separate the parts (it returned 5 non-volume
     # components). The parts are therefore the per-part STLs placed by the macro's own slider_at() transform (same
     # datum as the assembly export); the assembly STL on disk is cross-checked against them (volume + rays).
     frame_c, handle_c, pin_c = load("main_frame"), load("handle"), load("end_stop_pin")
     loc_ = sdg.slider_at(sdg.Solid.make_box(1, 1, 1), t).location.position
-    slider_p = load("l_arm_slider")
-    slider_p.apply_translation([loc_.X, loc_.Y, loc_.Z])
+    slider_p, shoe_c = load("l_arm_slider"), load("shoe")
+    for m_ in (slider_p, shoe_c):
+        m_.apply_translation([loc_.X, loc_.Y, loc_.Z])
+    hw_c = {k_: moved(v_, dx=loc_.X) for k_, v_ in HW.items()}
     rest = [slider_p]
-    P_ = trimesh.util.concatenate([frame_c, slider_p, handle_c, pin_c])
+    P_ = trimesh.util.concatenate([frame_c, slider_p, handle_c, pin_c, shoe_c] + list(hw_c.values()))
     xr = [bool(np.allclose(hits_along(A, o_, [0, 1, 0]), hits_along(P_, o_, [0, 1, 0]), atol=1e-3))
           for o_ in [np.array([x_ - t, -40.0, z_]) for x_ in (65.0, 80.0, 100.0, 105.0) for z_ in (-2.0, ZM, 12.0)]]
     print(f"   assembly STL on disk vs placed parts: volume {A.volume:.1f} vs {P_.volume:.1f}; 12 vertical rays "
           f"through the slider agree: {sum(xr)}/12 (slider offset X {loc_.X:.3f})")
-    comps = [frame_c, slider_p, handle_c, pin_c]
-    print(f"--- {pose.upper()}  travel {t:.3f} mm ({sdg.D_POSE if hasattr(sdg, 'D_POSE') else D['pose_teeth'][pose]} teeth)"
-          f"   components {len(comps)} (frame {frame_c.volume:.1f}, slider {sum(c.volume for c in rest):.1f}, "
-          f"handle {handle_c.volume:.1f}, pin {pin_c.volume:.1f})")
+    print(f"--- {pose.upper()}  travel {t:.3f} mm ({D['pose_teeth'][pose]} teeth)   components 5 + 3 hardware (frame "
+          f"{frame_c.volume:.1f}, slider {slider_p.volume:.1f}, handle {handle_c.volume:.1f}, pin {pin_c.volume:.1f}, shoe "
+          f"{shoe_c.volume:.1f})")
     slider_c = rest[0]
-    # r7 reinforce: the stop leg below the floor underside (placed slider sections) -> nearest frame / handle material,
-    # XY distance, sections Z -3/1/5/9/13; the leg's +X face from a -X ray at the leg mid-height.
-    _lw = box2(LAY["leg_x0"] - t - 0.01, LAY["leg_x1"] - t + 0.01, LAY["beam_top"] - ST["beam_t"] - 0.01, y_fl_ - 1e-3)
-    _lgd = []
-    for zz in (-3.0, 1.0, 5.0, 9.0, 13.0):
-        _lp = section_poly(slider_c, zz).intersection(_lw)
-        _fz, _hz = section_poly(frame_c, zz), section_poly(handle_c, zz)
-        _lgd.append((_lp.distance(_fz) if not _fz.is_empty else np.inf, _lp.distance(_hz) if not _hz.is_empty else np.inf, zz))
-    _lx = 130.0 - first_hit(slider_c, np.array([130.0 - t, 0.5 * (y_fl_ + LAY["beam_top"]), ZM]), [-1, 0, 0]) - t
-    _df, _dh = min(_lgd), min(_lgd, key=lambda q: q[1])
-    print(f"   STOP LEG +X face X {_lx:.4f} (ray at Y {0.5 * (y_fl_ + LAY['beam_top']):.2f}); leg (below the floor) -> frame "
-          f"{_df[0]:.4f} at Z {_df[2]}, -> handle {_dh[1]:.4f} at Z {_dh[2]} (head -X flat {XF:.4f} - leg +X "
-          f"{LAY['leg_x1'] - t:.4f} = {XF - LAY['leg_x1'] + t:.4f})")
+    if pose == "min":
+        # r8 assembly path: the shoe (bottom on the pocket bottom = insertion level) swept along -Z from outside the
+        # +Z face to its seat, then up (+Y) to the locked pose; the washer + jam nut sweep (Ø NUT_E, conservative)
+        # along -Z into the jam bore. Controls: the shoe 1.0 higher (top above the window) and the jam sweep 0.5 -X.
+        dy_i = SHOE["pocket"]["y0"] - SHOE["y_bot"]
+        zs_ = np.arange(0.0, 16.01, 0.5)
+        ins = [inter(moved(shoe_c, dy=dy_i, dz=dz), slider_c) for dz in zs_]
+        up_ = [inter(moved(shoe_c, dy=dy), slider_c) for dy in np.linspace(dy_i, 0.0, 9)]
+        jz_ = np.arange(0.0, 12.01, 0.5)
+        jins = [inter(moved(hw_c["hw_jam"], dz=dz), slider_c) for dz in jz_]
+        print(f"   WINDOW: shoe at the insertion level (dy {dy_i:.4f}) swept Z +{zs_[-1]:.1f} -> 0 in {len(zs_)} steps: max "
+              f"shoe∩slider {fmt(max(ins))} mm3; then +Y to the lock in 9 steps: max {fmt(max(up_))}; CONTROL shoe +1.0 Y "
+              f"at dz 8: {fmt(inter(moved(shoe_c, dy=dy_i + 1.0, dz=8.0), slider_c))} (must be > 0)")
+        print(f"   JAM BORE: washer + jam nut sweep swept Z +{jz_[-1]:.1f} -> 0: max ∩slider {fmt(max(jins))} mm3; CONTROL "
+              f"-X 0.5 at dz 0: {fmt(inter(moved(hw_c['hw_jam'], dx=-0.5), slider_c))} (must be > 0)")
 
     s_st = [x - t for x in (64.0, 80.0, 100.0, 120.0, 134.0)]
     c_st = list(np.linspace(CT["x_entry"] + 1.0, CT["x_exit"] - 1.0, 5))
@@ -921,26 +889,43 @@ for pose, t in TRAVEL.items():
     print(f"   axis ray from X -30 along the fitted slider axis: {len(hits_along(A, o, ds))} hits in the whole assembly")
     u = np.cross(ds, [0, 0, 1.0]); u /= np.linalg.norm(u)
     v = np.cross(ds, u)
-    n_hit = sum(len(hits_along(A, o + 1.5 * (math.cos(a) * u + math.sin(a) * v), ds)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False))
-    print(f"   16 rays on the Ø3.0 wire surface: {n_hit} hits")
+    n_hit = sum(len(hits_along(A, o + R_WIRE * (math.cos(a) * u + math.sin(a) * v), ds)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False))
+    n_ctl = sum(len(hits_along(A, o + R_CTRL * (math.cos(a) * u + math.sin(a) * v), ds)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False))
+    print(f"   16 rays on the Ø{2 * R_WIRE:.1f} wire surface: {n_hit} hits; CONTROL 16 rays at r {R_CTRL:.3f}: {n_ctl} hits "
+          f"(must be > 0)")
     enc = [x for x in np.arange(140.0, 172.0, 0.1)
            if all(first_hit(frame_c, cs + ds * ((x - cs[0]) / ds[0]), dd, max_d=8.0) is not None
                   for dd in ([0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]))]
     print(f"   axis enclosed by the C-tip: X {min(enc):.2f} .. {max(enc):.2f}" if enc else "   NOT enclosed by the C-tip")
-    print(f"   interference: slider∩frame {inter(slider_c, frame_c)}; handle∩frame {inter(handle_c, frame_c)}; "
-          f"handle∩slider {inter(handle_c, slider_c)}; pin∩slider {inter(pin_c, slider_c)}; pin∩frame {inter(pin_c, frame_c)} mm3")
-    for zz in (1.0, sdg.T_Z - 1.0):
-        oo = np.array([D["wire_x1"] - t - 20.0, WY, zz])
-        hs = hits_along(slider_c, oo, [1, 0, 0])
-        hf = hits_along(frame_c, oo, [1, 0, 0])
-        print(f"   tip gap at wire height (Z {zz}): crown X {oo[0] + hs[-1]:.3f} -> C-tip X {oo[0] + hf[hf > hs[-1]][0]:.3f} "
-              f"= {hf[hf > hs[-1]][0] - hs[-1]:.3f} mm")
+    ints = {"slider∩frame": inter(slider_c, frame_c), "handle∩frame": inter(handle_c, frame_c),
+            "handle∩slider": inter(handle_c, slider_c), "pin∩slider": inter(pin_c, slider_c),
+            "pin∩frame": inter(pin_c, frame_c), "shoe∩frame": inter(shoe_c, frame_c),
+            "shoe∩slider": inter(shoe_c, slider_c), "shoe∩handle": inter(shoe_c, handle_c),
+            "shoe∩pin": inter(shoe_c, pin_c)}
+    for k_, m_ in hw_c.items():
+        for n_, p_ in (("frame", frame_c), ("slider", slider_c), ("handle", handle_c), ("shoe", shoe_c)):
+            ints[f"{k_}∩{n_}"] = inter(m_, p_)
+    print("   interference LOCKED (mm3): " + "; ".join(f"{k_} {fmt(v_)}" for k_, v_ in ints.items()))
+    print(f"   CONTROLS locked shoe: moved -X 0.15 -> shoe∩frame {fmt(inter(moved(shoe_c, dx=-0.15), frame_c))}; moved "
+          f"+Y 0.05 -> {fmt(inter(moved(shoe_c, dy=0.05), frame_c))} (both must be > 0)")
+    # Lower block (slider below the floor underside) and the screw head -> frame / handle, XY on sections.
+    blk = box2(-300, 300, -300, y_fl_ - 1e-3)
+    dd = []
+    for zz in (-5.0, 0.5, ZM, 9.5, 15.0):
+        sf_, sh_ = section_poly(frame_c, zz), section_poly(handle_c, zz)
+        for lab, m_ in (("block", slider_c), ("head", hw_c["hw_screw"])):
+            pp = section_poly(m_, zz).intersection(blk)
+            if pp.is_empty:
+                continue
+            dd.append((lab, zz, pp.distance(sf_) if not sf_.is_empty else np.inf,
+                       pp.distance(sh_) if not sh_.is_empty else np.inf))
+    print("   BLOCK / HEAD clearance (XY, sections Z -5/0.5/5/9.5/15): " + "; ".join(
+        f"{lab} -> frame {min(q[2] for q in dd if q[0] == lab):.3f}, -> handle {min(q[3] for q in dd if q[0] == lab):.3f}"
+        for lab in ("block", "head")))
 
-    # r7 pawl, on the STL sections at Z 5 (every pawl feature is an in-plane profile over the full Z). Each tooth
-    # is found on the slider section; every probe height is derived from that tooth's own apex and the rack land.
-    secF, secS = section_poly(frame_c, ZM), section_poly(slider_c, ZM)
-    rack_w = secF.intersection(box2(LAY["xb"] - t - 6.0, PAWL["free_x"] - t + 6.0, -20.0, 1.0))
-    tl = pawl_teeth(secS, t)
+    # r8 shoe teeth (locked), on the STL sections at Z 5 (every shoe feature is an in-plane profile over its Z).
+    secF, secH = section_poly(frame_c, ZM), section_poly(shoe_c, ZM)
+    tl = shoe_teeth(secH, SHOE["face"])
     rows = []
     for k, g in enumerate(tl):
         ax_, ay_ = max(g.exterior.coords, key=lambda q: q[1])
@@ -949,32 +934,40 @@ for pose, t in TRAVEL.items():
         hg = (land + 0.25 * ov, land + 0.75 * ov)
         fx, wx = [], []
         for yy in hg:
-            sg_ = [s for s in hline(g, yy, ax_ - 1.5, ax_ + 2.0)]
-            fx.append(sg_[0][0])
-            wx.append(max(e for _, e in hline(secF, yy, ax_ - 1.5, ax_ + 2.0) if e <= fx[-1] + 1e-6))
-        hk_t = math.degrees(math.atan((fx[0] - fx[1]) / (hg[1] - hg[0])))
-        hk_w = math.degrees(math.atan((wx[0] - wx[1]) / (hg[1] - hg[0])))
-        rows.append((k, ax_, ay_, land, ov, g.distance(secF), fx[0] - wx[0], fx[1] - wx[1], hk_t, hk_w))
-    print(f"   pawl: {len(tl)} teeth on the slider section (need {PAWL['n_teeth']})")
-    for k, ax_, ay_, land, ov, sg_, b0, b1, hk_t, hk_w in rows:
-        print(f"     tooth {k} apex X {ax_:.3f} Y {ay_:.4f}; rack land Y {land:.4f} -> OVERLAP {ov:.4f}; seat gap (2D min "
-              f"tooth->rack) {sg_:.4f}; horizontal gap at the locking face {b0:.4f} / {b1:.4f} (land +25 % / +75 % of the "
-              f"overlap); hook: pawl face {hk_t:.3f}°, rack wall {hk_w:.3f}°")
-    # Stops: pad bottom -> stop block top on vertical chords just -X of each block's +X contact edge
-    gaps = {}
-    for lab, xs_ in (("inner", LAY["inner_x"]), ("outer", LAY["outer_x"])):
-        c = [s for s in chord_iv(secS, xs_ - t - 0.05) if s[1] < -20.0]
-        gaps[lab] = c[-1][0] - c[-2][1]
+            fx.append(hline(g, yy, ax_ - 1.5, ax_ + 3.0)[0][0])
+            wx.append(max(e for _, e in hline(secF, yy, ax_ - 1.5, ax_ + 3.0) if e <= fx[-1] + 1e-6))
+        hk = math.degrees(math.atan((fx[0] - fx[1]) / (hg[1] - hg[0])))
+        ramp = g.intersection(box2(ax_ + 0.3, ax_ + PITCH, -20.0, Y0 + 3.0)).distance(secF)
+        xl = ax_ - 0.1 - 0.5 * TEETH["land"]                             # mid rack land, -X of this tooth's wall
+        fg = [ray_gap(shoe_c, frame_c, [xl, SHOE["face"] - 0.5, zz], [0, 1, 0]) for zz in (1.0, ZM, 9.0)]
+        rows.append((k, ax_, ay_, land, ov, g.distance(secF), fx[0] - wx[0], fx[1] - wx[1], ramp, hk, fg))
+    print(f"   shoe: {len(tl)} teeth on the shoe section (need {sdg.PAWL_TEETH})")
+    for k, ax_, ay_, land, ov, sg_, b0, b1, ramp, hk, fg in rows:
+        print(f"     tooth {k} apex X {ax_:.3f} Y {ay_:.4f}; rack land Y {land:.4f} -> OVERLAP {ov:.4f}; face -> land "
+              f"(rays Z 1/5/9) {', '.join(f'{v:.4f}' for v in fg)}; min flank gap {sg_:.4f}; wall gap {b0:.4f} / {b1:.4f}"
+              f" (+25 % / +75 %); ramp gap {ramp:.4f}; wall angle {hk:.3f}°")
+    # Released: shoe lowered by the travel, swept one pitch in both X directions against the rack (2D, Z 5) and
+    # at +-half a pitch in 3D. Controls: still engaged (drop = overlap - 0.05) and not lowered must collide.
+    tr = SHOE["travel"]
     teeth_u = unary_union(tl)
-    need = {lab: drop_needed(teeth_u, rack_w, sgn) for lab, sgn in (("open", -1), ("close", +1))}
-    print(f"   pawl stops (chords at X inner {LAY['inner_x'] - t - 0.05:.3f} / outer {LAY['outer_x'] - t - 0.05:.3f}): "
-          f"inner gap {gaps['inner']:.4f}, outer gap {gaps['outer']:.4f}; rigid drop of all 4 teeth needed to OPEN (-X one "
-          f"pitch) {need['open']:.4f} -> inner-stop margin {gaps['inner'] - need['open']:+.4f}; to CLOSE (+X over the "
-          f"ramp) {need['close']:.4f} -> margin {gaps['inner'] - need['close']:+.4f}")
-    lift = [(d_, swept_hit(teeth_u, rack_w, d_, -1)) for d_ in (gaps["inner"], min(r[4] for r in rows) - 0.05, 0.0)]
-    print(f"   LIFT: teeth lowered by the inner stop gap {lift[0][0]:.4f}, swept -X one pitch: max overlap {lift[0][1]:.6f} mm2"
-          f" (must be 0); CONTROL drop {lift[1][0]:.4f} (overlap - 0.05): {lift[1][1]:.4f} mm2, CONTROL drop 0: "
-          f"{lift[2][1]:.4f} mm2 (both must be > 0)")
+    rack_w = secF.intersection(box2(SHOE["x0"] - t - 6.0, SHOE["x1"] - t + 6.0, -20.0, 1.0))
+    sw = {lab: swept_hit(teeth_u, rack_w, tr, sgn) for lab, sgn in (("-X", -1), ("+X", +1))}
+    need = {lab: drop_needed(teeth_u, rack_w, sgn) for lab, sgn in (("-X", -1), ("+X", +1))}
+    ctl = [(d_, swept_hit(teeth_u, rack_w, d_, -1)) for d_ in (min(r[4] for r in rows) - 0.05, 0.0)]
+    rel = moved(shoe_c, dy=-tr)
+    nut_r = moved(hw_c["hw_drive_nut"], dy=SHOE["nut_rel"][0] - SHOE["nut_lock"][0])
+    ri = {"shoe∩frame": inter(rel, frame_c), "shoe∩slider": inter(rel, slider_c),
+          "shoe∩hw_jam": inter(rel, hw_c["hw_jam"]), "shoe∩hw_screw": inter(rel, hw_c["hw_screw"]),
+          "drive_nut∩shoe": inter(nut_r, rel), "drive_nut∩slider": inter(nut_r, slider_c),
+          "shoe -X half pitch ∩frame": inter(moved(rel, dx=-0.5 * PITCH), frame_c),
+          "shoe +X half pitch ∩frame": inter(moved(rel, dx=0.5 * PITCH), frame_c)}
+    jg = ray_gap(rel, hw_c["hw_jam"], [SHOE["screw"]["x"] - t + 5.0, SHOE["y_bot"] - tr + 1.0, ZM], [0, -1, 0])
+    print(f"   RELEASED (shoe -Y {tr:.4f}): teeth swept one pitch -X max overlap {sw['-X']:.6f} mm2, +X {sw['+X']:.6f} mm2"
+          f" (must be 0); drop needed to pass -X {need['-X']:.4f} / +X {need['+X']:.4f} -> margin "
+          f"{tr - max(need.values()):+.4f}; CONTROL drop {ctl[0][0]:.4f}: {ctl[0][1]:.4f} mm2, drop 0: {ctl[1][1]:.4f} mm2"
+          f" (both must be > 0)")
+    print("   interference RELEASED (mm3): " + "; ".join(f"{k_} {fmt(v_)}" for k_, v_ in ri.items())
+          + f"; shoe bottom -> jam nut top {jg:.4f}")
 
     if pose == "min":
         coupling_gates(frame_c, slider_c, handle_c, t)
@@ -1026,7 +1019,8 @@ def down_faces(m, axis):
     return A[sel].sum(), steep, A[bed].sum(), out
 
 
-for tag, m, ax_ in (("main_frame flat (-Z on the bed)", fr, 2), ("handle standing (butt on the bed, +Y up)", hd, 1)):
+for tag, m, ax_ in (("main_frame flat (-Z on the bed)", fr, 2), ("handle standing (butt on the bed, +Y up)", hd, 1),
+                    ("shoe flat (-Z on the bed)", sh, 2)):
     tot, steep, bed_a, cl = down_faces(m, ax_)
     print(f"  {tag}: down-facing area {tot:.2f} mm2 ({len(cl)} clusters), of which with n < -0.7072 (clearly past 45°) {steep:.2f} mm2;"
           f" bed face {bed_a:.2f} mm2")

@@ -1,4 +1,8 @@
-"""SurgicalDrillGuide (rebuild, 2026-09-23): ratcheting K-wire / drill guide, three printed parts.
+"""SurgicalDrillGuide (rebuild, 2026-09-23): ratcheting K-wire / drill guide, five printed parts (r8).
+
+r8 (2026-10-18): the compliant pawl is replaced by a rigid printed SHOE in a pocket of the carriage's lower block,
+driven into the rack by an M6 knurled screw from below (DIN 464 + DIN 557 nuts, bought). The assemblies are written
+in the locked state and include the screw / nut clearance volumes (hw_*.stl, not printed).
 
 Replaces the v1 macro (snapshot: attempts/v1-zbore-separate-parts/macros/). v1 bored the wire through the
 part THICKNESS (Z) and had no long bar; this rebuild follows the confirmed topology (docs/MEASUREMENTS.md §1-2):
@@ -52,30 +56,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build123d import Compound, Pos, Solid, export_step, export_stl  # noqa: E402,F401  (Solid: used by sdg_gates)
 
 from sdg_model.constants import *  # noqa: E402,F401,F403
-from sdg_model.mechanisms import _line_x, pawl_tooth_pts, sawtooth_cutter_face, tooth_face_x  # noqa: E402,F401
-from sdg_model.parameters import derive_pin, parameters, seat_notch  # noqa: E402,F401
+from sdg_model.mechanisms import _line_x, pawl_tooth_pts, sawtooth_cutter_face  # noqa: E402,F401
+from sdg_model.parameters import derive_pin, derive_shoe, parameters  # noqa: E402,F401
 from sdg_model.parts.end_stop_pin import build_pin  # noqa: E402
 from sdg_model.parts.handle import build_handle  # noqa: E402
 from sdg_model.parts.l_arm_slider import build_l_arm_slider  # noqa: E402
 from sdg_model.parts.main_frame import build_main_frame, ctip_pad_region, hook_outer_region  # noqa: E402
+from sdg_model.parts.shoe import build_hardware, build_shoe  # noqa: E402
 from sdg_model.rings import (derive, derive_channel, horizontal_chord, rack_bottom_y, ring_face,  # noqa: E402,F401
                              ring_points, ring_points_file, vertical_chord)
 from sdg_model.shapes import (along_y, box, cone_y, cyl_y, extrude_z, one_solid, polygon_face,  # noqa: E402,F401
-                              shapely_faces, teardrop_bore_x)
+                              shapely_faces, teardrop_bore_x, teardrop_bore_y)
 
-PART_NAMES = ("main_frame", "l_arm_slider", "handle", "end_stop_pin")
+PART_NAMES = ("main_frame", "l_arm_slider", "handle", "end_stop_pin", "shoe")
+HW_NAMES = ("hw_screw", "hw_jam", "hw_drive_nut")   # bought parts, clearance volumes only (STL, not printed)
 
 
-def build_all():
-    D, travel, chan, teeth, bore, coup, pawl = parameters()
+def build_all(wire=WIRE_D):
+    D, travel, chan, teeth, bore, coup, shoe = parameters(wire)
     frame, a_list = build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])
-    a_seat, k_seat = seat_notch(a_list, pawl, D)
-    slider = build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, pawl, a_seat)
+    if [round(a, 9) for a in a_list] != [round(a, 9) for a in shoe["a_list"]]:
+        raise RuntimeError("frame notches differ from the notches the shoe was derived on")
+    slider = build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, shoe)
     handle = build_handle(D, T_Z, coup)
     pin = build_pin(D["pin"])
+    shoe_p = build_shoe(shoe, bore["apex_dir"])
     info = {"D": D, "travel": travel, "chan": chan, "teeth": teeth, "bore": bore, "coup": coup,
-            "pawl": pawl, "a_list": a_list, "a_seat": a_seat, "k_seat": k_seat}
-    return {"main_frame": frame, "l_arm_slider": slider, "handle": handle, "end_stop_pin": pin}, info
+            "shoe": shoe, "a_list": a_list, "hw": build_hardware(shoe)}
+    return {"main_frame": frame, "l_arm_slider": slider, "handle": handle, "end_stop_pin": pin, "shoe": shoe_p}, info
 
 
 def rack_notches(D, teeth):
@@ -85,16 +93,17 @@ def rack_notches(D, teeth):
     return a_list
 
 
-def build_one(name):
-    """One part only (the others are not built). The slider's seat notch comes from rack_notches()."""
-    D, travel, chan, teeth, bore, coup, pawl = parameters()
+def build_one(name, wire=WIRE_D):
+    """One part only (the others are not built)."""
+    D, travel, chan, teeth, bore, coup, shoe = parameters(wire)
     if name == "main_frame":
         return build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])[0]
     if name == "l_arm_slider":
-        a_seat, _ = seat_notch(rack_notches(D, teeth), pawl, D)
-        return build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, pawl, a_seat)
+        return build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, shoe)
     if name == "handle":
         return build_handle(D, T_Z, coup)
+    if name == "shoe":
+        return build_shoe(shoe, bore["apex_dir"])
     return build_pin(D["pin"])
 
 
@@ -103,10 +112,22 @@ def slider_at(slider, travel):
     return slider.moved(Pos(-travel, 0, 0))
 
 
-def part_path(name, ext):
+def shoe_at(shoe, travel, drop=0.0):
+    """Shoe (or hardware) at an opening pose; drop = the release travel (-Y), 0 = locked."""
+    return shoe.moved(Pos(-travel, -drop, 0))
+
+
+def part_path(name, ext, suffix=""):
     folder = OUT_DIR / {"stl": "stl", "step": "step", "png": "renders"}.get(ext, "")
     folder.mkdir(exist_ok=True)
-    return folder / f"{PREFIX}_{name}.{ext}"
+    return folder / f"{PREFIX}_{name}{suffix}.{ext}"
+
+
+def variant_suffix(name, wire):
+    """Output suffix of a part / assembly for a wire variant: the bored parts and the assemblies carry the
+    variant's suffix; the shared parts (handle, end_stop_pin, shoe, hardware) never do."""
+    suffix = WIRE_VARIANTS[wire][2]
+    return suffix if (name in BORE_PARTS or name.startswith("assembly_")) else ""
 
 
 def check_valid(parts):
@@ -122,25 +143,40 @@ def check_valid(parts):
         raise SystemExit(f"invalid part(s) {bad}: nothing exported")
 
 
-def export_part(name, shp):
-    export_step(shp, str(part_path(name, "step")))
-    export_stl(shp, str(part_path(name, "stl")), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+def export_part(name, shp, suffix=""):
+    export_step(shp, str(part_path(name, "step", suffix)))
+    export_stl(shp, str(part_path(name, "stl", suffix)), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. GENERATE
 # ═════════════════════════════════════════════════════════════════════════════
 
-def main_all():
-    parts, info = build_all()
+def main_all(wire=WIRE_D):
+    """Default wire: every part, hardware and assembly. Other wire variants: only the bored parts and the assemblies
+    (suffixed); the shared parts are built for the assemblies but never written (they stay the default build's)."""
+    variant = bool(WIRE_VARIANTS[wire][2])
+    parts, info = build_all(wire)
+    print(f"wire variant Ø{wire}: bore drawn Ø{info['bore']['d']}, reamed Ø{info['bore']['ream_d']}, suffix "
+          f"'{info['bore']['suffix']}'")
     D, chan = info["D"], info["chan"]
     print(f"wire Y {D['wire_y']:.3f}  handle axis X {D['handle_axis_x']:.3f}  ferrule shoulder Y {D['ferrule_top_y']:.3f}"
           f"  bar bottom at axis {D['bar_bottom_at_axis']:.3f}")
     print(f"channel Y {chan['y0']:.3f} .. {chan['y1']:.3f} (frame envelope {chan['envelope'][0]:.3f} .. "
           f"{chan['envelope'][1]:.3f} over X {chan['envelope'][2]:.2f} .. {chan['envelope'][3]:.2f})")
+    S = info["shoe"]
     print(f"teeth: {len(info['a_list'])} notches X {info['a_list'][0]:.3f} .. {info['a_list'][-1] + TOOTH_PITCH:.3f};"
-          f" pawl teeth seated in notches {info['k_seat']} (inner a = {info['a_seat'][0]:.3f}) at MIN")
+          f" shoe teeth in notches {S['k_seat']} (inner a = {S['a_seat'][0]:.3f}) at MIN")
+    print(f"shoe: X {S['x0']:.3f}..{S['x1']:.3f} Y {S['y_bot']:.3f}..{S['face']:.3f} (+ teeth {S['tooth_h']:.4f}) Z "
+          f"{S['z0']:.2f}..{S['z1']:.2f}; slot X {S['slot']['x0']:.3f}..{S['slot']['x1']:.3f} Y {S['slot']['y0']:.3f}.."
+          f"{S['slot']['y1']:.3f}; release travel {S['travel']:.4f}")
+    pk, wn, bk, sc, jm = S["pocket"], S["window"], S["block"], S["screw"], S["jam"]
+    print(f"pocket X {pk['x0']:.3f}..{pk['x1']:.3f} Y from {pk['y0']:.3f}; window Y {wn['y0']:.3f}..{wn['y1']:.3f}; block "
+          f"X {bk['x0']:.3f}..{bk['x1']:.3f} bottom {bk['y0']:.3f}; screw X {sc['x']:.3f} head top {sc['head_top']:.3f} tip "
+          f"{sc['tip']:.3f}; jam stack {jm['washer_bot']:.3f}..{jm['top']:.3f}, bore Y {jm['bore_y0']:.3f}..{jm['bore_y1']:.3f};"
+          f" engagement lock {S['engage_lock']:.3f} / release {S['engage_rel']:.3f}")
     check_valid(parts)
+    check_valid(info["hw"])
     cp = info["coup"]
     st = cp["seat"]
     print(f"coupling (arithmetic): lug end -> socket floor {st['lug_end_to_floor']:.3f} (push stop, seated); floor "
@@ -152,7 +188,12 @@ def main_all():
           f"{COUPLING_CARRIAGE_CLEAR}); bar top Y {cp['bar']['y_top']} from X {cp['bar']['x0']:.3f}, hook inner "
           f"contour at X {cp['bar']['x_hook']:.3f}")
     for name, shp in parts.items():
-        export_part(name, shp)
+        if variant and name not in BORE_PARTS:
+            continue
+        export_part(name, shp, variant_suffix(name, wire))
+    if not variant:
+        for name, shp in info["hw"].items():
+            export_stl(shp, str(part_path(name, "stl")), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
     pin = D["pin"]
     added, _, _ = ctip_pad_region(D, D["ctip"])
     print(f"pin: X {pin['x']:.3f} Y {pin['y']:.3f} hole Ø{pin['hole_d']:.2f}; collar face {pin['collar_face']:.3f}; "
@@ -162,23 +203,30 @@ def main_all():
           f"added to the traced outline {added.area:.2f} mm2")
     for pose, t in info["travel"].items():
         asm = Compound(children=[parts["main_frame"], slider_at(parts["l_arm_slider"], t), parts["handle"],
-                                 parts["end_stop_pin"]])
-        export_stl(asm, str(part_path(f"assembly_{pose}", "stl")), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
-        print(f"assembly_{pose}: travel {t:.3f} mm written")
+                                 parts["end_stop_pin"], shoe_at(parts["shoe"], t)]
+                       + [shoe_at(h, t) for h in info["hw"].values()])
+        an = f"assembly_{pose}"
+        export_stl(asm, str(part_path(an, "stl", variant_suffix(an, wire))), tolerance=TESS_TOL,
+                   angular_tolerance=TESS_ANG)
+        print(f"{an}{variant_suffix(an, wire)}: travel {t:.3f} mm written")
 
 
-def main_one(name):
-    parts = {name: build_one(name)}
+def main_one(name, wire=WIRE_D):
+    if WIRE_VARIANTS[wire][2] and name not in BORE_PARTS:
+        raise SystemExit(f"{name} is shared by every wire variant: build it without --wire")
+    parts = {name: build_one(name, wire)}
     check_valid(parts)
-    export_part(name, parts[name])
+    export_part(name, parts[name], variant_suffix(name, wire))
     print(f"{name}: STEP + STL written. Assembly STLs NOT rewritten; run without --part before the gates.")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Build SurgicalDrillGuide parts.")
     ap.add_argument("--part", choices=PART_NAMES, help="build and export this part only")
+    ap.add_argument("--wire", type=float, default=WIRE_D, choices=sorted(WIRE_VARIANTS),
+                    help="wire Ø (default 3.0; 1.5 writes the bored parts and assemblies with the suffix _wire1p5)")
     args = ap.parse_args()
     if args.part:
-        main_one(args.part)
+        main_one(args.part, args.wire)
     else:
-        main_all()
+        main_all(args.wire)

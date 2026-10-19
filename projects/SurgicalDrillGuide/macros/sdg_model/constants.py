@@ -25,17 +25,16 @@ RING_FILES = {
 # ── Z (breadth). No photo measures Z (MEASUREMENTS §8). ─────────────────────────
 T_Z = 10.0               # ASSUMED (user decision 2026-09-23): frame, rack and hook thickness
 Z_MID = T_Z / 2.0        # DERIVED: mid-plane; wire bores and handle axis lie on it
-WRAP_WALL_Z = 3.0        # ASSUMED: collar/carriage side-wall thickness beside the rack (each side)
+WRAP_WALL_Z = 4.0        # PROPOSED r8 sizing part 3 (the +Z window frees one top-wall edge; 3.995 needed at the
+                         # bound, SF 3.01): collar/carriage side-wall thickness beside the rack (each side);
+                         # slab -4.3 .. 14.3
 SLIDE_CLEAR = 0.30       # PLACEHOLDER (print-tolerance-expert, keep 0.30): rack-channel clearance per side in Z
 SLIDE_CLEAR_Y = 0.20     # PLACEHOLDER (print-tolerance-expert, round 3): channel clearance per side in Y (only
                          # derive_channel uses it; less Y play = less pawl-overlap loss when the slider cocks)
-CARRIAGE_TOP_WALL = 2.5  # DESIGNED (user decision, round 4; 2.0 in round 3 failed 10.86 vs 9.17 MPa at b 5):
-                         # carriage top wall over the channel ceiling; the traced top (1.675-1.740) is raised
-CARRIAGE_FLOOR = 2.5     # DESIGNED (user decision, round 4; traced floor 1.97-2.05 failed 9.60 vs 9.17 MPa at b 5):
-                         # carriage floor under the channel, OUTSIDE the pawl tongue. The tongue keeps the traced
-                         # bottom (t 1.97-2.02): its hard-stop stress is displacement-set (3E*delta*c/x^2), so a
-                         # thicker tongue would RAISE it past SF 3. A 45° chamfer steps the floor up to the tongue
-                         # at the anchor (no square re-entrant corner at the tongue root).
+CARRIAGE_TOP_WALL = 4.4  # PROPOSED r8 sizing part 3 (user-approved 2026-10-18; needs 4.333 at the bound): top wall
+                         # over the channel ceiling; the traced top (1.675-1.740) is raised
+CARRIAGE_FLOOR = 2.5     # DESIGNED (user decision, round 4): carriage floor under the channel; r8: removed over the
+                         # shoe pocket
 # The carriage +X end is squared over its full height at the traced end face at channel mid-height (DERIVED,
 # X 106.475); this removes the 0.048 mm sliver the round-3 top box left at X 106.438-106.486 (form-auditor).
 # User decision (fix round 2026-09-23): the L-arm (riser, top bar, crown) takes the collar/carriage Z, so the
@@ -86,15 +85,17 @@ HOOK_OUT_FILLET_R = 4.0  # DESIGNED (pass 3; brief r >= 3): concave fillet where
 # ── Rack extension (user decision: extend the rack so the ~74 mm maximum opening is restored) ─────────────
 # The traced free end (end face + bottom chamfer) is moved RACK_EXT towards -X; the gap is filled with the rack
 # section (top edge Y 0, bottom = the traced bottom line extended); teeth continue in phase at TOOTH_PITCH.
-RACK_EXT = 4.8           # PROPOSED r7 (ratchet_sizing.md §6): length added to the traced rack at its free end.
-                         # With pitch 2.6, MAX = 23 teeth = 59.80, tip gap 74.272; pin spare 0.006 after the 0.10 gap.
+RACK_EXT = 11.1          # USER DECISION r8 fix (2026-10-18, R8-12): length added to the traced rack at its free
+                         # end (was 9.8; +1.3 with the pin kept in place, so the pin's -X wall is 3.0). With pitch
+                         # 3.5: MAX 18 teeth = 63.0, tip gap 77.472. Notches never run under the pin hole.
 TARGET_MAX_GAP = 74.0    # user requirement: tip gap at wire height at the last pawl-seated pose (build asserts)
 
 # ── End-stop pin (user decision: removable printed pin through a Z hole near the rack tip) ─────────────────
 PIN_D = 3.0              # DESIGNED: pin diameter
 PIN_FIT_CLEAR = 0.20     # PLACEHOLDER (print-tolerance-expert, round 3): hole Ø = PIN_D + this = 3.20, snug
                          # slip fit for a removable pin (coupon 3.15 / 3.20 / 3.25)
-PIN_TIP_WALL = 1.7       # DESIGNED: rack material between the hole and the rack's free end
+PIN_TIP_WALL = 3.0       # DESIGNED r8 fix (R8-12; was 1.7): rack material between the hole and the rack's free
+                         # end. Raised by the same 1.3 as RACK_EXT, so the derived pin stays at X -6.482, Y -3.796
 PIN_PROTRUDE = WRAP_WALL_Z + SLIDE_CLEAR  # DESIGNED: pin ends flush with the slider's outer Z faces
 PIN_STOP_MIN_GAP = 0.10  # DESIGNED: the seated MAX pose must leave at least this gap to the pin, AFTER the pin's
                          # slop c/2 (round 3; see RACK_EXT)
@@ -103,59 +104,63 @@ PIN_STOP_MIN_GAP = 0.10  # DESIGNED: the seated MAX pose must leave at least thi
 WIRE_D = 3.0             # ASSUMED (user decision): Ø3 mm K-wire
 BORE_D = 3.4             # ASSUMED (user decision): bore drawn Ø3.4, reamed to 3.2 after printing
 REAM_D = 3.2             # ASSUMED (user decision): final bore after reaming
+# Wire variants (user request 2026-10-18): wire Ø -> (bore drawn, reamed, output suffix). Same rule for each: drawn
+# = wire + 0.4, reamed = wire + 0.2. Only the bored parts (main_frame C-tip, l_arm_slider) differ; the default 3.0
+# keeps the unsuffixed file names, the others write <name><suffix>.
+WIRE_VARIANTS = {3.0: (BORE_D, REAM_D, ""), 1.5: (1.9, 1.7, "_wire1p5")}
+BORE_PARTS = ("main_frame", "l_arm_slider")
 TEARDROP_APEX_DIR = +1   # DESIGNED: teardrop point towards +Z (print with the -Z face on the bed)
 BORE_OVERRUN = 3.0       # DESIGNED: bore cutters run this far past each traced face (through-hole)
 
 # ── Rack teeth (bottom face, MEASUREMENTS §3b) ──────────────────────────────────
-TOOTH_PITCH = 2.6        # PROPOSED r7 (ratchet_sizing.md §1; was 1.61 MEASURED): opening step 2.6 mm, sized for a
-                         # flat-on-flat locking contact with a 0.4 nozzle
-TOOTH_DEPTH = 1.4        # PROPOSED r7 (rack net section 5a SF 3.14 with the flat underside)
-TOOTH_LAND = 0.50        # PROPOSED r7: cutter land (apex-to-ramp-end complement); rack tooth tip 0.875 ~ 2 lines
+# r8 (user decision 2026-10-18, r8 sizing part 2): sawtooth, 0° locking wall, 60° ramp from vertical, no hook.
+TOOTH_PITCH = 3.5        # PROPOSED r8: opening step 3.5 mm (MAX 18 teeth, tip gap 77.472)
+TOOTH_DEPTH = 1.5        # PROPOSED r8 (rack net section 5a SF 3.06; 1.6 fails at 2.99)
+TOOTH_LAND = 0.902       # PROPOSED r8: = pitch - depth*tan 60°; rack land at the mouth (hook 0)
 TOOTH_CUT_EPS = 0.05     # DESIGNED: cutter lands sit this far below the envelope (no coincident faces)
-TEETH_START_MARGIN = 2.45  # PROPOSED r7b (phase +2.25 so the free length reaches 20.32): first notch offset from
-                           # the tip-chamfer end of the traced rack
+TEETH_START_MARGIN = 2.45  # PROPOSED r7b (unchanged r8; first notch -2.016): first notch offset from the
+                           # tip-chamfer end of the traced rack
 TEETH_X_END = 100.7      # DERIVED in MEASUREMENTS §3b (teeth end at the "30" graduation), ±1.5 mm
-TOOTH_HOOK_DEG = 15.0    # PROPOSED r7 (was 10): locking wall / pawl face undercut (≈6.6° after ±0.05 print error)
+TOOTH_HOOK_DEG = 0.0     # PROPOSED r8: vertical locking wall (a hook would block the shoe's straight retraction)
 RACK_FLAT_X1 = TEETH_X_END  # PROPOSED r7: rack underside flat at its traced Y at this X, for every X <= it (adds a
                             # wedge <= 0.24 under the traced line; the overlap is then equal at every pose)
 
-# ── Compliant pawl (DESIGNED substitution: the reference pawl, pivot screw and lever are not photographed
-#    internally, U7). r7: a thin flexure from the anchor carries a RIGID tooth block with PAWL_TEETH teeth; the
-#    release tab hangs from the block's free end, the pad runs from the block start to PAD_X1. ──
-PAWL_ANCHOR_X = 70.5     # PROPOSED r7: flexure root (the window and the 45° floor chamfer start here)
-PAWL_ROOT_R = 0.5        # DESIGNED (r7 fix D1): concave fillet from the flexure underside onto the traced collar wall;
-                         # it replaces the bevel's V-groove, so the flexure's free length starts where the fillet ends
-PAWL_FREE_X = 101.6      # PROPOSED r7b: block free end (slot to 102.4, floor strip 4.08 at the carriage end)
-PAWL_TEETH = 4           # PROPOSED r7: teeth on the block (1 carries the load, ratchet_sizing.md §2)
-PAWL_FLEX_T = 1.759      # DESIGNED (user decision r7, 2026-10-17, variant B): flexure thickness; release ~5 N at
-                         # the pad centre, stop SF 2.69 accepted (variant A 1.576 gave SF 3.00 at 3.6 N)
-PAWL_BLOCK_GAP = 0.5     # PROPOSED r7: block start = inner tooth locking face at the tongue top minus this
-                         # (flexure free length = block start - PAWL_ANCHOR_X; 20.32 in r7b)
-PAWL_BLOCK_DEPTH = 5.0   # DESIGNED (coupon): block thickness below the tongue top (rigid vs the flexure: (5/1.576)^3 = 32x)
-PAWL_SLOT_W = 0.80       # DESIGNED: free-end slot, in-plane (prints as a vertical gap), >= 2 nozzle widths
-PAWL_WINDOW_TOP_Y = -7.5  # DESIGNED: side walls are cut back to this Y over the tongue so the tooth can pass
-PAWL_SEAT_CLEAR = 0.10   # PLACEHOLDER (print-tolerance-expert): tooth-to-notch clearance when seated
-PAWL_TOOTH_MARGIN = 0.50  # DESIGNED: tooth right face stays this far inside the tongue free end
-TAB_W = 3.0              # DESIGNED: release tab width along X (hangs from the tongue free end)
-TAB_BOTTOM_Y = -24.0     # DESIGNED: tab reaches ~24 mm below the rack top (reference lever ~27 mm, cd2)
-PAD_X1 = 103.4           # PROPOSED r7: thumb pad +X end (r7 fix D2: the pad starts at the inner stop block's -X edge)
-PAD_T = 3.0              # DESIGNED: thumb pad thickness in Y
-# Two-point tab stop (r7): a leg down from the carriage floor past the pad's +X end, a beam under the pad, and two
-# 1.0-wide stop blocks on it. Each block's +X top edge is its contact point (the pad drops more towards +X).
-TAB_STOP_DROP = 1.30     # PROPOSED r7: inner stop gap = lift 1.170 + 0.125, at the inner tooth face X
-STOP_OUTER_GAP = 2.77    # PROPOSED r7b: outer stop gap (limits overpress)
-STOP_OUTER_X = 102.4     # PROPOSED r7: outer stop contact X (PAD_X1 - 1.0)
-STOP_BLOCK_W = 1.0       # DESIGNED: stop block width along X
-STOP_OUTER_H = 1.0       # DESIGNED: outer stop block height above the beam
-STOP_LEG_X0_IN = 2.5     # DESIGNED (round 5): leg -X face this far inside the squared carriage end (fixed: 0.5 guard
-                         # to the pad's +X end)
-STOP_LEG_W = 4.0         # DESIGNED (r7 reinforce d1, user-approved 2026-10-17): leg width along X BELOW the carriage
-                         # floor; grows +X past the carriage end (above the floor underside the end stays flush)
-STOP_BEAM_T = 3.62       # DESIGNED (r7 reinforce d1): beam thickness in Y (grows down; stop tops fixed)
-STOP_FILLET_R = 1.0      # DESIGNED (r7 fix 1h): fillet in the beam-leg inside corner
-STOP_LEG_TOP_R = 1.0     # DESIGNED (r7 reinforce d1): fillet where the leg's -X face meets the floor underside
-PAWL_ROOT_TOP_R = 0.5    # DESIGNED (r7 reinforce d1): fillet at the flexure root's top (tension) step in the outer Z
-                         # bands, where the collar side walls stop at PAWL_ANCHOR_X
+# ── Rigid pawl = screw-driven shoe (user decision r8, 2026-10-18, concept B; r8 sizing part 2). A separate printed
+#    shoe with PAWL_TEETH teeth sits in a pocket of the carriage's lower block. A DIN 464 M6 knurled screw from below,
+#    axially captured in the block floor (head below, washer + DIN 557 jam nut above), drives a DIN 557 square nut held
+#    in the shoe's slot: turning it raises the shoe onto the rack lands (lock) or lowers it out of the teeth (release).
+#    The shoe and the jam nut go in through a window in the carriage's +Z side wall. All values in the MIN pose. ──
+PAWL_TEETH = 6           # USER DECISION r8: shoe teeth, in the 6 right-most rack notches at MIN
+PAWL_SEAT_CLEAR = 0.10   # PLACEHOLDER (print-tolerance-expert): tooth flank clearance (wall and ramp, normal offset)
+SHOE_END_MARGIN = 1.5    # DESIGNED: shoe end past the first tooth wall (-X) / the last ramp end (+X)
+SHOE_CLEAR_X = 0.20      # PLACEHOLDER: shoe -> pocket clearance per side in X
+SHOE_CLEAR_Z = 0.20      # PLACEHOLDER: shoe -> pocket clearance per side in Z (pocket Z = the rack channel Z)
+SHOE_ROOF = 4.0          # PROPOSED: shoe face (on the rack lands) -> nut slot top
+SHOE_SLOT_X = 10.3       # PLACEHOLDER (fit DIN 557 s 10): nut slot width in X; its ±X walls stop the nut turning
+SHOE_SLOT_Y = 5.3        # PLACEHOLDER (DIN 557 m 5 + 0.3): nut slot height; the slot runs through Z
+SHOE_FLOOR = 3.0         # PROPOSED: slot bottom -> shoe bottom; Ø SCREW_HOLE_D teardrop hole (apex +Z)
+SHOE_HOLE_TOP_WALL = 1.8  # DESIGNED r8 fix 2 (1C-i, user 2026-10-18): the shoe's teardrop is cut flat this far under
+                          # the shoe's +Z face (Z 8.3 = top of the Ø6.6 circle); the flat is a ~2.73 wide bridge
+SHOE_RELEASE_GAP = 0.30  # DESIGNED: released tooth tips this far under the channel floor (sets the travel)
+SCREW_D = 6.0            # ASSUMED: M6 nominal (clearance volume only; the screw is bought, not printed)
+SCREW_L = 20.0           # ASSUMED: DIN 464 M6 x 20 shank length (head top -> tip)
+SCREW_HEAD_D = 24.0      # ASSUMED: DIN 464 M6 knurled head Ø (not in the sizing; measure the purchased screw)
+SCREW_HEAD_H = 7.5       # ASSUMED (r8 sizing): head height
+SCREW_AXIAL_PLAY = 0.20  # PLACEHOLDER: head top -> block floor underside
+SCREW_HOLE_D = 6.6       # PROPOSED: clearance hole in the block floor and the shoe floor (teardrop, apex +Z)
+NUT_S = 10.0             # ASSUMED: DIN 557 M6 width across flats
+NUT_M = 5.0              # ASSUMED: DIN 557 M6 height
+NUT_E = 14.14            # ASSUMED: DIN 557 M6 corner diameter (the jam nut turns with the screw: swept Ø)
+WASHER_D = 12.0          # ASSUMED: DIN 125-A M6 outer Ø (6.4 / 12 / 1.6)
+WASHER_T = 1.6           # ASSUMED: DIN 125-A M6 thickness
+JAM_GAP = 0.20           # DESIGNED (r8 sizing): released shoe bottom -> jam nut top (jam top at lock -23.692)
+JAM_BORE_D = 14.6        # DESIGNED: bore for the washer + turning jam nut, open to the +Z face
+JAM_BORE_TOP_CLEAR = 0.30  # DESIGNED r8 build (deviation): the bore runs this far above the jam nut top, because
+                           # the nut top is 1.3 above the pocket bottom, where the pocket is only 10.6 wide in Z
+BLOCK_FLOOR_T = 5.5      # PROPOSED (SF 3.51): block floor under the jam stack; the screw head bears under it
+BLOCK_WALL_X = 3.0       # DESIGNED: lower block ±X walls beside the pocket
+POCKET_INSERT_MARGIN = 1.5  # DESIGNED: pocket bottom (insertion level) this far under the released shoe bottom
+WINDOW_TOP_BELOW_CHANNEL = 1.0  # DESIGNED (user decision r8): +Z assembly window top, under the channel floor
 
 # ── Handle coupling, round 6 (concept D, coupling_sizing.md + bar_and_snap.md; all PROPOSED by
 #    print-tolerance-expert, user-approved round). Frame lug (tenon) in a blind square socket in the handle head,

@@ -39,6 +39,29 @@ def teardrop_bore_x(x0, x1, y, z, d, apex_dir=+1):
     return Solid.extrude(Face(w), Vector(x1 - x0, 0, 0))
 
 
+def teardrop_bore_y(x, y0, y1, z, d, apex_dir=+1, flat=None):
+    """Bore along Y: circle Ø d plus a 45° point towards apex_dir*Z (support-free when Z is the build axis).
+    flat: if given, the point is cut flat at this distance from the axis (r/√2 < flat < r·√2), leaving a short bridge."""
+    r = d / 2.0
+    s = r / math.sqrt(2.0)
+    h_apex = r * math.sqrt(2.0)
+    t1 = Vector(x + s, y0, z + apex_dir * s)
+    t2 = Vector(x - s, y0, z + apex_dir * s)
+    bottom = Vector(x, y0, z - apex_dir * r)
+    if flat is None:
+        apex = Vector(x, y0, z + apex_dir * h_apex)
+        tops = [Edge.make_line(t2, apex), Edge.make_line(apex, t1)]
+    else:
+        if not (s < flat < h_apex):
+            raise ValueError(f"teardrop flat {flat:.3f} outside ({s:.3f}, {h_apex:.3f})")
+        w_half = h_apex - flat
+        p1 = Vector(x + w_half, y0, z + apex_dir * flat)
+        p2 = Vector(x - w_half, y0, z + apex_dir * flat)
+        tops = [Edge.make_line(t2, p2), Edge.make_line(p2, p1), Edge.make_line(p1, t1)]
+    w = Wire(tops + [Edge.make_three_point_arc(t1, bottom, t2)])
+    return Solid.extrude(Face(w), Vector(0, y1 - y0, 0))
+
+
 def along_y(shape, x, y0, z):
     """Map a shape built along +Z (axis at the origin) onto an axis parallel to +Y through (x, y0, z)."""
     return Pos(x, y0, z) * Rot(-90, 0, 0) * shape

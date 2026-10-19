@@ -1,4 +1,4 @@
-"""SurgicalDrillGuide stage 3b: mechanism profiles - ratchet notch cutter, pawl tooth."""
+"""SurgicalDrillGuide stage 3b: mechanism profiles - ratchet notch cutter, shoe (rigid pawl) tooth."""
 
 import math
 
@@ -33,12 +33,6 @@ def sawtooth_cutter_face(yb, x_start, x_end, pitch, depth, land, eps, hook_deg=0
 def _line_x(p, u, y):
     """x where the line through p with direction u crosses height y."""
     return p[0] + u[0] * (y - p[1]) / u[1]
-
-
-def tooth_face_x(pts, y):
-    """x of a pawl tooth's locking face (pts from pawl_tooth_pts: root point then apex) at height y."""
-    (xb, yr), (ax_, ay_) = pts[0], pts[1]
-    return xb + (y - yr) * (ax_ - xb) / (ay_ - yr)
 
 
 def pawl_tooth_pts(a, yb_a, pitch, depth, land, clear, y_root, hook_deg=0.0):
