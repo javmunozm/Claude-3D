@@ -5,7 +5,7 @@ Updated: 2026-10-18, by session 0a716d67 (round 8: rigid shoe + M6, Ø1.5 wire v
 Keep this file under about 150 lines. Agents read it instead of the README. History, rejected approaches and narrative stay in the README.
 
 ## Current
-- **Bake:** `stl/` + `step/` from the round 8 working tree (not committed yet), built and gated 2026-10-18. Nothing printed.
+- **Bake:** `stl/` + `step/` from commit ce7f2a7 (round 8), built and gated 2026-10-18. Nothing printed.
   - SHA-256 (first 16), Ø3.0: main_frame `ee79750524c0746a`, l_arm_slider `e9399f8bedb4cd8a`, handle `89315e535cfed6b2` (unchanged since r7), end_stop_pin `56da0372746aac68`, shoe `1c7b775d0c9c358a`.
   - Ø1.5 variant: main_frame_wire1p5 `90af336e6e79592d`, l_arm_slider_wire1p5 `194056fcc3d775f5`. Handle, pin and shoe are shared.
   - `hw_*.stl` = metal screw / jam stack / drive nut clearance bodies (not printed). Assemblies are written locked.

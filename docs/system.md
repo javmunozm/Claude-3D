@@ -76,6 +76,29 @@ Environment, dependencies, and conventions shared by every project in this index
 | Blender | `E:\Blender\blender.exe` (on user PATH) | Headless STL rendering and sculpt handoff |
 | OrcaSlicer | `C:\Program Files\OrcaSlicer` | STL → G-code for FDM printing |
 
+### Python environment
+
+Every script in this repo runs with the repo venv, not the system `python`:
+
+```
+D:\CAD\Claude-Projects\.venv\Scripts\python.exe <script>.py
+```
+
+- **Why:** on 2026-10-17 the system `python` on PATH was Python 3.14.7 with none
+  of the packages above installed. Agents fell back to numpy-only scripts, and
+  `tools/reconcile.py` skipped every pair because build123d could not be imported.
+- **Built 2026-10-17:** Python 3.13.15 (`winget install Python.Python.3.13`),
+  then `py -3.13 -m venv .venv`, then the pinned versions in the tables above
+  (`build123d==0.11.1 trimesh==4.12.2 manifold3d==3.5.2 shapely==2.1.2
+  scipy==1.16.1 numpy==2.3.2 ezdxf==1.4.4 matplotlib==3.10.7 pyvista==0.48.4
+  Pillow==12.2.0 rtree==1.4.1 networkx==3.6 opencv-python==4.13.0.92
+  svgpathtools==1.7.2`). pymeshfix, pymeshlab, pydicom, SimpleITK,
+  scikit-image, vtracer and ocp-vscode are **not** installed in it yet.
+- **Checked:** the SurgicalDrillGuide round-5 build run in this venv wrote all
+  7 STLs byte-identical to the previous exports.
+- The FontManager patch below is applied to `.venv\Lib\site-packages\build123d\text.py`.
+- `.venv/` is gitignored. To rebuild it, repeat the three steps and reapply the patch.
+
 ### Install
 
 Core packages:

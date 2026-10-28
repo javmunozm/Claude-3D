@@ -202,6 +202,30 @@ See `audit/spike/spike_report.md`. In short:
 - **Pass 1, uniform-parameter loops with ungraded segment spacing** (up to 9× jumps on the dome stations): the tip round failed at 3/2/1.
 - **Pass 1, extra stations at y -37 and -39.5:** the main loft blew up (volume 1.4e8).
 - **Pass 1, flat at TOP_Z + 0.01:** loft ringing of about 0.04 left two dimple islands in the flat top. 0.03 leaves none.
+- **Pass top (2026-10-06), the body's outer top edge as a handle-like curve with a size that varies along y. Rejected by the user ("awful"; the latch top is better).**
+  - **The law:** an ellipse opening of each body section's outer top corner (`sections.top_face`), full size 12 x 6 (equivalent r 14–16; the handle's top at y -25 is r 20–32).
+  - **Run 1, 2D on the build's own sections:** a 12 x 6 starting near the pocket opens both latch pits to the outside (wall 0 above z 10.28 upper and 10.88 lower), because the pits' vertical outer faces sit at x 94.1–97.6. The largest size that keeps every pit closed is 5.25 x 4.1, which leaves 0.28 at the top of the upper pit (4.5 x 3.75 leaves 0.91).
+  - **Run 2, built and gated** (SHA-256 `4A194F9D…`; hard gates pass; pit walls z 0..10.2 3.271 / 4.629, latch 3.543 / 5.979): 12 x 6 ahead of the pits and between them, eased to 4.5 x 3.75 over each pit. The edge scalloped: 1 mm in from the flank it drops 1.9 mm between the pits and rises again (z 10.16 → 8.24 → 10.10 over y 24 → 33 → 40); turn 7.5° per 0.5 mm, 14° per 1 mm. It reads as finger-like waves.
+  - **Extra loft stations** at y 27–39 grew the body loft by 9944 mm³ and moved the rear corner by up to 20 mm.
+  - **Process failure:** the brief came from the orchestrator's reading of the user's words. It skipped the user's marked render (`renders/VitaGripPS5_v2_latch_front.xcf`) and the form-auditor register, and it left out the marked handle-junction area (y -20..16).
+  - **Do not:** vary the edge size along y between the pits.
+- **Round topface (2026-10-06..08): the flat top Z 11.4 rounded. Rejected by the user ("si no se puede eliminar la cara plana siguiendo la línea de los mangos, entonces no se hace"); v2 stays at pass latch (`817c403`).**
+  - **Option 2, outer edge only** (`parts/topface.py`, one lofted cutter; pit face moved in 0.6, flex gap 1.9): the handle's y -27 profile in front, a blend to a constant r 5.000 from the lower pit (y 11.34) to y 58. Builds `topface` (`14762B33…`), `topface_seams` (`B7C7CF75…`), `topface_seams2` (`A6CF4BBD…`): pit walls z 0..10.2 3.163 / 5.72, seams <= 7.94° to y 58.6, but the blend bent 14.8° / 17.9° along y at y 4.25 and the cut's rear end read 10.5° and 82–108° on 1.6–3.3 mm edges (designer's numbers). The user rejected option 2 itself: they meant the whole top face crowned ("option 4").
+  - **Crown, the whole top face** (`crown_R` 27, lift 0.15; crest x 89 in front ramping to x 93 over y 0..11.34; inner side a parabola, drop 1.5 at 20 mm; `border_r` 4.5; front fade y -24..-16). Build `topface_crown` (`8DCE9A5D…`): 1 body, watertight, genus 2, 0 sealed, but the upper pit wall read 2.832 at z 10.2 (< 3.0).
+  - **Why it failed, measured** (user mark `audit/topface/crown_roi_R.xcf` on crown3, located by ray-cast, silhouette IoU 0.992: x 74–106, y -12..9). The top has hollows where the latch part has none. Pooling depth along a line, W 12 mm:
+
+    | Zone | latch | crown3 (marked) | crown (built) |
+    |---|---|---|---|
+    | Outer junction, x 92–108, y -20..12 | 0.008 | 0.995 at (100.8, -5.8) | 0.580 at (100, -7.3) |
+    | Inner front corner, x 66–86, y -20..-9 | 0.050 | 1.269 at (74, -13.8) | 0.542 at (74.3, -15.5) |
+
+    - Cause, at x 100 along y: a ridge at y -20 (z 9.9–10.4), where the front fade leaves the handle's root flare uncut; a plateau of 9.21 at y -15..0 (the R 27 circle with the crest at x 89); then up to 10.63 from y 10 (the crest at x 93). The two circles give exactly 9.21 / 10.63.
+  - **Why the handle's line cannot be followed with the latches untouched:**
+    - The handle's crest runs inward toward the body: x 91.3 at y -50, 88.4 at y -28, 87.3 at the root (y -24). It does not run toward x 93.
+    - Upper pit wall at z 10.2 with the crest at x 87.3 (`crown_model.py`): 0 at R 20.2 (the handle's own radius) and at R 40, 1.6 at R 60. R 75 is the tightest that holds 3.0, a nearly flat top (about 1.3 mm drop over 13 mm). Control: crest at x 93 → R 25.2.
+  - **Not tried:** a crest that drifts monotonically from 87.3 to 93 over y -24..11.34, with the cut starting from the handle's own section (no fade). In principle it leaves no hollow, but it leaves the handle's line by up to 5.7 mm.
+  - **Process:** option 2 was built for a whole day from a record of the user's choice that was never checked against their marks; the crown was built by the orchestrator without a register or a designer pass.
+  - **Do not:** hold the crest at one x in front and another over the pits; fade the cut in where the old surface is rising (both make a hollow). Gate any top-face change with a hollow (pooling-depth) map against the latch part.
 
 ## Verification checklist (open)
 - The rear corner (y 59-77) is simplified; it is not verified against r16. The window, camera hole, lower lips and bottom opening were added in pass 2.

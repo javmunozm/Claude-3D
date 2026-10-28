@@ -1,6 +1,6 @@
 # VitaGripPS5: STATE
 
-Updated: 2026-10-05 by `/session-end` (session 49ca6a61: system improvement,
+Updated: 2026-10-08 by `/session-end` (session f77b040d: round topface rejected; earlier header: session 49ca6a61, system improvement,
 then the v2 B-rep spike and passes 1–1d).
 
 Keep this file under about 150 lines. Agents read it instead of the README. History, rejected approaches and narrative stay in the README.
@@ -8,7 +8,7 @@ Keep this file under about 150 lines. Agents read it instead of the README. Hist
 ## Current
 - **Bake:** `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
-- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_latch.stl` (pass "latch" on top of plate `79c753a`; SHA-256 `DAA382EE…`, re-hashed after the 2026-10-06 power outage; reviewed ACCEPT WITH LISTED ARTIFACTS, committed 2026-10-06). Next: the top-face pass, then the pocket contour ("Decisions pending" item 5). See "v2" below.
+- **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_latch.stl` (pass "latch" on top of plate `79c753a`; SHA-256 `DAA382EE…`, re-hashed after the 2026-10-06 power outage; reviewed ACCEPT WITH LISTED ARTIFACTS, committed 2026-10-06). **The top face stays flat:** pass top was rejected 2026-10-06, and round topface (option 2 and the crown) on 2026-10-08. Code restored to `817c403`, and the restored build is byte-identical to the latch STL. Next: the pocket contour ("Decisions pending" item 5). See "v2" below.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).
 - **Method:** r16 is a mesh pipeline on the DualSense scan (numpy and trimesh), not B-rep; fillets cannot be made on it. **The user decided on 2026-10-04 to rebuild the case as a CAD (B-rep) design** in `v2/` (`docs/versioning.md`); a spike runs first (`v2/audit/spike/spike_report.md`). r16 stays the printable bake until a v2 replaces it.
 - **The part:** X width 220.08; Y fore-aft from the handle tips at -68.0025 to the rear at +78.550; Z up, pocket floor -8.80, flat top 11.40. 137 216 faces, watertight, 1 body, genus 2, volume 266 520.9 mm3.
@@ -122,6 +122,20 @@ List price of the agent runs only (the orchestrator is not included); measured 2
 | v2 plate review | 2026-10-06 | review (usage-limit stop) + 51 | at `/session-end` | ACCEPT WITH LISTED ARTIFACTS, 0 regressions; A1, A2 listed; rear 9.01° facets = tessellation (B-rep 0.01–0.63°); orchestrator rebuild byte-identical (committed 2026-10-06) |
 | v2 latch | 2026-10-06 | designer 53 | at `/session-end` | finger x2 (3.6 / 1.8), root r 2.0, hook 1.5, gap 2.5; pit walls 3.543 / 5.979; A3 accepted |
 | v2 latch review + root check | 2026-10-06 | review 38; print-tolerance-expert (count not recorded: power outage before the orchestrator read it) | at `/session-end` | review ACCEPT WITH LISTED ARTIFACTS, 1 regression (S10), S11 first swept; root check: fillet Kt 1.30 (in-layer SF 3.25), slot-wall foot corner brackets Kt 1.30–2.39 (SF 3.25–1.77); S10 and S11 accepted by the user (committed 2026-10-06) |
+| v2 top (runs 1 + 2) | 2026-10-06 | designer 28 (stopped at step 1; peak 161k), designer 58 (turn limit; peak 193k) | $2.63 + $4.38 | REJECTED by the user: an edge size varied along y scalloped the outer top (a 1.9 mm dip between the pits). No register, no marked render read. Deleted; lesson in `v2/README.md` |
+| v2 topface register | 2026-10-06 | form-auditor 21 (peak 153k) | $2.52 | S12 (outer edge r 3 vs R 20.2), S13 (junction flat vs crown); pit-wall vs radius table; the user chose option 2 |
+| v2 topface gap check | 2026-10-07 | print-tolerance-expert 4 (stopped by the user) | $0.22 | nothing written; brief kept for next session |
+| v2 topface gap + radius | 2026-10-07 | print-tolerance-expert 16 (peak 72k), form-auditor 17 (peak 64k) | $0.87 + $0.66 | max move-in 0.6 (root fillet); largest r 5.15 at D 0.6; the user chose r 5.0 |
+| v2 topface fix (runs 1 + 2) | 2026-10-07 | designer 83 (turn limit, nothing exported; peak 243k) + 73 (peak 138k) | $4.70 + $2.62 | one lofted cutter; built; rebuild byte-identical; off = latch byte-identical |
+| v2 topface review | 2026-10-07 | form-auditor 64 (peak 183k) | $3.23 | METHOD REVIEW: S14–S18 at the cutter's seams; the user chose to fix the seams; A3 re-accepted |
+| v2 topface seams + crown | 2026-10-07 | designer 46 (peak 161k) + 53 (peak 193k); crown by the orchestrator | $3.00 + $3.97 | seams2: blend bend 14.8 / 17.9° along y, rear end 82–108°; the user rejected option 2 (meant: crown the whole top); crown built with no register: hollows 0.58 / 0.54 mm, upper pit wall 2.832 |
+| v2 topface rejected | 2026-10-08 | orchestrator only | $4.67 (the session) | user mark located (IoU 0.992); hollow measured; crest at the handle line needs R >= 75; round rejected; files deleted; lesson in `v2/README.md` |
+
+Session f77b040d total (2026-10-08), orchestrator only: $4.67 list.
+
+Session 4a23062d total (2026-10-07; closed without `/session-end`, costs filled in 2026-10-08), orchestrator included: $38.25 list (main $19.18, agents $19.07).
+
+Session cbf143b6 total (2026-10-06/07; after the power outage), orchestrator included: $22.10 list (main $12.36, agents $9.75). The latch review and root check ran in session 49ca6a61 before the outage.
 
 Session 49ca6a61 total, orchestrator included: $85.10 list (main $61.04, agents $24.06).
 
@@ -141,8 +155,16 @@ Session 49ca6a61 total, orchestrator included: $85.10 list (main $61.04, agents 
    - **Root check** (`v2/audit/latch/root_check.md`, 2D FE on the built STL): the fillet holds Kt 1.30 (in-layer SF 3.25, as sized). The slot-wall foot is a sharp 90° corner the sizing did not model: Kt 1.30 (notch-insensitive) to 2.39 (printed foot r 0.1), in-layer SF 3.25 to 1.77; 3.0 not demonstrated with the foot. Interlayer <= 1.01 in every case (side print only). Push-in 63.1 N and release 5.74 N unchanged. Fixes it flagged, not built: G1 (slot-side r 1.2 + foot r 0.3, SF 3.19) and F1r (local undercut, full r 2 + foot r 0.2, SF 3.40).
    - **S10 (ACCEPTED by the user 2026-10-06):** the slot-side root fillet is cut short (meets the slot floor at 16.2°, 0.057 flat, sharp slot-wall foot). The user will test the slot on the print (0.4 nozzle, PETG, expected tight) and adjust in the slicer if needed. Before printing: look at the slot-wall foot for whitening or cracks after 10+ insertions.
    - **S11 (ACCEPTED, 2026-10-06):** the root arcs and pit plan corners are 0.065 mm planar facets (sagitta about 0.0003). Print-neutral; the review flags it as a risk for an OCC fillet that crosses the pits.
-   - **Top face (user, 2026-10-06):** the grip's flat top at Z 11.4 outboard of the latches, the continuation of the handle into the main body (y about -15 to the rear corner; measured 2026-10-06: about 9 mm wide at y 33, outer edge a 3 mm round, equivalent r 2–3; the handle's outer top r 20–32 at y -25). The user chose to **continue the handle curve** on its outer side: the face stays at Z 11.4 next to the screen and curves down outward like the handle's top. It runs over the upper pits' outer walls (A3: 3.0 at z 10.8 now), so those walls are measured after the build. Not started.
-   - Order: edge (done) → plate edges (done) → latches (done) → top face → pocket contour; each pass reviewed before the next.
+   - **Pass top: REJECTED by the user 2026-10-06** ("awful"; the latch top is better). It varied an elliptical edge opening along y (12 x 6, eased to 4.5 x 3.75 over the pits), and the edge scalloped (a 1.9 mm dip between the pits). Files deleted, code restored to `817c403`, and the lesson recorded in `v2/README.md`, "Rejected approaches". The process failed: no marked render was read, no register was run.
+   - **Round topface: REJECTED by the user 2026-10-08** ("si no se puede eliminar la cara plana siguiendo la línea de los mangos, entonces no se hace"). The top stays flat at Z 11.4.
+     - **What was built:**
+       - Option 2, outer edge only: an r 5.000 cutter from the lower pit back (`topface`, `_seams`, `_seams2`). The user rejected it on 2026-10-07: they meant the whole top crowned.
+       - The crown (`topface_crown`): R 27, crest x 89 in front and x 93 over the pits. Built with no register; upper pit wall 2.832 at z 10.2.
+     - **Measured (2026-10-08) on the user's mark `v2/audit/topface/crown_roi_R.xcf`:** a hollow at the junction, 0.580 mm at (100, -7.3) and 0.542 at the inner front corner (74.3, -15.5); crown3, the marked one, reads 0.995 / 1.269; latch 0.008 / 0.050. Cause: the crest at x 89 in front against x 93 over the pits (plateaus 9.21 / 10.63 at x 100), plus the front fade's ridge at y -20.
+     - **Infeasible as asked:** the handle's crest runs inward (x 91.3 at y -50 to 87.3 at y -24). With the crest there, the upper pit wall reaches 3.0 at z 10.2 only at R >= 75, almost flat; the handle's own R 20.2 opens the pits.
+     - Files deleted, code restored to `817c403`; the restored build is byte-identical to `VitaGripPS5_v2_latch.stl` (`DAA382EE…`). `v2/audit/topface/` is kept as the record; its scripts that import `parts/topface.py` no longer run. Full lesson: `v2/README.md`, "Rejected approaches".
+     - Not tried: a crest drifting monotonically from 87.3 to 93, with the cut starting from the handle's own section. It leaves the handle's line by up to 5.7 mm.
+   - Order: edge (done) → plate edges (done) → latches (done) → top face (rejected, stays flat) → pocket contour; each pass reviewed before the next.
 5. Handle tolerance against r16: working limit RMS 0.3 / max 2.0 mm, round band excluded (set by the orchestrator; confirm or change). The user chose the 3 mm round everywhere and the 15 mm root transition.
 6. Any structural check that hard-codes the old tip (-75.18 / -78.15), the +22 mm handle length or the 34 mm girth station must be re-reconciled before it is trusted.
 7. Archiving `audit/r9`..`r15` to `audit/archive/` (it needs your approval).
