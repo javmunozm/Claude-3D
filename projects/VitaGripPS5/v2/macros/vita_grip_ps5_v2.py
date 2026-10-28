@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--pre-post-brep", default=None, help="write the half before the post-fuse nose fillets; stop")
     ap.add_argument("--open-end-r", type=float, default=None, help="override OPEN_END_R (0 = pass s8)")
     ap.add_argument("--corner-round", type=float, default=None, help="override CORNER_ROUND (0 = pass front)")
+    ap.add_argument("--cove-r", type=float, default=None, help="override COVE_R (0 = pass latch)")
     ap.add_argument("--off", default="", help="comma list of pass-2 switches to turn off, or 'all' (= pass corner)")
     ap.add_argument("--sections-only", action="store_true")
     ap.add_argument("--half-brep", default=None, help="write the half before the lip (BREP), for fillet searches")
@@ -49,6 +50,8 @@ def main():
     args = ap.parse_args()
     if args.corner_round is not None:
         C.CORNER_ROUND = args.corner_round
+    if args.cove_r is not None:
+        C.COVE_R = args.cove_r
     if args.open_end_r is not None:
         C.OPEN_END_R = args.open_end_r
     if args.plate_nose_r is not None:
@@ -268,6 +271,23 @@ def main():
     if args.half_brep:
         export_brep(half, args.half_brep)
         log("half before the lip written to %s" % args.half_brep)
+    if C.COVE_R > 0:
+        # pass cove: the seat-corner strip, built alone, joined here so both pit cuts trim it
+        import math
+        from vgps5_v2.parts.cove import corner_cove
+        hl = C.FINGER_W / 2.0 + C.FINGER_SLOT
+        pits = [(C.FINGER_P, n, hl)]
+        if C.LOWER_LIP_ON:
+            pits.append((C.FINGER_P_LO, np.array(C.FINGER_N_LO) / np.linalg.norm(C.FINGER_N_LO), hl))
+        th_end = C.COVE_THETA_END   # A2: to where the wall ends (A1 stopped at the upper pit centre)
+        pieces = corner_cove(C.CAP_XC, C.CAP_A, C.CAP_B, C.YC, C.FLOOR_Z, C.COVE_R, C.COVE_EMBED, th_end, pits)
+        v0 = half.volume
+        for i, piece in enumerate(pieces):
+            half = one_solid(half.fuse(piece), "corner cove piece %d fused" % i)
+        R["cove"] = dict(r=C.COVE_R, embed=C.COVE_EMBED, theta_end=round(th_end, 3), pieces=len(pieces),
+                         piece_volumes=[round(p.volume, 3) for p in pieces], added=round(half.volume - v0, 3))
+        log("cove r %.2f: %d pieces (to theta %.2f), %s mm3, added %.1f mm3"
+            % (C.COVE_R, len(pieces), th_end, [round(p.volume, 1) for p in pieces], half.volume - v0))
     half = one_solid(half.cut(pit), "pit cut")
     finger = one_solid(build_finger(C.FINGER_P, n, C.FINGER_W, prof), "finger")
     half = one_solid(half.fuse(finger), "finger union")

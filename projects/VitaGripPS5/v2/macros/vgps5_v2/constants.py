@@ -236,3 +236,15 @@ OPEN_X_END = 67.4                                             # pass s8: 66.75 l
 OPEN_Y_LO = -25.0                                             # r16: no material at x < 66.75, y -25..-9.3, z >= -8.8
 OPEN_END_R = 1.2                                              # pass edge: round on the closed end / grip edge (0 = s8)
 OPEN_END_R_FALLBACK = (1.0,)                                  # tried in order if OPEN_END_R fails
+
+# pass cove (2026-10-27, user): a strip in the console seat corner (pocket wall / floor Z -8.8) along the elliptical
+# cap, section COVE_R x COVE_R with its free edge rounded to the full COVE_R (tangent to wall and floor), built alone
+# (parts/cove.py) and joined before the pit cuts. Measured: the console clears an r 3 cove by >= 2.45.
+# A1 (user report): only along the handle-side wall — from the front (theta -90) to the upper pit; removed over each
+# pit's full length. Past y ~60 (the rear/trigger corner) there is no wall and the strip stood alone as a thin fin.
+# 0 = pass latch (byte-identical).
+COVE_R = 3.0
+COVE_EMBED = 0.5                                              # reach into the wall and floor, so the union overlaps
+# A2 (user: "reduced too much"): run past the upper pit to where the wall still backs the full height — measured on
+# the latch STL: wall at u 0 up to h 4 for theta 32..38 deg, gone at h 4 by 40, gone by 45. Pits stay as breaks.
+COVE_THETA_END = 38.0                                         # degrees on the cap ellipse (y 59.3)
