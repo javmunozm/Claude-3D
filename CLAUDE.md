@@ -33,16 +33,16 @@ geometry change run `python tools\render_check.py projects\<Project>\stl\<Part>.
 lit render**; before trusting any structural verdict, read its
 `tools/reconcile.py` block.
 
-**A render is not a measurement.** Ask `form-auditor` for a number before
-believing a picture, and `perspective-checker` before comparing a picture to a
-photo — see [docs/agents.md](docs/agents.md).
+**A render is not a measurement.** Run the `form-audit` skill for a number
+before believing a picture, and the QUALIFY stage of `photo-to-vectors` before
+comparing a picture to a photo — see [docs/agents.md](docs/agents.md).
 
 ## Documentation
 
 | Doc | Covers |
 |-----|--------|
 | [docs/architecture.md](docs/architecture.md) | Repo structure, `sources/` vs `projects/`, geometry code → exports → verification → viewer, project conventions |
-| [docs/agents.md](docs/agents.md) | The nine subagents, their handoff order, the `/verify` skill, and how to brief them |
+| [docs/agents.md](docs/agents.md) | The skills (plan → run → report), the reference chain, the fix-round cycle, the eval set; the subagents they replaced |
 | [docs/commands.md](docs/commands.md) | Standard commands: generate, view, verify, DXF/SVG import, mesh repair, Blender rendering, pyvista inspection, DICOM reading |
 | [docs/system.md](docs/system.md) | Full toolchain — packages with versions, Blender setup, import capabilities, rendering, disk constraints, known issues |
 | [docs/versioning.md](docs/versioning.md) | Nesting a second generation inside a project, the move procedure, the path constants it breaks, retiring a version |
@@ -52,7 +52,10 @@ photo — see [docs/agents.md](docs/agents.md).
 | [docs/cad_method.md](docs/cad_method.md) | B-rep by default; bringing a scanned shape into B-rep; CAD tools compared; the stage cache |
 | [docs/lessons.md](docs/lessons.md) | Post-mortems with their numbers — one entry per incident, read by the agents each concerns |
 
-Agents are briefed from `docs/templates/` with numeric ceilings; see `docs/workflow.md`.
+Work runs in the main session through skills (`.claude/skills/`): each writes a
+plan with numeric ceilings, shows it, runs it once and reports — see
+`docs/workflow.md`. The nine subagents were archived on 2026-10-27
+(`.claude/agents-archive/`); skills are tested with `.claude/evals/skills_eval.md`.
 
 ## Two rules that cost this repo the most
 

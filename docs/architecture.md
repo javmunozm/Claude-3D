@@ -85,8 +85,8 @@ clean SVG (mm units, smooth curves, features labeled)
 DXF (importable by build123d via import_dxf)
 ```
 
-The `vector-tracer` agent runs this pipeline; the `accuracy-reviewer` agent
-verifies the output against the source image and known dimensions. See
+The TRACE stage of the `photo-to-vectors` skill runs this pipeline; its REVIEW
+stage verifies the output against the source image and known dimensions. See
 [commands.md](commands.md#vectorize-a-reference-image) for the specific
 commands.
 

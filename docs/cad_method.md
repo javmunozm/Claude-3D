@@ -89,7 +89,7 @@ Measured on this machine, 2026-10-03:
    top as solids and extrusions, from traced outlines (`vectors/`) or the spec.
 5. **Assemble.**
    - Mirror the half.
-   - Union with at least 1 mm of overlap (the cad-designer rule: solids that only
+   - Union with at least 1 mm of overlap (the cad-build rule: solids that only
      touch do not fuse).
 6. **Rounds.** Large transitions are part of the loft. Fillet small edges, and
    check the largest radius before choosing one.
@@ -179,3 +179,9 @@ else:
 ```
 
 `work/` is an untracked workflow folder (`docs/architecture.md`).
+
+**Implemented 2026-10-27** as `tools/stage_cache.py`, keyed per part (the
+builder's arguments, the source and UPPERCASE constants of the modules it uses,
+the input files, the build123d version), with an export manifest so unchanged
+files are not rewritten. Reference use: SurgicalDrillGuide's
+`surgical_drill_guide.py`; tests in its `work/build_report.md`.

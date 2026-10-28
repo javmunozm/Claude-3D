@@ -1,0 +1,149 @@
+# Measuring a reference image
+
+Moved from the reference-analyst agent (2026-10-27). Read the section you need.
+
+## The one rule everything rests on
+
+**A photograph contains no absolute scale.** It contains proportions. Every measurement you produce must be traceable to a single **anchor**: one real-world dimension, known independently of the photo, that sets the pixels-per-mm for everything else.
+
+The VitaGrip project did this correctly and it is the house method: the PS Vita's official 182 mm width spanned 738 px in a 960×960 image, giving 4.055 px/mm, and every other dimension was derived against that scale. Follow the same discipline.
+
+If you have no anchor, you have no measurements. Say so and ask the user for one dimension — a spec-sheet width, a caliper reading, a ruler in the frame — rather than producing numbers that look authoritative and are not.
+
+## Sourcing and organizing references
+
+Reference material lives in `sources/<subject>/` at the repo root, shared across projects (a subject may inform more than one part).
+
+For every subject, maintain `sources/<subject>/SOURCES.md` recording per image: filename, where it came from (URL or "user photo"), pixel dimensions, view type (front / rear / side / three-quarter / detail), and what it is trusted for. Provenance matters — the VitaGrip project correctly *rejected* a downloaded reference STL because its 170×170×123 mm envelope contradicted the confirmed 182×83.5×18.6 mm body. Without recorded provenance that contradiction is invisible.
+
+**Check the repo's meshes before the web, and check what each mesh has lost.** A remeshed or voxelised mesh smooths away small features.
+- On VitaGripPS5 (2026-10-02) the PS Vita's shoulder buttons were absent from `projects/VitaGripPS5/stl/console_solid.stl`, a 2.2 mm voxel remesh. They were present in `sources/psvitaGrip/Vita 1000/psvitaManualJoin_decimated.stl` as separate bodies, and were measured from it to ±0.4 mm.
+- No web source gave those dimensions.
+- Before measuring a feature on a mesh, say which mesh it is, how it was made, and how it was aligned to the project frame.
+
+**Sourcing paths**
+- Web: `WebSearch` / `WebFetch` for product photos, spec sheets, manuals. Spec sheets are gold — an official dimension is an anchor.
+- User photos: when the user supplies or can take images, give them the capture protocol below.
+- Screenshots of product pages, where direct download fails.
+
+**Capture protocol to give the user** (a good photo makes modeling tractable; a bad one makes it guesswork):
+1. **Orthographic-ish views**: straight-on front, rear, and side — the camera perpendicular to the face, centered on the object.
+2. **Stand back and zoom in.** Distance plus zoom compresses perspective; a close-up wide shot bows straight edges and makes far features read smaller than near ones.
+3. **Put scale in the frame**: a ruler alongside the object, or confirm a known dimension of the object itself.
+4. **Flat, even lighting**, plain contrasting background, no harsh shadows across the silhouette — you will be tracing that edge.
+5. **Highest resolution available**, no crop that cuts the anchor dimension.
+
+## How you measure
+
+1. **Establish the anchor first.** Identify the known dimension and the two pixel coordinates spanning it, compute px/mm, and state all three in your report. Every later number cites this scale.
+2. **Assess the image before trusting it.** Is the view actually straight-on? Are the object's own parallel edges parallel in the image, or converging (perspective)? Is the anchor in the same focal plane as the features you're measuring? Say what you find — a three-quarter view can give proportions and shape language but not reliable orthogonal dimensions.
+3. **Trace silhouettes systematically**, row-by-row or column-by-column, rather than eyeballing endpoints. This is how VitaGrip established that a horn was 46 mm long, not the 92 mm a previous pass had assumed — an error that had nearly doubled a major dimension and skewed the whole part.
+
+   Deliver the trace as a **width-vs-position table across the full feature**, not just its endpoints, and state the profile's *direction* in words — "swells from 8 mm at the neck to 53 mm at its widest ~55% down, then rounds to a tip." Endpoints alone are the trap that sank four VitaGrip revisions: the horn was modeled tapering 42 → 13 mm when the reference actually **swells** 8 → 53 mm before rounding off. Both descriptions have a "narrow end" and a "wide end"; only the sequence tells you it's a teardrop rather than a spike. A loft needs stations on both sides of any bulge, so give enough rows to carry the curve.
+4. **Cross-check across images.** A dimension measured in two independent views that agrees is far stronger than one measured once. Where views disagree, report the disagreement and the range rather than silently picking one.
+5. **Prefer the object's own spec** over any photo measurement when both exist. Photos fill in what specs omit — shape, curvature, proportion, feature placement — not what specs already state.
+6. **Check whether the reference shows the same variant as the target**, and say so explicitly. Reference photos frequently show a different model, revision, or size than the part being built — VitaGrip's references show a PCH-**2000** (slim) while the project targets a PCH-**1000**, whose body is a different width and notably thicker (18.6 mm vs 15.0 mm). Nothing in the project recorded this, so photo-derived numbers risked being applied to the wrong body.
+
+   When the variants differ, split your table in two and label it plainly:
+   - **From spec (absolute)** — the target variant's own dimensions. These set real size.
+   - **From photos (proportional)** — shape language, silhouette profile, relative placement, how solid the form reads. These set form, expressed as ratios or as "relative to the body's width/height," never as absolute mm lifted from a photo of a different object.
+
+   State the ratio between the two bodies so downstream scaling is explicit, and flag any feature whose fit depends on a dimension that differs between variants.
+
+Use `Read` to view an image, cropped to the region you need, once, to see what to measure. Then measure with Python (`PIL`, `numpy`), run from a `.py` file: threshold the silhouette, find the edge coordinates per row, and convert to mm through the anchor scale. Do not crop, look and crop again to hunt for an edge. One run did this 25 times, with 34 image reads, and the images made up over half its context.
+
+## What you deliver
+
+A measurement table, written to `projects/<Project>/docs/MEASUREMENTS.md` (the file the REVIEW stage reads) with a one-line pointer in the project's `STATE.md`, with **one row per dimension** and these columns:
+
+| Dimension | Value | Source image | Method | Confidence |
+|---|---|---|---|---|
+
+Confidence is one of:
+
+- **Specified** — from an official spec or a user's physical measurement. Not a photo measurement at all; the most trustworthy row.
+- **Measured** — pixel-derived from a straight-on view against a solid anchor. Good for proportion and shape; typically a few percent of scale error.
+- **Estimated** — derived from an oblique view, a partially occluded feature, or an uncertain edge. Usable for shape language; not for anything that must fit.
+- **Judgement** — chosen by you for engineering reasons, not measured. Say so and give the reasoning.
+
+Never blur these levels. Whoever sizes a mating feature needs to know whether a number came from a spec sheet or from counting pixels on a marketing photo, and **the fdm-tolerance skill will refuse to anchor a tight-tolerance fit on anything below Specified** — so mislabeling a row defeats a real safety check.
+
+Also state explicitly what the references **cannot** establish, so nobody assumes silence means confirmation.
+
+### Some shapes cannot be delivered as a table at all
+
+A row in a table is a scalar. An outline is a curve. When the thing you are
+measuring is a *shape* rather than a *size*, a measurement table silently throws
+away the very thing that matters, and it does so invisibly — the table looks
+complete, every row has a confidence level, and the shape is gone.
+
+The tell: if you find yourself writing a row like "body width 182 mm, body
+height 83.55 mm" for something that is **not** a rectangle, you have just
+described its bounding box, not its outline. Downstream, `Rectangle(182, 83.55)`
+is the obvious way to build from those two numbers, and it is wrong.
+
+This is what happened with the PS Vita in VitaGrip1000. The console's front
+outline tapers over about 40 mm at each end. Delivered as width × height, it
+became a rectangular pocket that cut **1232 mm² — 8.8 % — more than the console
+occupies**, removing exactly the material that should have wrapped its ends. The
+first pass's measurement table was not wrong in any row; it was the wrong
+*shape* of deliverable.
+
+When the outline carries information:
+
+- **Say so, in the table**, with a row whose Value is a pointer, not a number:
+  "see `vectors/psvita_front.dxf` — outline, not a rectangle."
+- **Go on to the TRACE stage** rather than trying to encode the curve as
+  constants. That is what the pipeline order in `docs/agents.md` is for, and it
+  is the stage most often skipped because a table *feels* like enough.
+- **Quantify the error the primitive would introduce** — area difference, or
+  maximum deviation in mm — so the cost of skipping the vector stage is a number
+  in the README rather than a matter of taste.
+
+The same applies to any feature you are tempted to summarise with two numbers:
+a tapered flank, a swelling handle, a non-circular boss, a compound curve.
+
+### An outline is not a solid: measure what stands proud of it
+
+A face-on view shows an object's silhouette. It does **not** show what sticks
+out towards the camera, and that is invisible precisely because it is pointing
+at you. Analog sticks, buttons, lenses, connectors and bosses all vanish in the
+view that otherwise looks most authoritative.
+
+If anything in your subject mates with, wraps, or closes over a face, you owe
+the downstream builder a **depth profile of that face**, not just its outline:
+
+1. Find the view that sees the face **edge-on** — the top, bottom or side
+   orthographic view. That is the only view where a protrusion has a measurable
+   height.
+2. Separate body from protrusion by occupancy, not by bounding box. A body row
+   spans most of the view's width; a protrusion row spans only where the feature
+   is. Taking the whole component's bounding box as the body's dimension is a
+   real and easy error — the PS Vita's 18.6 mm depth reads as 23.4 mm from the
+   top view and 37.8 mm from the bottom if you skip this step.
+3. Report each protrusion as **height proud of the face, centre position, and
+   extent** — and cross-check it in both edge views if the object has two. In
+   VitaGrip1000 the top and bottom views agreed on the analog sticks to 0.03 mm
+   (4.75 vs 4.72 mm proud), which is what made the number trustworthy.
+
+State plainly in your handoff that a pocket or lid built to the silhouette alone
+will foul these features.
+
+## Handing off
+
+The cad-build skill consumes the table directly and should not re-measure. In your handoff, flag:
+- Which dimensions are firm (Specified) versus provisional (Measured / Estimated).
+- Which need physical confirmation before printing, so they land in the README's verification checklist.
+- Any contradiction between sources, and which you recommend trusting and why.
+
+After cad-build builds the geometry, close the loop:
+
+```
+python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front --reference sources\<subject>\<photo>
+```
+
+`Read` the resulting `_vs_reference.png` and describe the difference in plain words. Judge **form**, not dimensions: overall proportion, whether the part reads as solid or skeletal, where mass sits, and whether features swell or taper in the same direction as the reference.
+
+Ignore the printed silhouette-profile table as evidence of agreement — it compares outer bounds only, and scored the known-bad VitaGrip part as near-perfect while the two images were plainly different objects. The image is the evidence.
+
+This is the check that four VitaGrip revisions never ran, and its absence is why a part that passed every dimensional and topological gate still looked nothing like the reference.

@@ -71,7 +71,7 @@ compresses depth so severely that a 40x35 mm volumetric handle read as a flat
 slab during VitaGrip review — a wrong verdict that would have triggered a
 rebuild of correct geometry. Choose the view that contains the axis in doubt
 (`right`/`left` for depth, `front`/`back` for the X-Y silhouette), and when the
-question is dimensional rather than visual, hand it to `form-auditor` for
+question is dimensional rather than visual, run the `form-audit` skill for
 cross-sections instead of judging by eye.
 
 ### (d) Mating check (multi-piece or mating parts only)
@@ -105,7 +105,7 @@ were obviously different objects. Only the image is evidence.
 
 If no reference exists, say so plainly rather than implying visual confirmation.
 
-**Qualify the reference before comparing to it.** Run `perspective-checker` (or
+**Qualify the reference before comparing to it.** Run the QUALIFY stage of the `photo-to-vectors` skill (or
 its mirror-IoU test) on the photo first. A photo shot down one axis is blind to
 that axis: VitaGrip's `054-1.webp` scores 0.967 (on-axis, usable for X-Y) while
 `020-1.webp` scores 0.562 (three-quarter, shape reference only). A view that

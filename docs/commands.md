@@ -123,7 +123,7 @@ Smooth shading with every vertex normal averaged (no feature split), and a
 zebra pass whose stripes break at a crease or a curvature step. **Measured
 limit (2026-10-04):** on the VitaGripPS5 scan mesh it does not separate
 tessellation marks from real defects, because those marks are real facet
-edges; classify marks by measurement there (form-auditor's mark classes).
+edges; classify marks by measurement there (the form-audit skill's mark classes).
 Meant for smooth (B-rep) tessellations; not yet tested on one.
 
 ### Sweep the whole part, and compare with the baseline
@@ -270,7 +270,7 @@ for path in paths:
 doc.saveas("outline.dxf")
 ```
 
-See the `vector-tracer` and `accuracy-reviewer` agents for the full workflow.
+See the `photo-to-vectors` skill (stages TRACE and REVIEW) for the full workflow.
 
 ## Repair non-manifold meshes
 

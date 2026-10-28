@@ -44,18 +44,30 @@ tools/reconcile.py (docs/mechanism_sizing.py) keep working unchanged.
 
 Run:  python "D:\\CAD\\Claude-Projects\\projects\\SurgicalDrillGuide\\macros\\surgical_drill_guide.py"
       ... --part handle     builds and exports ONE part (assemblies are not rewritten)
+      ... --no-cache        rebuild and rewrite everything
 Gates: python "D:\\CAD\\Claude-Projects\\projects\\SurgicalDrillGuide\\macros\\sdg_gates.py"
+
+Incremental build (2026-10-27, tools/stage_cache.py): each part is keyed on its builder's arguments, the source and
+constants of the modules it uses, and the traced DXFs. An unchanged part loads from <out>/work/cache/ and its files are
+not rewritten; an assembly is rewritten only when one of its parts changed. The build prints what it rebuilt.
+SDG_OUT_DIR (environment) sends every output, the cache included, to another folder: previews never touch stl/.
 """
 
 import argparse
+import hashlib
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 
 from build123d import Compound, Pos, Solid, export_step, export_stl  # noqa: E402,F401  (Solid: used by sdg_gates)
 
 from sdg_model.constants import *  # noqa: E402,F401,F403
+from sdg_model.constants import IMPORT_DIR  # noqa: E402
+
+OUT_DIR = Path(os.environ.get("SDG_OUT_DIR", OUT_DIR))  # noqa: F405
 from sdg_model.mechanisms import _line_x, pawl_tooth_pts, sawtooth_cutter_face  # noqa: E402,F401
 from sdg_model.parameters import derive_pin, derive_shoe, parameters  # noqa: E402,F401
 from sdg_model.parts.end_stop_pin import build_pin  # noqa: E402
@@ -68,22 +80,73 @@ from sdg_model.rings import (derive, derive_channel, horizontal_chord, rack_bott
 from sdg_model.shapes import (along_y, box, cone_y, cyl_y, extrude_z, one_solid, polygon_face,  # noqa: E402,F401
                               shapely_faces, teardrop_bore_x, teardrop_bore_y)
 
+import sdg_model.mechanisms as _m_mech  # noqa: E402
+import sdg_model.parts.end_stop_pin as _m_pin  # noqa: E402
+import sdg_model.parts.handle as _m_handle  # noqa: E402
+import sdg_model.parts.l_arm_slider as _m_slider  # noqa: E402
+import sdg_model.parts.main_frame as _m_frame  # noqa: E402
+import sdg_model.parts.shoe as _m_shoe  # noqa: E402
+import sdg_model.rings as _m_rings  # noqa: E402
+import sdg_model.shapes as _m_shapes  # noqa: E402
+import stage_cache  # noqa: E402
+
 PART_NAMES = ("main_frame", "l_arm_slider", "handle", "end_stop_pin", "shoe")
 HW_NAMES = ("hw_screw", "hw_jam", "hw_drive_nut")   # bought parts, clearance volumes only (STL, not printed)
+_COMMON = (_m_shapes, _m_mech, _m_rings)            # helpers every part builder may call
 
 
-def build_all(wire=WIRE_D):
-    D, travel, chan, teeth, bore, coup, shoe = parameters(wire)
-    frame, a_list = build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])
+def open_cache(enabled=True):
+    return stage_cache.Cache(OUT_DIR / "work" / "cache", enabled=enabled)
+
+
+def _specs(P):
+    """name -> (builder module, builder arguments, build function returning (shape, side data))."""
+    D, travel, chan, teeth, bore, coup, shoe = P
+    spec = {
+        "main_frame": (_m_frame, (D, T_Z, teeth, bore, coup, D["ctip"], D["pin"]),
+                       lambda a: (lambda r: (r[0], [float(x) for x in r[1]]))(build_main_frame(*a))),
+        "l_arm_slider": (_m_slider, (D, T_Z, WRAP_WALL_Z, chan, bore, shoe), lambda a: (build_l_arm_slider(*a), None)),
+        "handle": (_m_handle, (D, T_Z, coup), lambda a: (build_handle(*a), None)),
+        "end_stop_pin": (_m_pin, (D["pin"],), lambda a: (build_pin(*a), None)),
+        "shoe": (_m_shoe, (shoe, bore["apex_dir"]), lambda a: (build_shoe(*a), None)),
+    }
+    for h in HW_NAMES:
+        spec[h] = (_m_shoe, (shoe, h), lambda a: (build_hardware(a[0])[a[1]], None))
+    return spec
+
+
+def _key(mod, args):
+    """The part's cache key, or None (always rebuilt) if an argument cannot be keyed."""
+    try:
+        return stage_cache.fingerprint((mod,) + _COMMON, args, sorted(Path(IMPORT_DIR).glob("*.dxf")))
+    except TypeError as e:
+        print(f"  (not cached: {e})")
+        return None
+
+
+def _get(cache, name, mod, args, fn):
+    key = _key(mod, args)
+    if key is None:
+        shp, data = fn(args)
+        cache.rebuilt.append(name)
+        return shp, data, f"uncached-{os.urandom(8).hex()}"
+    shp, data = cache.shape(name, key, lambda: fn(args))
+    return shp, data, key
+
+
+def build_all(wire=WIRE_D, cache=None):
+    """Every part and the hardware. With a cache, unchanged parts are loaded, not rebuilt. Returns (parts, info)."""
+    cache = cache or open_cache(enabled=False)
+    P = parameters(wire)
+    D, travel, chan, teeth, bore, coup, shoe = P
+    got = {n: _get(cache, n, *s) for n, s in _specs(P).items()}
+    frame, a_list = got["main_frame"][0], got["main_frame"][1]
     if [round(a, 9) for a in a_list] != [round(a, 9) for a in shoe["a_list"]]:
         raise RuntimeError("frame notches differ from the notches the shoe was derived on")
-    slider = build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, shoe)
-    handle = build_handle(D, T_Z, coup)
-    pin = build_pin(D["pin"])
-    shoe_p = build_shoe(shoe, bore["apex_dir"])
     info = {"D": D, "travel": travel, "chan": chan, "teeth": teeth, "bore": bore, "coup": coup,
-            "shoe": shoe, "a_list": a_list, "hw": build_hardware(shoe)}
-    return {"main_frame": frame, "l_arm_slider": slider, "handle": handle, "end_stop_pin": pin, "shoe": shoe_p}, info
+            "shoe": shoe, "a_list": a_list, "hw": {h: got[h][0] for h in HW_NAMES},
+            "keys": {n: g[2] for n, g in got.items()}}
+    return {n: got[n][0] for n in PART_NAMES}, info
 
 
 def rack_notches(D, teeth):
@@ -93,18 +156,11 @@ def rack_notches(D, teeth):
     return a_list
 
 
-def build_one(name, wire=WIRE_D):
-    """One part only (the others are not built)."""
-    D, travel, chan, teeth, bore, coup, shoe = parameters(wire)
-    if name == "main_frame":
-        return build_main_frame(D, T_Z, teeth, bore, coup, D["ctip"], D["pin"])[0]
-    if name == "l_arm_slider":
-        return build_l_arm_slider(D, T_Z, WRAP_WALL_Z, chan, bore, shoe)
-    if name == "handle":
-        return build_handle(D, T_Z, coup)
-    if name == "shoe":
-        return build_shoe(shoe, bore["apex_dir"])
-    return build_pin(D["pin"])
+def build_one(name, wire=WIRE_D, cache=None):
+    """One part only (the others are not built). Returns (shape, key)."""
+    cache = cache or open_cache(enabled=False)
+    shp, _, key = _get(cache, name, *_specs(parameters(wire))[name])
+    return shp, key
 
 
 def slider_at(slider, travel):
@@ -143,20 +199,45 @@ def check_valid(parts):
         raise SystemExit(f"invalid part(s) {bad}: nothing exported")
 
 
-def export_part(name, shp, suffix=""):
-    export_step(shp, str(part_path(name, "step", suffix)))
-    export_stl(shp, str(part_path(name, "stl", suffix)), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+def export_part(name, shp, suffix="", cache=None, key=None):
+    """STEP + STL. With a cache and a key, files already written from this key are left alone."""
+    step, stl = part_path(name, "step", suffix), part_path(name, "stl", suffix)
+    if cache is not None and key and not (cache.needs_write(step, key) or cache.needs_write(stl, key)):
+        cache.skip(step)
+        cache.skip(stl)
+        return
+    export_step(shp, str(step))
+    export_stl(shp, str(stl), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+    if cache is not None and key:
+        cache.wrote(step, key)
+        cache.wrote(stl, key)
+
+
+def export_stl_keyed(shp, path, cache, key):
+    if not cache.needs_write(path, key):
+        cache.skip(path)
+        return
+    export_stl(shp, str(path), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+    cache.wrote(path, key)
+
+
+def assembly_key(keys, travel):
+    h = hashlib.sha256(repr(sorted(keys.items())).encode() + repr(float(travel)).encode())
+    return h.hexdigest()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. GENERATE
 # ═════════════════════════════════════════════════════════════════════════════
 
-def main_all(wire=WIRE_D):
+def main_all(wire=WIRE_D, use_cache=True):
     """Default wire: every part, hardware and assembly. Other wire variants: only the bored parts and the assemblies
-    (suffixed); the shared parts are built for the assemblies but never written (they stay the default build's)."""
+    (suffixed); the shared parts are built for the assemblies but never written (they stay the default build's).
+    With the cache, only changed parts are rebuilt and only files whose inputs changed are rewritten."""
     variant = bool(WIRE_VARIANTS[wire][2])
-    parts, info = build_all(wire)
+    cache = open_cache(enabled=use_cache)
+    parts, info = build_all(wire, cache)
+    keys = info["keys"]
     print(f"wire variant Ø{wire}: bore drawn Ø{info['bore']['d']}, reamed Ø{info['bore']['ream_d']}, suffix "
           f"'{info['bore']['suffix']}'")
     D, chan = info["D"], info["chan"]
@@ -190,10 +271,10 @@ def main_all(wire=WIRE_D):
     for name, shp in parts.items():
         if variant and name not in BORE_PARTS:
             continue
-        export_part(name, shp, variant_suffix(name, wire))
+        export_part(name, shp, variant_suffix(name, wire), cache, keys[name])
     if not variant:
         for name, shp in info["hw"].items():
-            export_stl(shp, str(part_path(name, "stl")), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+            export_stl_keyed(shp, part_path(name, "stl"), cache, keys[name])
     pin = D["pin"]
     added, _, _ = ctip_pad_region(D, D["ctip"])
     print(f"pin: X {pin['x']:.3f} Y {pin['y']:.3f} hole Ø{pin['hole_d']:.2f}; collar face {pin['collar_face']:.3f}; "
@@ -202,22 +283,32 @@ def main_all(wire=WIRE_D):
     print(f"C-tip pad: X {D['ctip']['x_entry']:.3f}..{D['ctip']['x_exit']:.3f}, half-height {D['ctip']['half_h']:.2f}; "
           f"added to the traced outline {added.area:.2f} mm2")
     for pose, t in info["travel"].items():
+        an = f"assembly_{pose}"
+        path = part_path(an, "stl", variant_suffix(an, wire))
+        akey = assembly_key(keys, t)
+        if not cache.needs_write(path, akey):
+            cache.skip(path)
+            continue
         asm = Compound(children=[parts["main_frame"], slider_at(parts["l_arm_slider"], t), parts["handle"],
                                  parts["end_stop_pin"], shoe_at(parts["shoe"], t)]
                        + [shoe_at(h, t) for h in info["hw"].values()])
-        an = f"assembly_{pose}"
-        export_stl(asm, str(part_path(an, "stl", variant_suffix(an, wire))), tolerance=TESS_TOL,
-                   angular_tolerance=TESS_ANG)
+        export_stl(asm, str(path), tolerance=TESS_TOL, angular_tolerance=TESS_ANG)
+        cache.wrote(path, akey)
         print(f"{an}{variant_suffix(an, wire)}: travel {t:.3f} mm written")
+    cache.save()
+    print(cache.summary())
 
 
-def main_one(name, wire=WIRE_D):
+def main_one(name, wire=WIRE_D, use_cache=True):
     if WIRE_VARIANTS[wire][2] and name not in BORE_PARTS:
         raise SystemExit(f"{name} is shared by every wire variant: build it without --wire")
-    parts = {name: build_one(name, wire)}
-    check_valid(parts)
-    export_part(name, parts[name], variant_suffix(name, wire))
-    print(f"{name}: STEP + STL written. Assembly STLs NOT rewritten; run without --part before the gates.")
+    cache = open_cache(enabled=use_cache)
+    shp, key = build_one(name, wire, cache)
+    check_valid({name: shp})
+    export_part(name, shp, variant_suffix(name, wire), cache, key)
+    cache.save()
+    print(cache.summary())
+    print(f"{name}: done. Assembly STLs NOT rewritten; run without --part before the gates.")
 
 
 if __name__ == "__main__":
@@ -225,8 +316,9 @@ if __name__ == "__main__":
     ap.add_argument("--part", choices=PART_NAMES, help="build and export this part only")
     ap.add_argument("--wire", type=float, default=WIRE_D, choices=sorted(WIRE_VARIANTS),
                     help="wire Ø (default 3.0; 1.5 writes the bored parts and assemblies with the suffix _wire1p5)")
+    ap.add_argument("--no-cache", action="store_true", help="rebuild every part and rewrite every file")
     args = ap.parse_args()
     if args.part:
-        main_one(args.part, args.wire)
+        main_one(args.part, args.wire, not args.no_cache)
     else:
-        main_all(args.wire)
+        main_all(args.wire, not args.no_cache)

@@ -1,3 +1,5 @@
+<!-- Agent-era template, not used since 2026-10-27: a fix pass is now planned with
+     .claude/skills/cad-build/plan_template.md. Kept for restoring the cad-designer agent. -->
 # Brief: <Project> r<NN> fix pass (cad-designer)
 
 <!-- Fill every <...>. A brief with an empty ceiling is not sent (docs/agents.md, "Briefing agents"). -->

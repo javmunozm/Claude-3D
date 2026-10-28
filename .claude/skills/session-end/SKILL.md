@@ -19,8 +19,8 @@ user-invocable: true
    - `python "D:/CAD/Claude-Projects/tools/token_audit/token_audit.py" agents <session-id prefix>`
    - `python "D:/CAD/Claude-Projects/tools/token_audit/cost.py" <session-id prefix>`
 
-   Copy the list-price total and the peak context per agent into STATE.md's
-   Rounds table.
+   Copy the list-price total and the peak context (main session, and any
+   subagent still used) into STATE.md's Rounds table.
 4. **Uncommitted files.** Run `git -C "D:/CAD/Claude-Projects" status --short`
    and list the uncommitted files in the tracked set:
    - `.claude/`, `tools/`, `docs/`, `CLAUDE.md`;

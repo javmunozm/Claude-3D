@@ -1,3 +1,5 @@
+<!-- Agent-era template, not used since 2026-10-27: an audit is now planned with
+     .claude/skills/form-audit/plan_template.md. Kept for restoring the form-auditor agent. -->
 # Brief: <Project> r<NN> <REGISTER | REVIEW> (form-auditor)
 
 ## Ceilings

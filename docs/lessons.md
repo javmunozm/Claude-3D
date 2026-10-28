@@ -216,7 +216,7 @@ shape comparison.
 ### How to apply
 
 - **Verify the FORM before refining its dimensions.** Ask which reference the
-  cross-section came from, and run `perspective-checker` on that image, before
+  cross-section came from, and QUALIFY that image (`photo-to-vectors`), before
   any measurement work. A dimension gate on a wrong shape produces a
   well-measured wrong shape.
 - **A scalar table is not a shape.** When a reference exists as geometry — a
