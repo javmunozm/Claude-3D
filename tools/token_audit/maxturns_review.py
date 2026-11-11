@@ -17,7 +17,7 @@ import statistics
 import sys
 from collections import defaultdict
 
-sys.path.insert(0, "D:/CAD/Claude-Projects/tools/token_audit")
+sys.path.insert(0, "D:/Proyectos/Claude-3D/tools/token_audit")
 import token_audit as ta  # noqa: E402
 
 PRICES = {  # $/MTok: input, output, cache read, 5m write, 1h write (03_token_economics.md)

@@ -18,7 +18,7 @@ Run the project's geometry script directly with Python. This (re)writes the
 `.step` and `.stl` files into the project's `step/` and `stl/` folders.
 
 ```
-python "D:\CAD\Claude-Projects\projects\BedLifter\macros\bed_lifter_b123d.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\bed_lifter_b123d.py"
 ```
 
 Run this any time the constants or builder logic in the script change —
@@ -36,7 +36,7 @@ python -m ocp_vscode --port 3939 --axes --grid_xy --theme dark
 # (or use the OCP CAD Viewer panel in VS Code instead of a browser)
 
 # Terminal 2 — build parts and send them to the viewer
-python "D:\CAD\Claude-Projects\projects\BedLifter\macros\view_parts.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\view_parts.py"
 ```
 
 Re-run the Terminal 2 script after any geometry change to refresh the view;
@@ -151,7 +151,7 @@ python tools\token_audit\token_audit.py agents <session-id prefix>     # tool ca
 python tools\token_audit\agent_behavior_check.py runs                 # every agent run: brief with a number or not, rule breaks
 ```
 
-They read the session transcripts in `~/.claude/projects/D--CAD-Claude-Projects/`.
+They read the session transcripts in `~/.claude/projects/D--Proyectos-Claude-3D/`.
 Dollar figures are API list-price equivalents, used only to compare runs; a
 claude.ai plan is not billed that way. The other scripts in the folder
 (`cache_misses.py`, `composition.py`, `calibrate.py`, `thinking_share.py`,
@@ -166,7 +166,7 @@ Project-specific, dependency-free scripts that validate the design against
 material and load assumptions. No CAD environment required.
 
 ```
-python "D:\CAD\Claude-Projects\projects\BedLifter\macros\structural_check.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\structural_check.py"
 ```
 
 Look for `[PASS]` / `[FAIL]` per check in the output, and an overall

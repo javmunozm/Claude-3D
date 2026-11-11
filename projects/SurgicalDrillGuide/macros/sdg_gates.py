@@ -7,7 +7,7 @@ What is imported from the macro, and why:
   * ring file paths, for the outline-survival comparison
 Every number printed below is computed in this run. Nothing is a literal.
 
-Run: python "D:\\CAD\\Claude-Projects\\projects\\SurgicalDrillGuide\\macros\\sdg_gates.py"
+Run: python "D:\\Proyectos\\Claude-3D\\projects\\SurgicalDrillGuide\\macros\\sdg_gates.py"
 """
 import math
 import sys

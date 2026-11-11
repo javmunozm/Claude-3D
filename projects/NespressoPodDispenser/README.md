@@ -40,7 +40,7 @@ for the replacement foot that joins to the salvaged piece without glue.
 Regenerate with:
 
 ```
-python "D:\CAD\Claude-Projects\NespressoPodDispenser\macros\nespresso_dispenser.py"
+python "D:\Proyectos\Claude-3D\projects\NespressoPodDispenser\macros\nespresso_dispenser.py"
 ```
 
 ## Dimensions

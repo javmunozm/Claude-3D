@@ -14,7 +14,7 @@ import os
 import struct
 import sys
 
-ROOT = r"C:\Users\javmu\.claude\projects\D--CAD-Claude-Projects"
+ROOT = r"C:\Users\javmu\.claude\projects\D--Proyectos-Claude-3D"
 SECTION = sys.argv[1] if len(sys.argv) > 1 else "sessions"
 ONLY = sys.argv[2:]
 

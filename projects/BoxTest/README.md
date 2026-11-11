@@ -16,7 +16,7 @@ Hollow open-top box with rounded edges, from hand-drawn sketches.
 
 | File | Purpose |
 |------|---------|
-| `macros/box_test.py` | build123d geometry script. Run: `python "D:\CAD\Claude-Projects\projects\BoxTest\macros\box_test.py"`. Exports only when run, not on import |
+| `macros/box_test.py` | build123d geometry script. Run: `python "D:\Proyectos\Claude-3D\projects\BoxTest\macros\box_test.py"`. Exports only when run, not on import |
 | `step/BoxTest.step` | STEP export |
 | `stl/BoxTest.stl` | STL export |
 | `renders/BoxTest_*.png` | `render_check.py` renders (flat, unlit: they do not show the open top) |

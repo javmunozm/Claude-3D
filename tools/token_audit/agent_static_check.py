@@ -11,7 +11,7 @@ import hashlib
 import re
 from pathlib import Path
 
-ROOT = Path(r"D:\CAD\Claude-Projects")
+ROOT = Path(r"D:\Proyectos\Claude-3D")
 AGENTS = sorted((ROOT / ".claude" / "agents").glob("*.md"))
 OTHER = [ROOT / "CLAUDE.md", ROOT / ".claude" / "skills" / "verify" / "SKILL.md"] + sorted((ROOT / "docs").glob("*.md"))
 AGENT_NAMES = {p.stem for p in AGENTS}

@@ -12,7 +12,7 @@ Dimensions (mm):
 
 Origin at the centre of the bounding box.
 
-Run: python "D:\\CAD\\Claude-Projects\\projects\\BoxTest\\macros\\box_test.py"
+Run: python "D:\\Proyectos\\Claude-3D\\projects\\BoxTest\\macros\\box_test.py"
 Exports to ../stl/ and ../step/ only when run, never on import.
 """
 

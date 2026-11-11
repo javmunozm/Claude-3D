@@ -81,7 +81,7 @@ Environment, dependencies, and conventions shared by every project in this index
 Every script in this repo runs with the repo venv, not the system `python`:
 
 ```
-D:\CAD\Claude-Projects\.venv\Scripts\python.exe <script>.py
+D:\Proyectos\Claude-3D\.venv\Scripts\python.exe <script>.py
 ```
 
 - **Why:** on 2026-10-17 the system `python` on PATH was Python 3.14.7 with none
@@ -194,7 +194,7 @@ output — safe to delete and rebuild from the `.py` source at any time.
 Claude-Projects/
 ├── CLAUDE.md              Root index — projects table + links to docs/
 ├── docs/                  Index-wide documentation (this folder)
-│   ├── agents.md          The nine subagents, handoff order, /verify, briefing
+│   ├── agents.md          The skills, the fix-round cycle, the eval set; archived subagents
 │   ├── architecture.md    How a project's geometry/build pipeline fits together
 │   ├── attempts.md        attempts/ folders and the record-then-delete procedure
 │   ├── commands.md        Standard commands for building/viewing/checking

@@ -83,7 +83,7 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-ROOT = Path(r"D:\CAD\Claude-Projects\projects\BrokeFeet\v2")
+ROOT = Path(r"D:\Proyectos\Claude-3D\projects\BrokeFeet\v2")
 SRC = ROOT / "stl" / "BrokeFeetV1_smoothed.stl"
 OUTDIR = ROOT / "blender"
 

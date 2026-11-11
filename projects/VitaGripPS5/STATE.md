@@ -62,13 +62,13 @@ Not swept in r16: D38, the fillet families D27/D28/D31/D32, the groove at y -9.2
 - **Review cameras** (agreed 2026-10-04): R corner, position (190, 150, -90), target (90, 65, -12), fov 30 (silhouette IoU 0.997); its L mirror, (-190, 150, -90) -> (-90, 65, -12); back__iso, `render_views.py` iso of the copy turned 180 deg about X (IoU 0.990); front top, `render_views.py` top.
 
 ## Commands
-- **Build** (about 165 s): `timeout 600 python "D:/CAD/Claude-Projects/projects/VitaGripPS5/macros/build_case_ext.py" --out <path>.stl`. `--out` may not point into `stl/`.
-- **Gates:** `python "D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/r15/scripts/check15.py" <stl> [<baseline stl> | -] [heavy]`, then `python D:/CAD/Claude-Projects/tools/render_check.py <stl> --views front`.
-- **Sweep** (about 8 s for r16; measured 2026-10-04): `python D:/CAD/Claude-Projects/tools/form_sweep.py <stl> --regions "D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/regions.json" --out <audit/rNN/sweep> --tag rNN --baseline "D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/r16/sweep/sweep_r16.json"`.
+- **Build** (about 165 s): `timeout 600 python "D:/Proyectos/Claude-3D/projects/VitaGripPS5/macros/build_case_ext.py" --out <path>.stl`. `--out` may not point into `stl/`.
+- **Gates:** `python "D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r15/scripts/check15.py" <stl> [<baseline stl> | -] [heavy]`, then `python D:/Proyectos/Claude-3D/tools/render_check.py <stl> --views front`.
+- **Sweep** (about 8 s for r16; measured 2026-10-04): `python D:/Proyectos/Claude-3D/tools/form_sweep.py <stl> --regions "D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/regions.json" --out <audit/rNN/sweep> --tag rNN --baseline "D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r16/sweep/sweep_r16.json"`.
   - **Baseline:** `audit/r16/sweep/sweep_r16.json`, the sweep of the baked r16 mesh. It reproduces the r16 review's `sweep_r16.log` line for line.
   - `audit/regions.json` comes from `macros/export_sweep_regions.py`; re-export it after any change to the pocket, fingers, pits, window or camera hole.
   - Checks specific to one defect stay in the round's own `scripts/`; `audit/r16/review/scripts/` holds the last ones (rim, roll, films, slits).
-- **Region render:** `python D:/CAD/Claude-Projects/tools/render_roi.py <stl> <out.png> --center X Y Z --size 40`.
+- **Region render:** `python D:/Proyectos/Claude-3D/tools/render_roi.py <stl> <out.png> --center X Y Z --size 40`.
 - **Corner closeups:** `python <audit/r9/closeup.py> <stl> <png> 90 65 -12 190 150 -90` (R); `-90 65 -12 -190 150 -90` (L).
 - **Locating a user mark:** ray-cast through the red pixels with the render's camera, after validating the camera by silhouette IoU. Use VTK's OBBTree: the pure-Python trimesh ray backend runs out of memory on large batches.
 

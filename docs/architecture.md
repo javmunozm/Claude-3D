@@ -259,8 +259,8 @@ project's `vectors/` runs only on a machine that still has those folders.
 
 | File | Role | Rule |
 |---|---|---|
-| `STATE.md` | the present: bake, preview, macro, method, open entries, locks, gates, commands, rounds with their cost, pending decisions | at most about 150 lines (template `docs/templates/STATE.md`). Agents read it instead of the README. The orchestrator updates it at the end of every round and session (`/session-end`). Tracked |
-| `README.md` | the brief, the history, rejected approaches, measured negative results | appended, never rewritten. Agents Grep it by section and never read it whole in a round |
+| `STATE.md` | the present: bake, preview, macro, method, open entries, locks, gates, commands, rounds with their cost, pending decisions | at most about 150 lines (template `docs/templates/STATE.md`). Skills read it instead of the README. The main session updates it at the end of every round and session (`/session-end`). Tracked |
+| `README.md` | the brief, the history, rejected approaches, measured negative results | appended, never rewritten. Skills Grep it by section and never read it whole in a round |
 | `NEXT_SESSION.md` | a human summary for the next session | at most 60 lines; points to `STATE.md`; ends with the first decision needed |
 
 ```

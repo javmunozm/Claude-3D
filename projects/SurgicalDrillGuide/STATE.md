@@ -62,7 +62,7 @@ Keep this file under about 150 lines. Agents read it instead of the README. Hist
 - **Gates:** `python macros\sdg_gates.py` and `python macros\sdg_gates.py --wire 1.5` (about 30 s each).
 - **Structural:** `python docs\mechanism_sizing.py`.
 - **Region render:** `python tools/render_roi.py <stl> <out.png> --center X Y Z --size 40`.
-- Use the venv `D:\CAD\Claude-Projects\.venv\Scripts\python.exe`; paths relative to `projects/SurgicalDrillGuide/`.
+- Use the venv `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`; paths relative to `projects/SurgicalDrillGuide/`.
 
 ## Rounds
 | Round | Date | Agents (tool calls) | Peak context | List price | Result |

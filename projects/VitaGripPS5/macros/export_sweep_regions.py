@@ -7,7 +7,7 @@ the macro does. The values are computed exactly as the r9-r16 review script
 v_sweep.py computed them. Re-run after any change to the pocket, the fingers,
 the pits, the window or the camera hole.
 
-Run: python "D:/CAD/Claude-Projects/projects/VitaGripPS5/macros/export_sweep_regions.py"
+Run: python "D:/Proyectos/Claude-3D/projects/VitaGripPS5/macros/export_sweep_regions.py"
 """
 import json
 import sys

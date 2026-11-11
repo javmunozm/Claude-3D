@@ -15,5 +15,8 @@ Each skill's `reference/` files hold these agents' method sections verbatim (min
 the coverage check of 2026-10-27 found every number, path and rule present except the turn-limit mechanics.
 
 **To restore an agent** (for example if `.claude/evals/skills_eval.md` shows a skill doing worse than the agent it
-replaced): move its file back to `.claude/agents/`. Nothing else is needed; the budget hook and `budgets.json` still
-know every agent by name.
+replaced): move its file back to `.claude/agents/`. The budget hook and `budgets.json` still know every agent by name.
+
+**The hooks are inactive.** `.claude/hooks/budget_nudge.py`, `shell_guard.py` and `budgets.json` only act on subagent
+calls, and no `settings.json` (user or project) registers them (checked 2026-11-11). Restoring an agent with its turn
+budget also means adding them back under `hooks` in `.claude/settings.json`.

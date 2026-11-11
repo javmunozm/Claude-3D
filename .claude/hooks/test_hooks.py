@@ -1,7 +1,7 @@
 """Offline tests for the hooks in this folder. Commands marked REAL were taken from
 this repo's session transcripts (2026-09-22 .. 2026-10-03).
 
-Run: python -B "D:/CAD/Claude-Projects/.claude/hooks/test_hooks.py"
+Run: python -B "D:/Proyectos/Claude-3D/.claude/hooks/test_hooks.py"
 It also runs both hooks as subprocesses with JSON on stdin, the way Claude Code calls them.
 """
 import json
@@ -17,29 +17,29 @@ import shell_guard  # noqa: E402
 
 CASES = [
     # (tool, command, expected rules)  -- REAL = from transcripts
-    ("Bash", "cd /d/Temp/claude/D--CAD-Claude-Projects/8b688bc4/scratchpad/sdg/; python -c \"import sys,numpy as np,cv2; sys.path.insert(0,'ref')\"",
+    ("Bash", "cd /d/Temp/claude/D--Proyectos-Claude-3D/8b688bc4/scratchpad/sdg/; python -c \"import sys,numpy as np,cv2; sys.path.insert(0,'ref')\"",
      {"cd", "chained commands", "python -c / stdin code"}),                                   # REAL (user pasted it)
-    ("Bash", "sed -i \"s/^PT_PASSES = 2 /PT_PASSES = 0 /\" \"D:/CAD/Claude-Projects/projects/VitaGripPS5/macros/build_case_ext.py\" && timeout 600 python \"D:/CAD/Claude-Projects/projects/VitaGripPS5/macros/build_case_ext.py\" --out \"D:/Temp/x.stl\"",
+    ("Bash", "sed -i \"s/^PT_PASSES = 2 /PT_PASSES = 0 /\" \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/macros/build_case_ext.py\" && timeout 600 python \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/macros/build_case_ext.py\" --out \"D:/Temp/x.stl\"",
      {"chained commands"}),                                                                   # REAL r10 designer
-    ("Bash", "until grep -q \"^done\" \"D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/r15/build_v5.log\"; do sleep 5; done; grep -n \"D19\" \"D:/x.log\"",
+    ("Bash", "until grep -q \"^done\" \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r15/build_v5.log\"; do sleep 5; done; grep -n \"D19\" \"D:/x.log\"",
      {"chained commands"}),                                                                   # REAL r15 designer
     ("Bash", "python -c \"import mapbox_earcut; print('earcut ok')\"", {"python -c / stdin code"}),  # REAL r14 designer (13.2 min)
     ("Bash", "python - <<'EOF'\nimport re\np = 'D:/x.py'\nEOF", {"heredoc code", "python -c / stdin code"}),  # REAL shape, r14
     ("Bash", "F=\"D:/CAD/x.py\"; S=\"D:/Temp/y\"", {"chained commands"}),                       # REAL r10 designer
-    ("Bash", "cat \"D:/CAD/Claude-Projects/CLAUDE.md\"", {"viewing files in the shell"}),
-    ("Bash", "ls -la D:/CAD/Claude-Projects/projects", {"viewing files in the shell"}),
+    ("Bash", "cat \"D:/Proyectos/Claude-3D/CLAUDE.md\"", {"viewing files in the shell"}),
+    ("Bash", "ls -la D:/Proyectos/Claude-3D/projects", {"viewing files in the shell"}),
     ("PowerShell", "Get-Content \"D:\\x.txt\" -TotalCount 6", {"viewing files in the shell"}),
     ("PowerShell", "timeout 300 python \"D:\\Temp\\probe.py\"", {"timeout in PowerShell (use the tool's timeout parameter, or the Bash tool)"}),  # REAL, this session
     ("Bash", "py -c \"print(1)\"", {"python -c / stdin code"}),
     # allowed
-    ("Bash", "timeout 900 python -u \"D:/CAD/Claude-Projects/projects/VitaGripPS5/macros/build_case_ext.py\" --out \"D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/r10/case_preview_r10.stl\"", set()),  # REAL
+    ("Bash", "timeout 900 python -u \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/macros/build_case_ext.py\" --out \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r10/case_preview_r10.stl\"", set()),  # REAL
     ("PowerShell", "python \"D:\\Temp\\claude\\x\\scratchpad\\token_audit.py\" agents 537be8a2 8be432e3", set()),  # REAL, this session
-    ("PowerShell", "git -C \"D:\\CAD\\Claude-Projects\" log --reverse --format=\"%h %ad %s\" --date=iso -S\"## Shell commands\" -- .claude/agents/cad-designer.md", set()),  # REAL
-    ("PowerShell", "Get-ChildItem -Path \"D:\\CAD\\Claude-Projects\" -Force | Select-Object Mode, LastWriteTime, Length, Name | Format-Table -AutoSize", set()),  # REAL
-    ("PowerShell", "$env:PYTHONPATH = 'D:\\CAD\\Claude-Projects'; python \"D:\\x.py\"", set()),  # allowed by settings.local.json
+    ("PowerShell", "git -C \"D:\\Proyectos\\Claude-3D\" log --reverse --format=\"%h %ad %s\" --date=iso -S\"## Shell commands\" -- .claude/agents/cad-designer.md", set()),  # REAL
+    ("PowerShell", "Get-ChildItem -Path \"D:\\Proyectos\\Claude-3D\" -Force | Select-Object Mode, LastWriteTime, Length, Name | Format-Table -AutoSize", set()),  # REAL
+    ("PowerShell", "$env:PYTHONPATH = 'D:\\Proyectos\\Claude-3D'; python \"D:\\x.py\"", set()),  # allowed by settings.local.json
     ("Bash", "echo \"a; b && c\"", set()),
     ("PowerShell", "git commit -m @'\nFirst line; still the message\nsecond line\n'@", set()),
-    ("Bash", "python -X faulthandler \"D:/CAD/Claude-Projects/projects/VitaGripPS5/audit/r10/scripts/ft10.py\" \"D:/x.stl\"", set()),  # REAL shape
+    ("Bash", "python -X faulthandler \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r10/scripts/ft10.py\" \"D:/x.stl\"", set()),  # REAL shape
     ("Bash", "taskkill //PID 35708 //F", set()),                                              # REAL
 ]
 

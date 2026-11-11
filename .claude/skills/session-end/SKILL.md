@@ -16,12 +16,12 @@ user-invocable: true
    points to STATE.md for detail, and ends with the first decision the user has
    to make next time.
 3. **Cost.** Run the token audit for this session:
-   - `python "D:/CAD/Claude-Projects/tools/token_audit/token_audit.py" agents <session-id prefix>`
-   - `python "D:/CAD/Claude-Projects/tools/token_audit/cost.py" <session-id prefix>`
+   - `python "D:/Proyectos/Claude-3D/tools/token_audit/token_audit.py" sessions <session-id prefix>`
+   - `python "D:/Proyectos/Claude-3D/tools/token_audit/cost.py" <session-id prefix>`
 
-   Copy the list-price total and the peak context (main session, and any
-   subagent still used) into STATE.md's Rounds table.
-4. **Uncommitted files.** Run `git -C "D:/CAD/Claude-Projects" status --short`
+   Copy the list-price total and the main session's peak context (`peakctx`)
+   into STATE.md's Rounds table.
+4. **Uncommitted files.** Run `git -C "D:/Proyectos/Claude-3D" status --short`
    and list the uncommitted files in the tracked set:
    - `.claude/`, `tools/`, `docs/`, `CLAUDE.md`;
    - each project's `README.md`, `STATE.md` and `macros/**/*.py`.

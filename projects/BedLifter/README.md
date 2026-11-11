@@ -86,7 +86,7 @@ Only the upper half needs reprinting when the design changes above the split.
 
 ```
 pip install build123d ocp-vscode
-python "D:\CAD\Claude-Projects\BedLifter\macros\bed_lifter_b123d.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\bed_lifter_b123d.py"
 ```
 
 ## How to view
@@ -98,13 +98,13 @@ python -m ocp_vscode --port 3939 --axes --grid_xy --theme dark
 # Browser — open http://localhost:3939
 
 # Terminal 2 — send parts
-python "D:\CAD\Claude-Projects\BedLifter\macros\view_parts.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\view_parts.py"
 ```
 
 ## Run structural check
 
 ```
-python "D:\CAD\Claude-Projects\BedLifter\macros\structural_check.py"
+python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\structural_check.py"
 ```
 
 ## Dimensions to verify before printing

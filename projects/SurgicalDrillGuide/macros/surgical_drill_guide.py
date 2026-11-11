@@ -42,10 +42,10 @@ to collide across projects in one process (the second project silently read the 
 Every stage name is re-exported here, so `import surgical_drill_guide as sdg` (sdg_gates.py) and
 tools/reconcile.py (docs/mechanism_sizing.py) keep working unchanged.
 
-Run:  python "D:\\CAD\\Claude-Projects\\projects\\SurgicalDrillGuide\\macros\\surgical_drill_guide.py"
+Run:  python "D:\\Proyectos\\Claude-3D\\projects\\SurgicalDrillGuide\\macros\\surgical_drill_guide.py"
       ... --part handle     builds and exports ONE part (assemblies are not rewritten)
       ... --no-cache        rebuild and rewrite everything
-Gates: python "D:\\CAD\\Claude-Projects\\projects\\SurgicalDrillGuide\\macros\\sdg_gates.py"
+Gates: python "D:\\Proyectos\\Claude-3D\\projects\\SurgicalDrillGuide\\macros\\sdg_gates.py"
 
 Incremental build (2026-10-27, tools/stage_cache.py): each part is keyed on its builder's arguments, the source and
 constants of the modules it uses, and the traced DXFs. An unchanged part loads from <out>/work/cache/ and its files are
