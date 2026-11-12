@@ -22,7 +22,7 @@ Usage in a structural check
     from tools.reconcile import reconcile
 
     reconcile(
-        geometry_module="BedLifter.macros.bed_lifter_b123d",
+        geometry_module="BedLifter.macros.bed_lifter_b123d",   # (BedLifter was removed 2026-11-11; the shape holds)
         pairs=[
             # (label, value used here, name in the geometry module, direction)
             ("tilt angle (deg)",   ANGLE_DEG,   "ANGLE_DEG",     "neutral"),
@@ -67,15 +67,28 @@ def _is_conservative(used, actual, direction):
 def reconcile(geometry_module, pairs, strict=True, quiet=False):
     """Compare values used in a check against the geometry module's own values.
 
-    Returns True if everything matches. If `strict`, raises SystemExit on a
-    non-conservative mismatch so a stale check cannot silently report PASS.
+    Returns True if everything matches. If `strict` (the default), raises
+    SystemExit on a non-conservative mismatch, and also when the geometry module
+    cannot be imported, so a stale or unreconciled check cannot go on to print
+    PASS. With `strict=False` an import failure returns None after a warning:
+    the caller must then report its verdict as unverified.
+
+    The import failure was a silent skip until 2026-11-11. On 2026-10-17 the
+    `python` on PATH had no build123d, every pair was skipped, and the checks
+    printed their verdicts as usual (docs/system.md, "Python environment").
     """
     try:
         mod = importlib.import_module(geometry_module)
     except Exception as exc:
         print(f"  [WARN]  cannot import {geometry_module} ({exc.__class__.__name__}: {exc})")
         print("          reconciliation SKIPPED — values below are unverified.")
-        print("          Install build123d, or verify these by hand against the source.")
+        print("          Run with the repo venv (it has build123d), or verify these by hand against the source.")
+        if strict:
+            print("=" * 70)
+            print("RECONCILIATION NOT RUN: no verdict below this line would be reconciled.")
+            print("  Fix the import, or call reconcile(..., strict=False) and report the verdict as unverified.")
+            print("=" * 70)
+            sys.exit(2)
         return None
 
     rows = []

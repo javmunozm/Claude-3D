@@ -120,3 +120,18 @@ and r16 reviews' sweep logs line for line, 2026-10-04). On VitaGripPS5 r11 a
 copied script still pointed at r10, and its first run overwrote two r10 logs.
 Checks specific to one defect go in your own `audit/rNN/scripts/`. Write only
 into your own round's folder and the scratchpad.
+
+**What the tool sweeps depends on the regions file.** With the thresholds
+alone (`{"thresholds": {"turn": 8, "bump": 0.3, "tooth": 0.3}}`) it runs on
+any mesh: lumps, hollows and creases of the top and underside height fields,
+column non-convexity, sharp-edge serration, mirror symmetry (x to -x; set
+`"symmetric": false` for a part that is not), and with `--baseline` the
+NEW/WORSE components. Three stages need the part described: back thickness
+and pit pads (`pocket` + `back`), walls (`pocket` + `walls`), plan outline and
+flank radius (`sections` + `plan_bands` + `flank`, for a part with two side
+lobes). A stage without its block is printed and stored as **UNSWEPT**; copy
+that line into the register's unswept list. The schema is in the tool's
+docstring. Until 2026-11-11 the tool raised `KeyError: 'pocket'` on anything
+that was not a VitaGripPS5 case, so the cycle could not run on another part.
+The height fields look along Z: a wall that is vertical in the mesh's frame is
+not swept by them; say so, or sweep a rotated copy.

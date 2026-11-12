@@ -42,9 +42,15 @@ FIX = ("Rewrite it as ONE command with absolute paths. For Python, Write the cod
        "View files with Read, find them with Glob, search them with Grep.")
 
 
-def split_top_level(cmd):
-    """Split a command on ; && || and newlines that sit outside quotes."""
-    segs, buf, q, i = [], [], None, 0
+def split_top_level(cmd, hashtables=False):
+    """Split a command on ; && || and newlines that sit outside quotes.
+
+    With `hashtables` (PowerShell), a `;` inside a hashtable literal `@{ ... }` separates
+    its entries, not commands: `Select-Object Name, @{n='GB';e={$_.Size/1GB}}` is one
+    pipeline (it was blocked as "chained commands" twice on 2026-11-11). A script block
+    `{ a; b }` outside a hashtable is still split: that is two statements.
+    """
+    segs, buf, q, i, depth = [], [], None, 0, 0
     while i < len(cmd):
         ch = cmd[i]
         if q:
@@ -53,6 +59,13 @@ def split_top_level(cmd):
                 q = None
         elif ch in "'\"":
             q = ch
+            buf.append(ch)
+        elif hashtables and not depth and cmd.startswith("@{", i):
+            depth = 1
+            buf.append("@{")
+            i += 1
+        elif depth:
+            depth += (ch == "{") - (ch == "}")
             buf.append(ch)
         elif cmd.startswith("&&", i) or cmd.startswith("||", i):
             segs.append("".join(buf))
@@ -80,9 +93,9 @@ def decide(command, tool="Bash"):
         rules.append("heredoc code")
         segs = [cmd]  # the heredoc body is not a command list
     else:
-        segs = split_top_level(cmd)
+        segs = split_top_level(cmd, hashtables=(tool == "PowerShell"))
     if len(segs) > 1:
-        # explicitly allowed by .claude/settings.local.json: `$env:X = ...; python ...`
+        # the one allowed pair: `$env:X = ...; <python> ...`
         if not (len(segs) == 2 and ENV_ASSIGN.match(segs[0]) and ANY_PY.match(segs[1])):
             rules.append("chained commands")
     for s in segs:

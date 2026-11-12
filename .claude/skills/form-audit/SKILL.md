@@ -38,6 +38,12 @@ contain:
 - **The sweep** (REGISTER, REVIEW): one `tools/form_sweep.py` command with the
   regions file, thresholds, and for REVIEW the baseline named in `STATE.md`.
   The regions it will not reach are listed as unswept now, not discovered later.
+  A project with no `audit/regions.json` yet gets one in the plan: the
+  thresholds alone are enough (`{"thresholds": {"turn": 8, "bump": 0.3, "tooth": 0.3}}`),
+  and the tool then sweeps the surfaces, the sharp edges and the mirror
+  symmetry on any part. Walls, back thickness and plan outline need their
+  blocks (`reference/register.md`); without them the tool prints them as
+  UNSWEPT, and the plan covers them with extra checks or lists them.
 - **Extra checks:** at most 3, each named, with the function in the one
   scratch script that will run it.
 - **Ceilings** from the mode table, and the deliverable path.

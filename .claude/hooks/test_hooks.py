@@ -1,4 +1,4 @@
-"""Offline tests for the hook in this folder. Commands marked REAL were taken from
+"""Offline tests for the hooks in this folder (shell_guard.py, git_state.py). Commands marked REAL were taken from
 this repo's session transcripts (2026-09-22 .. 2026-10-03), with `python` rewritten
 to the repo venv where the command is meant to pass (rule added 2026-11-11).
 
@@ -12,10 +12,12 @@ work has run in the main thread since 2026-10-27.
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import git_state  # noqa: E402
 import shell_guard  # noqa: E402
 
 PY = '"D:/Proyectos/Claude-3D/.venv/Scripts/python.exe"'
@@ -60,6 +62,12 @@ CASES = [
     ("PowerShell", "git commit -m @'\nFirst line; still the message\nsecond line\n'@", set()),
     ("Bash", PY + " -X faulthandler \"D:/Proyectos/Claude-3D/projects/VitaGripPS5/audit/r10/scripts/ft10.py\" \"D:/x.stl\"", set()),  # REAL shape
     ("Bash", "taskkill //PID 35708 //F", set()),                                              # REAL
+    # PowerShell hashtable literals: `;` separates entries, not commands (both blocked on 2026-11-11)
+    ("PowerShell", "Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter, @{n='SizeGB';e={[math]::Round($_.Size/1GB,1)}}, @{n='FreeGB';e={[math]::Round($_.SizeRemaining/1GB,1)}} | Format-Table -AutoSize", set()),  # REAL
+    ("PowerShell", "Get-Disk | Select-Object Number, @{n='SizeGB';e={[math]::Round($_.Size/1GB,0)}} | Format-Table -AutoSize", set()),  # REAL
+    ("PowerShell", "Get-Volume | Select-Object @{n='a';e={1}}; Get-Disk", {"chained commands"}),   # a second command after it
+    ("PowerShell", "Get-Partition | ForEach-Object { $d = Get-Disk -Number $_.DiskNumber; $d.FriendlyName }", {"chained commands"}),  # statements in a script block
+    ("Bash", "echo @{a=1;b=2}", {"chained commands"}),                                         # Bash has no hashtable literal
 ]
 
 
@@ -106,10 +114,75 @@ def test_subprocess():
     return bad
 
 
+def check(ok, text):
+    print(f"  {'ok  ' if ok else 'FAIL'} {text}")
+    return 0 if ok else 1
+
+
+def git(cwd, *args):
+    return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                          cwd=str(cwd), capture_output=True, text=True, timeout=60)
+
+
+def test_git_state():
+    """parse and message on fixed text, then a real clone of a bare repository: commit, push, commit."""
+    bad = 0
+    sample = ("# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -0\n"
+              "1 .M N... 100644 100644 100644 a b docs/x.md\n2 R. N... 100644 100644 100644 a b R100 new.py\told.py\n? requirements.txt\n")
+    st = git_state.parse_status(sample)
+    bad += check(st == {"branch": "main", "upstream": "origin/main", "ahead": 2, "behind": 0, "changed": 2, "untracked": 1},
+                 f"parse_status: {st}")
+    m = git_state.message("SessionStart", st) or ""
+    bad += check("2 commit(s)" in m and "3 file(s)" in m, f"SessionStart text: {m[:90]!r}")
+    clean = dict(st, ahead=0, changed=0, untracked=0)
+    bad += check(git_state.message("SessionStart", clean) is None, "SessionStart, clean and pushed: nothing")
+    bad += check("Push now" in (git_state.message("PostToolUse", st, 'git -C "D:/x y" commit -m "a"') or ""),
+                 "PostToolUse after `git -C <path> commit`, 2 ahead: reminder")
+    bad += check(git_state.message("PostToolUse", clean, "git commit -m a") is None, "PostToolUse after a commit that is already pushed: nothing")
+    for cmd in ("git status", "git log --grep commit", "git -C D:/x push origin main", 'echo "git commit"x'):
+        bad += check(git_state.message("PostToolUse", st, cmd) is None, f"PostToolUse after {cmd!r}: nothing")
+    for cmd in ("git commit -m x", "git -c user.name=a commit --amend", "timeout 60 git --no-pager commit -q -m x"):
+        bad += check(bool(git_state.COMMIT.search(cmd)), f"commit recognised in {cmd!r}")
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        git(d, "init", "-q", "--bare", "remote.git")
+        git(d, "clone", "-q", "remote.git", "work")
+        w = d / "work"
+        (w / "a.txt").write_text("1", encoding="utf-8")
+        git(w, "add", "a.txt")
+        git(w, "commit", "-q", "-m", "one")
+        s1 = git_state.read_state(w)
+        t1 = git_state.unpushed_text(s1) if s1 else None
+        bad += check(bool(t1), f"clone with one commit, never pushed: {t1!r}")
+        git(w, "push", "-q", "-u", "origin", "HEAD")
+        s2 = git_state.read_state(w)
+        bad += check(s2 is not None and s2["ahead"] == 0 and git_state.message("SessionStart", s2) is None, f"after push: ahead {s2 and s2['ahead']}, nothing to say")
+        (w / "a.txt").write_text("2", encoding="utf-8")
+        (w / "b.txt").write_text("new", encoding="utf-8")
+        s3 = git_state.read_state(w)
+        bad += check(s3 is not None and (s3["changed"], s3["untracked"]) == (1, 1), f"one edit, one new file: changed {s3 and s3['changed']}, untracked {s3 and s3['untracked']}")
+        git(w, "commit", "-q", "-am", "two")
+        s4 = git_state.read_state(w)
+        bad += check(s4 is not None and s4["ahead"] == 1, f"second commit, not pushed: ahead {s4 and s4['ahead']}")
+    # as Claude Code runs it, against this repository: valid JSON or nothing, exit 0
+    for payload in ({"hook_event_name": "SessionStart", "source": "startup"},
+                    {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "git status"}}):
+        r = subprocess.run([sys.executable, str(HERE / "git_state.py")], input=json.dumps(payload), capture_output=True, text=True, timeout=60)
+        try:
+            ok = r.returncode == 0 and (r.stdout.strip() == "" or "hookSpecificOutput" in json.loads(r.stdout))
+        except ValueError:
+            ok = False
+        bad += check(ok, f"git_state subprocess, {payload['hook_event_name']}: exit {r.returncode}, {r.stdout.strip()[:100] or 'no output'}")
+    return bad
+
+
 if __name__ == "__main__":
     print("shell_guard.decide:")
     fails = test_shell_guard()
     print("as a subprocess:")
     fails += test_subprocess()
+    print("git_state:")
+    fails += test_git_state()
     print("ALL PASS" if fails == 0 else f"{fails} FAILED")
     sys.exit(1 if fails else 0)

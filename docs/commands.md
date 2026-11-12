@@ -134,9 +134,9 @@ Meant for smooth (B-rep) tessellations; not yet tested on one.
 ### Sweep the whole part, and compare with the baseline
 
 ```
-python tools\form_sweep.py projects\VitaGripPS5\audit\r17\case_preview_r17.stl ^
-    --regions projects\VitaGripPS5\audit\regions.json --out projects\VitaGripPS5\audit\r17\sweep ^
-    --tag r17 --baseline projects\VitaGripPS5\audit\r16\sweep\sweep_r16.json
+python tools\form_sweep.py projects\<Project>\audit\r<NN>\<preview>.stl ^
+    --regions projects\<Project>\audit\regions.json --out projects\<Project>\audit\r<NN>\sweep ^
+    --tag r<NN> --baseline projects\<Project>\audit\r<MM>\sweep\sweep_r<MM>.json
 ```
 
 It prints, per region, the surface lumps, hollows and creases, the
@@ -147,6 +147,26 @@ fields. It writes `sweep_<tag>.json` and the fields to `--out`; `--stages
 hf,ys,edges,walls,sym` runs a subset. The project's region rules, thresholds
 and fixed geometry are in its `audit/regions.json` (VitaGripPS5's comes from
 `macros/export_sweep_regions.py`). About 8 s on the 137k-face r16 case.
+
+Only the thresholds are required (`{"thresholds": {"turn": 8, "bump": 0.3, "tooth": 0.3}}`):
+the surfaces, the sharp edges and the mirror symmetry are then swept on any
+mesh, and the stages that need the part described (back thickness, walls, plan
+outline and flank) are printed as UNSWEPT. The schema is in the tool's
+docstring. Checked 2026-11-11 on a synthetic tray with a full regions file:
+output and JSON identical to the previous version, with and without
+`--baseline`; not re-checked on the VitaGripPS5 meshes, which were lost.
+
+### Check the toolchain itself
+
+```
+python tools\selftest.py
+```
+
+Builds a small part with build123d and runs every shared tool, the hooks'
+tests and a parse of every skill's frontmatter on it, in a temporary folder.
+One line per check, exit code 1 on any failure. Run it after rebuilding the
+venv, after an edit to `tools/` or `.claude/hooks/`, and before trusting a gate
+on a new machine. `--keep <folder>` leaves the files for a look.
 
 ## Measure what a session or an agent run cost
 

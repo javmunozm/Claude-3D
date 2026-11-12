@@ -1,6 +1,7 @@
 # Arithmetic first, then the five gates
 
-Moved verbatim from the cad-designer agent (2026-10-27).
+Moved from the cad-designer agent (2026-10-27). Interpreter and paths updated 2026-11-11: `python` is the repo
+venv (`CLAUDE.md`), and `<stl>` is the file being checked, which during a pass is a preview, not `stl/`.
 
 
 ### Before you build: run the arithmetic
@@ -26,7 +27,7 @@ Before writing geometry for a change:
 
 While iterating, run only the gates the change can affect: (a) regenerate, (b) topology, and (d) mating if an interface moved. Run **all five**, including the render in (c) and the comparison in (e), once before you report done. Do not report work complete until each has passed, and report what each one actually said. Do not render after every intermediate edit. In one build, 14 render runs took 15 minutes, and their 15 image reads stayed in context for every later call.
 
-**(a) It regenerates.** Run the script with plain `python` and confirm `.step`/`.stl` are written without error. This is the *start* of verification, not the end.
+**(a) It regenerates.** Run the script from the command line (the repo venv's `python`, not an IDE or a notebook), into a preview folder, and confirm `.step`/`.stl` are written without error. This is the *start* of verification, not the end.
 
 Before any export, check every part: `is_valid` is True and it has exactly one
 solid. Make the generate step refuse to export otherwise. **An invalid solid
@@ -42,7 +43,7 @@ files.
 **(b) Topology gate.** Run the shared checker on every exported STL:
 
 ```
-python tools/render_check.py projects/<Project>/stl/<Part>.stl
+python tools/render_check.py <stl>
 ```
 
 `body_count == 1` and `is_watertight` are hard gates — a part failing either is not printable, regardless of how correct its dimensions are. If a part is legitimately multi-piece, pass `--expect-bodies N` deliberately, never to silence a failure you don't understand.
@@ -50,7 +51,7 @@ python tools/render_check.py projects/<Project>/stl/<Part>.stl
 **(c) Form render, actually looked at.** Render and then **read the image back** and describe what you see:
 
 ```
-python tools/render_views.py projects/<Project>/stl/<Part>.stl --views front back
+python tools/render_views.py <stl> --views front back
 ```
 
 `render_check.py`'s own images are flat, unlit silhouettes: they show the outline and hide every cross-section and surface defect inside it. Judge form on the lit views of `render_views.py`.
@@ -78,7 +79,7 @@ Never regenerate only one half of a split part. If you change a split, either re
 **(e) Whole-form comparison against the reference — whenever a reference exists.** This is the gate that four VitaGrip revisions skipped.
 
 ```
-python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front --reference sources\<subject>\<photo>
+python tools\render_check.py <stl> --views front --reference sources\<subject>\<photo>
 ```
 
 Then `Read` the generated `_vs_reference.png` and answer, in your response, one question in plain words:

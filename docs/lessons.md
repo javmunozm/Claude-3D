@@ -713,3 +713,60 @@ the outline), and each tuning produced a new defect on the same outline:
 - **Every fix report and review states, in one plain sentence, what the
   geometry physically is** ("a block glued into a hole", "a slit"), before the
   numbers.
+
+---
+
+## The repository could not run the system it was meant to preserve
+
+2026-11-11. Claude recommended MiniTool Partition to merge unallocated space
+into existing partitions. By the user's account it corrupted both disks it
+touched (`C:` and the second internal disk, `RespaldoD`) and the system had to
+be formatted. The repo was cloned again from `origin`.
+
+What was gone, and what the clone could not do (each measured that day):
+
+| Loss or fault | Number |
+|---|---|
+| Commits never pushed | about two weeks of work (the user's statement) |
+| Untracked inputs and records | every `sources/`, `stl/`, `step/`, `renders/`, `audit/`, `attempts/`, `vectors/*.dxf`, `NEXT_SESSION.md`, and the memory folder |
+| SurgicalDrillGuide build | `FileNotFoundError: vectors\import\main_frame_body.dxf`; its structural check `docs/mechanism_sizing.py` was untracked too |
+| VitaGripPS5 hard gate | `audit/r15/scripts/check15.py`, with `audit/regions.json` and the baseline sweep, all untracked |
+| `python` in every documented command | Python 3.14.10 on PATH, `import numpy` fails; the packages are in `.venv` |
+| The shell hook | registered in no settings file; five skills said "a hook denies the rest" |
+| The budget hook | returned nothing for the main thread, where all work had run since 2026-10-27 |
+| `/round`, `/session-end`, `/verify` | frontmatter rejected by a YAML parser (`: ` inside `description`); listed by their H1 only |
+| `tools/form_sweep.py` | `KeyError: 'pocket'` on any part that was not a VitaGripPS5 case, at every `--stages` |
+| `reconcile(strict=True)` | returned `None` after a warning when the geometry module could not be imported |
+| Skills eval | 11 of 14 cases name an input that no longer exists; one more needs the SurgicalDrillGuide build |
+
+### Why nothing caught it
+
+- **The tracked set was chosen by file type, not by what a rebuild reads.**
+  "README, STATE and `macros/**/*.py`" left out traced vectors, a check script
+  in `docs/` and a gate script in a round's `audit/` folder: three kinds of
+  code and input the macros and the cycle depend on.
+- **Nothing ever ran from a clean clone.** Every fault above was invisible on
+  the machine that had the untracked files, the local settings and the right
+  `python`. The first clean clone was the one after the format.
+- **Commit and push were one rule in the user's head and two steps in the
+  text.** `CLAUDE.md` said "ask before committing" and said nothing about
+  pushing; `/session-end` listed uncommitted files and not unpushed commits.
+- **Statements about enforcement were prose.** "A hook denies the rest" stayed
+  in five skills after the file that registered the hook was gone, and the
+  toolchain's "Checked" list in `docs/system.md` was done by hand.
+- **A destructive tool was recommended without a warning or a backup check.**
+
+### How to apply
+
+- **A commit is pushed in the step that makes it.** `.claude/hooks/git_state.py`
+  states what is still local at session start and after each commit.
+- **Track what a rebuild and a review read:** vectors, `docs/*.py`,
+  `audit/regions.json`, audit reports, baseline sweeps (`.gitignore`). A gate
+  script lives in `macros/`. `sources/` needs a copy off the machine.
+- **Run `python tools\selftest.py` on a clean clone and after any rebuild of
+  the venv:** 26 checks in 22 s on 2026-11-11, each gate with a control case
+  it must fail. A claim about the toolchain that no script checks is a claim.
+- **Say "enforced" only of something registered in a tracked file** and
+  covered by a test (`.claude/settings.json`, `.claude/hooks/test_hooks.py`).
+- **No partition, boot or firmware tool without a plain warning and a check
+  that the work is pushed and copied off the machine** (`CLAUDE.md`).

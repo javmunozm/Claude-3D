@@ -1,6 +1,7 @@
 ---
 name: session-end
-description: Close a work session on a project. Updates STATE.md and NEXT_SESSION.md, records the session's cost, lists uncommitted files and unpushed commits, and proposes memory updates for approval. Usage: /session-end <Project>
+description: "Close a work session on a project. Updates STATE.md and NEXT_SESSION.md, records the session's cost, lists uncommitted files and unpushed commits, and proposes memory updates for approval. Use when the user says the session is over or asks to wrap up, save state or hand off to the next session."
+argument-hint: "<Project>"
 user-invocable: true
 ---
 

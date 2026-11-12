@@ -60,6 +60,7 @@ out = {
     ],
     "thresholds": {"turn": 8.0, "bump": 0.3, "tooth": 0.3, "wall": 3.0, "back": 3.5, "symmetry": 1.0},
     "regression_delta": {"turn": 4.0, "bump": 0.15},
+    "convexity": {"y_gt": -14},   # the lower-hull check leaves the handles out (was a constant in form_sweep.py)
     "pocket": xy(P),
     "wall": float(E.WALL),
     "pits": [xy(q.exterior.coords) for q in pit_fps],

@@ -33,8 +33,10 @@ is read by section, only when needed.
 **The shell rules are enforced, not only written.** `.claude/settings.json`
 (tracked) registers `.claude/hooks/shell_guard.py` on every Bash and
 PowerShell call: one command per call, no `cd`, no `python -c`, no file
-viewing in the shell, and `python` must be the repo venv. Test it with
-`.claude/hooks/test_hooks.py`. Until 2026-11-11 the registration lived in an
+viewing in the shell, and `python` must be the repo venv. The same file
+registers `.claude/hooks/git_state.py`: at session start it states the commits
+that are not on `origin` and the uncommitted files, and after a `git commit`
+it says what is still unpushed. Test both with `.claude/hooks/test_hooks.py`. Until 2026-11-11 the registration lived in an
 untracked `settings.local.json`; when that file was lost, five skills went on
 saying "a hook denies the rest" while nothing did.
 
@@ -242,10 +244,10 @@ form-audit  REVIEW (fresh session): re-measures every entry + repeats the full s
 ## Testing the skills
 
 `.claude/evals/skills_eval.md` holds 14 past incidents as requests, with
-objective pass lines. **Their inputs were lost on 2026-11-11** (sources,
-exports and five projects); the file says which cases can still run. Until
-new cases replace them, an edit to a skill is checked by reading its plan on a
-real task. When inputs exist: run each case twice in a fresh session, and
+objective pass lines. **The inputs of 11 of them were lost on 2026-11-11**
+(sources, exports and five projects), and a twelfth needs a build that no
+longer runs; the file says which. Until new cases replace them, an edit to a
+skill is checked by reading its plan on a real task. When inputs exist: run each case twice in a fresh session, and
 after any edit to a skill. If a skill scores worse than the agent
 it replaced, restore the agent from `.claude/agents-archive/`.
 

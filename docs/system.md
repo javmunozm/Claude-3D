@@ -117,6 +117,10 @@ D:\Proyectos\Claude-3D\.venv\Scripts\python.exe <script>.py
 - `.venv/` is gitignored. To rebuild it: `py -3.13 -m venv .venv`, then
   `.venv\Scripts\python.exe -m pip install -r requirements.txt` (the same pins as
   above, tracked at the repo root since 2026-11-11), then reapply the patch.
+- **`python tools\selftest.py` checks the result** (since 2026-11-11): pinned
+  versions against `requirements.txt`, a build with an analytic volume, text
+  extrusion (the FontManager patch), every shared tool, the hooks' tests and
+  the skills' frontmatter. It replaces the by-hand list under "Checked" above.
 - **The hook enforces it.** `.claude/hooks/shell_guard.py` (registered in the
   tracked `.claude/settings.json`) denies a bare `python` / `py` in Bash and
   PowerShell and names the venv path. `py -3.13 -m venv ...` is let through.
@@ -148,6 +152,42 @@ data) crashes the `register_font` method with `TTLibError: Not a TrueType or
 OpenType font`. The fix is a try/except wrapping the `TTFont()` / `TTCollection()`
 call in `build123d/text.py:register_font`. This patch lives in the installed
 package and must be reapplied after upgrading build123d, until upstream fixes it.
+`python tools\selftest.py` checks it (the text-extrusion line).
+
+**Open, recorded 2026-11-11** (found in the review after the disk format; none
+is fixed):
+
+- **`sources/` has no copy off this machine,** and it is empty: every source
+  was lost. Git does not hold it. A second internal disk is not a backup: the
+  partition tool that caused the format reached both internal disks.
+- **`tools/form_sweep.py` looks along Z.** Its surface fields are the top and
+  underside height fields, so a wall that is vertical in the mesh's frame is
+  not swept by them. Sweep a rotated copy, or list the wall as unswept.
+- **The generalised `form_sweep.py` was compared with the previous version on a
+  synthetic tray only** (output and JSON identical, with and without
+  `--baseline`). The VitaGripPS5 meshes it was written for were lost; repeat
+  the r16 sweep when a case mesh exists again.
+- **`tools/stage_cache.py` never deletes an old `.brep`:** every key change
+  leaves one more file in `work/cache/`. A module global whose name is
+  UPPERCASE and whose value cannot be keyed (a module alias such as
+  `import constants as C`, a compiled regex) raises `TypeError`; that is by
+  design, and the message names the constant.
+- **Three macros can only write into `stl/`:** `nespresso_dispenser.py`,
+  `nespresso_base_repair.py` and `nespresso_dispenser_extension.py` take no
+  output argument, so `/verify` reports gate (a) as NOT RUN for them. Left as
+  they are on the user's instruction (2026-11-11).
+- **`tools/token_audit/agent_static_check.py`, `agent_behavior_check.py` and
+  `maxturns_review.py` read `.claude/agents/`,** which has not existed since
+  the agents were archived. They are tools for the subagent era, kept for
+  restoring one.
+- **The shell hook does not see a leading `cd <repo root> &&`:** Claude Code
+  removes it before the hook runs (measured: `cd <repo> && cat x` was denied
+  for the `cat` only, `cd /c/Users && ...` for the `cd`). Harmless, since it
+  is a `cd` to where the command already runs.
+- **Most of the skills eval cannot run:** 11 of its 14 cases name an input
+  that was lost, and one more needs the SurgicalDrillGuide build
+  (`.claude/evals/skills_eval.md`). An edit to a skill is checked on a real
+  task until new cases exist.
 
 ## Import capabilities
 

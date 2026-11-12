@@ -33,7 +33,7 @@ Rules:
 - Set `direction` honestly so the tool can tell a safe deviation from a dangerous one: `higher-is-conservative`, `lower-is-conservative`, or `neutral`. This distinction is the whole point — a rod modeled thinner than reality is conservative; a collar modeled larger than reality is not.
 - Keep `strict=True` (the default) so a non-conservative mismatch exits before printing a PASS verdict. Never lower it to get a check to run.
 - Reconciliation output must appear **above** the PASS/FAIL results, so a reader sees the inputs were trustworthy before reading conclusions.
-- If the geometry module can't be imported (no build123d installed), `reconcile` warns and returns `None` rather than failing — that preserves the decoupling. When this happens, say plainly in your report that inputs were **unverified**, and don't present the verdict as confirmed.
+- If the geometry module can't be imported, `reconcile` stops the script (exit code 2) before any verdict prints. Until 2026-11-11 it warned and returned `None`, and on 2026-10-17 a whole set of checks printed their verdicts with every pair skipped, because the `python` on PATH had no build123d. Run the check with the repo venv. `strict=False` keeps the old behaviour (warn, return `None`) for a machine with no CAD environment: say then, plainly, that the inputs were **unverified**, and don't present the verdict as confirmed.
 
 When you find drift, fix the check's inputs to match the geometry, re-run, and report **both** verdicts — before and after. A verdict that changed under corrected inputs is the most important thing you can tell the user; a verdict that held is worth stating as now-trustworthy.
 

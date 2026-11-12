@@ -294,6 +294,9 @@ def main():
                     help="reference image to compare the first rendered view against "
                          "(builds a side-by-side image you must then open and read)")
     args = ap.parse_args()
+    if args.reference and not args.views:
+        # until 2026-11-11 this ran the topology gate, exited 0 and compared nothing
+        ap.error("--reference needs --views: the comparison uses the first rendered view (e.g. --views front)")
 
     stl_path = pathlib.Path(args.stl).resolve()
     if not stl_path.exists():

@@ -11,6 +11,29 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"D:/Proyectos/Claude-3D/.venv/Scripts/python.exe\" \"D:/Proyectos/Claude-3D/.claude/hooks/git_state.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"D:/Proyectos/Claude-3D/.venv/Scripts/python.exe\" \"D:/Proyectos/Claude-3D/.claude/hooks/git_state.py\"",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

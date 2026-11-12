@@ -15,12 +15,14 @@ measurement or edit. Numbers carry their tolerance; a measurement that disagrees
 
 Cases that change files (E10, E12) are marked **writes**: run them on a scratch copy or revert afterwards.
 
-> **Not runnable since 2026-11-11.** A disk format lost `sources/`, every `stl/` and `audit/` folder, and the
-> projects BrokeFeet, VitaGrip1000, BedLifter, BoxTest and VitaGrip-hori were then removed. Checked 2026-11-11
-> against the paths each case names: E01–E08 and E11–E14 name an input that no longer exists; E09 and E10 name
-> SurgicalDrillGuide files whose macro cannot build without `vectors/import/*.dxf`. The cases stay here as the
-> record of what each skill must catch. Write new cases from the next real incidents, with inputs that are
-> tracked (`.gitignore` allowlist) so they survive a clone.
+> **Mostly not runnable since 2026-11-11.** A disk format lost `sources/`, every `stl/` and `audit/` folder, and
+> the projects BrokeFeet, VitaGrip1000, BedLifter, BoxTest and VitaGrip-hori were then removed. Checked
+> 2026-11-11 against the *Inputs* line of each case: 11 of 14 name a file that no longer exists (E01–E08, E11,
+> E13, E14). E10 names files that exist, but it builds SurgicalDrillGuide, which fails without
+> `vectors/import/*.dxf`. E09 and E12 name only files that still exist (`STATE.md`, `sdg_model/constants.py`) and
+> are plan-only; they were not re-run. The cases stay here as the record of what each skill must catch. Write
+> new cases from the next real incidents, with inputs that are tracked (`.gitignore` allowlist) so they survive
+> a clone.
 
 ---
 

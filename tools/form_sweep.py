@@ -18,6 +18,25 @@ worse: per-region height changes and NEW/WORSE components (the regression count)
 Usage:
   python tools/form_sweep.py <mesh.stl> --regions <project>/audit/regions.json \
       --out <dir> --tag <name> [--baseline <dir>/sweep_<tag>.json] [--stages all|hf,ys,edges,walls,sym]
+
+regions.json (since 2026-11-11 only `thresholds` is required; before that the
+tool raised KeyError 'pocket' on any part that was not a VitaGripPS5 case):
+
+  required   thresholds {turn, bump, tooth}      degrees, mm, mm: chosen from the part's intent
+  optional   regions [...]                       rules, first match wins; default one region "part"
+             grid {step, x, y, offset}           default: the mesh footprint + 2 mm, 0.5 mm cells
+             regression_delta {turn, bump}       default 4.0 / 0.15
+             convexity {y_gt}                    limit the lower-hull check to y > y_gt; default no limit
+             symmetric                           false = skip the mirror check (x -> -x); default true
+  a case     pocket, wall, pits, fingers, y1, yc -> TOP metrics leave the pocket out
+  with a     back   {floor_z, pit_root_z, pit_buffer, exclude}  + thresholds.back -> back thickness, pit pads
+  pocket     walls  {z, end_ax_gt, end_y, finger_clear}         + thresholds.wall -> the walls stage
+  two side   sections {y, step, offset, side_ax_gt}, plan_bands, flank -> the ys stage
+  lobes        (plan outline and flank radius of the two |x| > side_ax_gt lobes)
+
+A stage whose block is missing does not run: it is printed and stored as
+UNSWEPT, never passed in silence. projects/VitaGripPS5/macros/export_sweep_regions.py
+writes the full set.
 """
 import argparse
 import hashlib
@@ -205,8 +224,13 @@ def main():
     ap.add_argument("--stages", default="all")
     a = ap.parse_args()
     cfg = json.loads(Path(a.regions).read_text(encoding="utf-8"))
-    RULES = cfg["regions"]
-    th = cfg["thresholds"]
+    RULES = cfg.get("regions") or [{"name": "part"}]
+    th = cfg.get("thresholds", {})
+    lacking = [k for k in ("turn", "bump", "tooth") if k not in th]
+    if lacking:  # no default: a threshold comes from the part's intent, and the report states it
+        ap.error("%s: thresholds lacks %s" % (a.regions, ", ".join(lacking)))
+    unswept = []                                                 # what this regions.json cannot drive
+    has_pocket = "pocket" in cfg
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     stages = set(a.stages.split(","))
@@ -228,15 +252,25 @@ def main():
                                                               np.round(m.extents, 2).tolist()))
     SUMMARY["mesh_info"] = {"faces": int(len(m.faces)), "watertight": bool(m.is_watertight),
                             "euler": int(m.euler_number), "extent": np.round(m.extents, 3).tolist()}
-    P = np.array(cfg["pocket"])
-    oval = Polygon(P)
-    R0 = oval.buffer(cfg["wall"], resolution=64)
-    pit_fps = [Polygon(q) for q in cfg["pits"]]
-    fingers = [np.array(p) for p in cfg["fingers"]]
-    Y1, YC = cfg["y1"], cfg["yc"]
-    print("Y1 %.2f; pits at %s" % (Y1, [np.round(p, 1).tolist() for p in fingers]))
+    if has_pocket:
+        P = np.array(cfg["pocket"])
+        oval = Polygon(P)
+        R0 = oval.buffer(cfg["wall"], resolution=64)
+        pit_fps = [Polygon(q) for q in cfg["pits"]]
+        fingers = [np.array(p) for p in cfg["fingers"]]
+        Y1, YC = cfg["y1"], cfg["yc"]
+        print("Y1 %.2f; pits at %s" % (Y1, [np.round(p, 1).tolist() for p in fingers]))
+    else:
+        P = oval = R0 = YC = None
+        pit_fps, fingers = [], []
 
-    gr = cfg["grid"]
+    gr = cfg.get("grid")
+    if gr is None:                                               # the mesh's own footprint + 2 mm, 0.5 mm cells
+        b = m.bounds
+        gr = {"step": 0.5, "x": [float(np.floor(b[0][0]) - 2), float(np.ceil(b[1][0]) + 2)],
+              "y": [float(np.floor(b[0][1]) - 2), float(np.ceil(b[1][1]) + 2)], "offset": [0.013, 0.029]}
+        print("grid from the mesh bounds: x %s y %s step %s" % (gr["x"], gr["y"], gr["step"]))
+    SUMMARY["grid"] = gr
     G = gr["step"]
     xs = np.arange(gr["x"][0], gr["x"][1] + 0.001, G) + gr["offset"][0]
     ys = np.arange(gr["y"][0], gr["y"][1] + 0.001, G) + gr["offset"][1]
@@ -252,15 +286,19 @@ def main():
         zmin, zmax = hfield(m, xs, ys)
         np.savez(files["cache"], zmin=zmin, zmax=zmax, sha256=digest)
     print("height field %.0fs" % (time.time() - T0))
-    inPocket = shapely.contains_xy(oval.buffer(-0.6), X.ravel(), Y.ravel()).reshape(X.shape)
-    inR0 = shapely.contains_xy(R0.buffer(1.0), X.ravel(), Y.ravel()).reshape(X.shape)
+    if has_pocket:
+        inPocket = shapely.contains_xy(oval.buffer(-0.6), X.ravel(), Y.ravel()).reshape(X.shape)
+        inR0 = shapely.contains_xy(R0.buffer(1.0), X.ravel(), Y.ravel()).reshape(X.shape)
+    else:
+        inPocket = inR0 = np.zeros(X.shape, dtype=bool)
+    hull_y = cfg.get("convexity", {}).get("y_gt", -np.inf)       # VitaGripPS5: -14 (the handles are left out)
 
     if run("hf"):
         devU, turnU, mkU = surf_metrics(zmin, "UNDER", ~inPocket | True, X, Y, G, th["bump"], th["turn"])
         devT, turnT, mkT = surf_metrics(zmax, "TOP", ~inR0, X, Y, G, th["bump"], th["turn"])
-        hd = np.full(zmin.shape, np.nan)                         # convexity of each column (lower hull), y >= -14
+        hd = np.full(zmin.shape, np.nan)                         # convexity of each column (lower hull), y > hull_y
         for i in range(len(xs)):
-            v = np.isfinite(zmin[i]) & (ys > -14)
+            v = np.isfinite(zmin[i]) & (ys > hull_y)
             edges = np.flatnonzero(np.diff(np.concatenate([[0], v.astype(int), [0]])))
             for s, e in zip(edges[::2], edges[1::2]):
                 if e - s < 10:
@@ -276,30 +314,36 @@ def main():
                 hd[i, s:e] = zz - np.interp(yy, hx, hy)
         hd = np.where(mkU, hd, np.nan)
         report("UNDER column non-convexity (z above lower hull, mm)", X.ravel(), Y.ravel(), hd.ravel(), thr=th["bump"])
-        bk = cfg["back"]                                          # back wall under the pocket
-        ex = [q.buffer(bk["pit_buffer"]) for q in pit_fps]
-        for e in bk["exclude"]:
-            ex.append(sbox(*e["box"]).buffer(e["buffer"]) if "box" in e else Point(*e["circle"]).buffer(e["r"]))
-        ex = unary_union(ex)
-        kk = inPocket & ~shapely.contains_xy(ex, X.ravel(), Y.ravel()).reshape(X.shape)
-        bt = np.where(kk, bk["floor_z"] - zmin, np.nan)
-        report("BACK thickness under pocket (min; thr %s)" % th["back"], X.ravel(), Y.ravel(), bt.ravel(),
-               thr=-(th["back"] - 0.01), sign=-1)
-        SUMMARY["pit_pads"] = []
-        for q, p in zip(pit_fps, fingers):
-            k2 = shapely.contains_xy(q, X.ravel(), Y.ravel()).reshape(X.shape)
-            pad = bk["pit_root_z"] - np.nanmax(zmin[k2])
-            print("   under pit at %s: zmin max %.2f -> pad below pit bottom %.2f (need 3.0)"
-                  % (np.round(p, 1).tolist(), np.nanmax(zmin[k2]), pad))
-            SUMMARY["pit_pads"].append({"pit": np.round(p, 1).tolist(), "pad": round(float(pad), 3)})
+        bt = np.full(zmin.shape, np.nan)
+        if has_pocket and "back" in cfg:
+            bk = cfg["back"]                                      # back wall under the pocket
+            ex = [q.buffer(bk["pit_buffer"]) for q in pit_fps]
+            for e in bk["exclude"]:
+                ex.append(sbox(*e["box"]).buffer(e["buffer"]) if "box" in e else Point(*e["circle"]).buffer(e["r"]))
+            ex = unary_union(ex)
+            kk = inPocket & ~shapely.contains_xy(ex, X.ravel(), Y.ravel()).reshape(X.shape)
+            bt = np.where(kk, bk["floor_z"] - zmin, np.nan)
+            report("BACK thickness under pocket (min; thr %s)" % th["back"], X.ravel(), Y.ravel(), bt.ravel(),
+                   thr=-(th["back"] - 0.01), sign=-1)
+            SUMMARY["pit_pads"] = []
+            for q, p in zip(pit_fps, fingers):
+                k2 = shapely.contains_xy(q, X.ravel(), Y.ravel()).reshape(X.shape)
+                pad = bk["pit_root_z"] - np.nanmax(zmin[k2])
+                print("   under pit at %s: zmin max %.2f -> pad below pit bottom %.2f (need 3.0)"
+                      % (np.round(p, 1).tolist(), np.nanmax(zmin[k2]), pad))
+                SUMMARY["pit_pads"].append({"pit": np.round(p, 1).tolist(), "pad": round(float(pad), 3)})
+        else:
+            unswept.append("back thickness and pit pads (no pocket + back block)")
         np.savez(files["fields"], devU=devU, turnU=turnU, devT=devT, turnT=turnT, hd=hd, bt=bt)
         print("hf metrics %.0fs" % (time.time() - T0))
 
-    sc = cfg["sections"]
-    yS = np.arange(sc["y"][0], sc["y"][1], sc["step"]) + sc["offset"]
-    TH = np.radians(np.arange(-180, 180, 2.0))
-    side = sc["side_ax_gt"]
-    if run("ys"):
+    if run("ys") and not all(k in cfg for k in ("sections", "plan_bands", "flank")):
+        unswept.append("plan outline and flank radius (no sections + plan_bands + flank blocks)")
+    elif run("ys"):
+        sc = cfg["sections"]
+        yS = np.arange(sc["y"][0], sc["y"][1], sc["step"]) + sc["offset"]
+        TH = np.radians(np.arange(-180, 180, 2.0))
+        side = sc["side_ax_gt"]
         xout = np.full((2, len(yS)), np.nan)
         Rf = np.full((2, len(yS), len(TH)), np.nan)
         cen = np.full((2, len(yS), 2), np.nan)
@@ -441,7 +485,9 @@ def main():
                                     for r in rows[:22]]}
         print("edges %.0fs" % (time.time() - T0))
 
-    if run("walls"):
+    if run("walls") and not (has_pocket and "walls" in cfg):
+        unswept.append("walls from the pocket and pits to outer air (no pocket + walls block)")
+    elif run("walls"):
         wl = cfg["walls"]
         big = sbox(-200, -200, 200, 200)
         cav = unary_union([oval] + pit_fps).buffer(0.15)
@@ -471,7 +517,9 @@ def main():
             SUMMARY["walls"]["%.1f" % z] = row
         print("walls %.0fs" % (time.time() - T0))
 
-    if run("sym"):
+    if run("sym") and not cfg.get("symmetric", True):
+        unswept.append("mirror symmetry (regions.json says symmetric: false)")
+    elif run("sym"):
         pts, fi = trimesh.sample.sample_surface_even(m, 300000, seed=1) if hasattr(trimesh.sample, "sample_surface_even") else (None, None)
         if pts is None or len(pts) < 100000:
             pts, fi = trimesh.sample.sample_surface(m, 300000, seed=1)
@@ -498,6 +546,9 @@ def main():
     if a.baseline:
         diff(cfg, json.loads(Path(a.baseline).read_text(encoding="utf-8")), files, a.tag, X, Y, G, oval, th, m)
 
+    SUMMARY["unswept"] = unswept
+    if unswept:
+        print("--- UNSWEPT (this regions.json has no block for it): " + "; ".join(unswept))
     SUMMARY["seconds"] = round(time.time() - T0, 1)
     js.write_text(json.dumps(SUMMARY, indent=1), encoding="utf-8")
     print("wrote %s" % js)
@@ -509,7 +560,8 @@ def diff(cfg, base, files, tag, X, Y, G, oval, th, m):
     tags = (bt, nt)
     C = {bt: np.load(base["files"]["cache"]), nt: np.load(files["cache"])}
     F = {bt: np.load(base["files"]["fields"]), nt: np.load(files["fields"])}
-    S = {bt: np.load(base["files"]["ysec"]), nt: np.load(files["ysec"])}
+    have_ys = "flank" in cfg and Path(base["files"]["ysec"]).exists() and Path(files["ysec"]).exists()
+    S = {bt: np.load(base["files"]["ysec"]), nt: np.load(files["ysec"])} if have_ys else {}
     Mb = trimesh.load(base["mesh"])
     print("=== DIFF %s (baseline %s, %s) -> %s" % (bt, base["mesh"], base["sha256"][:8], nt))
     for t, mm_ in ((bt, Mb), (nt, m)):
@@ -545,9 +597,10 @@ def diff(cfg, base, files, tag, X, Y, G, oval, th, m):
             if ww.any():
                 print("   %s %s: %d cells (%.1f mm2) x %.1f..%.1f y %.1f..%.1f" % (nm, "LR"[s > 0], ww.sum(), ww.sum() * G * G,
                       X[ww].min(), X[ww].max(), Y[ww].min(), Y[ww].max()))
-    inP = shapely.contains_xy(oval.buffer(-0.6), X.ravel(), Y.ravel()).reshape(X.shape)
-    print("   pocket columns (oval-0.6): max |dz top| %.3f, max |dz under| %.3f (under excludes nothing)"
-          % (np.nanmax(np.abs(dT[inP])), np.nanmax(np.abs(dU[inP]))))
+    if oval is not None:
+        inP = shapely.contains_xy(oval.buffer(-0.6), X.ravel(), Y.ravel()).reshape(X.shape)
+        print("   pocket columns (oval-0.6): max |dz top| %.3f, max |dz under| %.3f (under excludes nothing)"
+              % (np.nanmax(np.abs(dT[inP])), np.nanmax(np.abs(dU[inP]))))
     drop = dT < -0.1
     for s in (-1, 1):
         w = drop & (np.sign(X) == s)
@@ -561,13 +614,15 @@ def diff(cfg, base, files, tag, X, Y, G, oval, th, m):
     for t in tags:
         j = np.nanargmax(C[t]["zmax"])
         print("   %s top-field max %.2f at (%.1f,%.1f)" % (t, C[t]["zmax"].ravel()[j], X.ravel()[j], Y.ravel()[j]))
-    dl = cfg["regression_delta"]
+    dl = cfg.get("regression_delta", {"turn": 4.0, "bump": 0.15})
     for nm, key, thr, delta, sg in (("UNDER turn", "turnU", th["turn"], dl["turn"], 1), ("UNDER lump", "devU", th["bump"], dl["bump"], -1),
                                     ("UNDER hollow", "devU", th["bump"], dl["bump"], 1), ("UNDER non-convexity", "hd", th["bump"], dl["bump"], 1),
                                     ("TOP turn", "turnT", th["turn"], dl["turn"], 1), ("TOP lump", "devT", th["bump"], dl["bump"], 1),
                                     ("TOP hollow", "devT", th["bump"], dl["bump"], -1)):
         new_components(sg * F[bt][key], sg * F[nt][key], thr, delta, X, Y, C[nt]["zmin" if nm.startswith("U") else "zmax"], nm, 8, tags)
-    for si, s in enumerate((-1, 1)):
+    if not have_ys:
+        print("   FLANK regressions: not compared (no flank block, or a Y-section file is missing)")
+    for si, s in enumerate((-1, 1)) if have_ys else ():
         vals = {}
         for t in tags:
             Rr = S[t]["Rf"][si]

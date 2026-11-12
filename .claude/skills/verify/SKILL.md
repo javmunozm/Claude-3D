@@ -1,6 +1,7 @@
 ---
 name: verify
-description: Run the five-gate geometry verification for an STL, a bake or a preview. Usage: /verify <path to .stl> [--reference <path>] [--regen]
+description: "Run the five-gate geometry verification on an STL, a bake or a preview (regenerate, topology, lit render actually looked at, mating, whole-form comparison with a reference). Use after any geometry change, before a bake, and before calling a part done or verified."
+argument-hint: "<path to .stl> [--reference <path>] [--regen]"
 user-invocable: true
 ---
 
@@ -20,7 +21,9 @@ resolved under `projects/`) or a preview (`projects/<Project>/audit/r<NN>/…`,
 the one in `stl/`. If the user passes just a project name, glob
 `projects/<Project>/stl/*.stl` (and `projects/<Project>/v*/stl/*.stl` for
 versioned projects) and list the available STLs; ask which one to verify.
-Renders go next to the STL for a preview, to the sibling `renders/` for a bake.
+Renders go to a `renders/` folder: beside `stl/` for a bake, inside the STL's
+own folder for a preview (`audit/r<NN>/renders/`); `--out-dir` / `--outdir`
+overrides it.
 
 If `--reference <path>` is passed, use it for gate (e). Otherwise check
 `sources/` for a directory matching the project subject and offer any

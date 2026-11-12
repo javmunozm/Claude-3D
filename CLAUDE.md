@@ -38,6 +38,7 @@ lit render**; before trusting any structural verdict, read its
 **`python` always means the repo venv,** `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`
 (`requirements.txt`). The `python` on PATH has none of the packages; a hook
 (`.claude/hooks/shell_guard.py`, registered in `.claude/settings.json`) denies it.
+`python tools\selftest.py` checks the whole toolchain in under two minutes.
 
 **A render is not a measurement.** Run the `form-audit` skill for a number
 before believing a picture, and the QUALIFY stage of `photo-to-vectors` before
@@ -74,10 +75,15 @@ plan with numeric ceilings, shows it, runs it once and reports — see
 - **A commit is not saved until it is pushed.** On 2026-11-11 the disk was formatted
   and two weeks of commits that had never been pushed were lost, together with
   every untracked source, export and audit record. Push with every approved
-  commit; `/session-end` reports anything still local. `sources/` is not in
-  git: it needs its own copy off this disk.
+  commit; a hook (`.claude/hooks/git_state.py`) states what is still local at
+  session start and after each commit, and `/session-end` reports it.
+  `sources/` is not in git: it needs its own copy off this machine.
 - **No disk tools without a warning and a backup.** Never recommend, install or
   run a partitioning, boot or firmware tool, or anything that needs a reboot to
   apply, before saying plainly that it can make the machine unbootable and
-  checking that the work is pushed and `sources/` is copied elsewhere. The
-  2026-11-11 format followed a partition tool suggested in a session here.
+  checking that the work is pushed and `sources/` is copied **off this
+  machine**. On 2026-11-11 Claude recommended MiniTool Partition to merge
+  unallocated space into existing partitions; by the user's account it
+  corrupted both disks it touched (`C:` and the second disk, `RespaldoD`) and
+  the system had to be formatted. A second disk in the same machine is not a
+  backup.

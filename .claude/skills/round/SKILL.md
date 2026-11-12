@@ -1,6 +1,7 @@
 ---
 name: round
-description: Run one bounded fix round on a project. A round is a register, the user's approval, a fix pass and a review, each run in the main session with its skill (form-audit, cad-build), plan first, with numeric ceilings, a report file and a cost line. Usage: /round <Project> status|register|fix|review
+description: "Run one bounded fix round on a project. A round is a register, the user's approval, a fix pass and a review, each run in the main session with its skill (form-audit, cad-build), plan first, with numeric ceilings, a report file and a cost line. Use when the user asks for a round, a register, a fix pass or a review of a built part, or for the state of a project's round."
+argument-hint: "<Project> status|register|fix|review"
 user-invocable: true
 ---
 
@@ -23,7 +24,9 @@ Print these sections of STATE.md and stop:
    - the user's marks, with their located coordinates;
    - the sweep command: `python tools/form_sweep.py <mesh> --regions
      projects/<Project>/audit/regions.json --out audit/r<NN>/sweep --tag r<NN>
-     --baseline <the baseline in STATE.md>`;
+     --baseline <the baseline in STATE.md>`; a project without a
+     `regions.json` gets a thresholds-only one in the plan, and the stages the
+     tool prints as UNSWEPT go into the register's unswept list;
    - ceilings: 0 builds, at most 4 images;
    - the deliverable, `audit/r<NN>/register.md`, summary block first.
 2. Present to the user, from the summary block:

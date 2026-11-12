@@ -15,8 +15,9 @@
 
 ## Sweep (REGISTER, REVIEW)
 - Command: `python tools/form_sweep.py <mesh> --regions projects/<Project>/audit/regions.json --out audit/r<NN>/sweep --tag r<NN> [--baseline <...>]`
+- Regions file: <exists | written in this plan: thresholds only, or with which blocks>
 - Thresholds: turn <deg>, bump <mm>, tooth <mm>, wall <mm>
-- Unswept, known now: <regions and why, or "none">
+- Unswept, known now: <regions and why; the stages the tool will print as UNSWEPT for this regions file; or "none">
 
 ## Extra checks (at most 3, functions in one scratch script)
 1. <name: what, where>
