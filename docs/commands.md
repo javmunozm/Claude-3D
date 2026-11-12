@@ -1,7 +1,12 @@
 # Commands
 
-Standard commands for working with any project in this index. Examples use
-`BedLifter`; substitute the project folder name.
+Standard commands for working with any project in this index. Substitute
+`<Project>`, `<Part>` and `<script>`.
+
+**`python` in every command below is the repo venv,**
+`D:\Proyectos\Claude-3D\.venv\Scripts\python.exe` (`requirements.txt`,
+`docs/system.md`). The `python` on PATH has none of the packages, and the
+shell hook denies it.
 
 ## Setup (once per environment)
 
@@ -18,7 +23,7 @@ Run the project's geometry script directly with Python. This (re)writes the
 `.step` and `.stl` files into the project's `step/` and `stl/` folders.
 
 ```
-python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\bed_lifter_b123d.py"
+python "D:\Proyectos\Claude-3D\projects\<Project>\macros\<script>.py"
 ```
 
 Run this any time the constants or builder logic in the script change —
@@ -36,7 +41,7 @@ python -m ocp_vscode --port 3939 --axes --grid_xy --theme dark
 # (or use the OCP CAD Viewer panel in VS Code instead of a browser)
 
 # Terminal 2 — build parts and send them to the viewer
-python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\view_parts.py"
+python "D:\Proyectos\Claude-3D\projects\<Project>\macros\view_parts.py"
 ```
 
 Re-run the Terminal 2 script after any geometry change to refresh the view;
@@ -53,10 +58,10 @@ wireframe views missed all three; a solid (filled) render caught them.
 
 ```
 # Topology gate only (fast, no rendering)
-python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl
+python tools\render_check.py projects\<Project>\stl\<Part>.stl
 
 # Topology gate + flat (unlit, single-colour) renders from standard cameras
-python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl --views front back
+python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front back
 ```
 
 `body_count == 1` and `is_watertight` are hard gates — failing either means
@@ -75,7 +80,7 @@ renderer:
 
 ```
 python tools\render_views.py projects\VitaGripPS5\stl\VitaGripPS5.stl
-python tools\render_views.py projects\BoxTest\stl\BoxTest.stl --views front back left right
+python tools\render_views.py projects\<Project>\stl\<Part>.stl --views front back left right
 ```
 
 It renders the full turntable by default, one PNG per view plus a
@@ -86,7 +91,7 @@ It renders the full turntable by default, one PNG per view plus a
 ### Compare against a reference photo (required when a reference exists)
 
 ```
-python tools\render_check.py projects\BedLifter\stl\MiddleLifter.stl --views front ^
+python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front ^
     --reference sources\psvitaGrip\054-1.webp
 ```
 
@@ -166,7 +171,7 @@ Project-specific, dependency-free scripts that validate the design against
 material and load assumptions. No CAD environment required.
 
 ```
-python "D:\Proyectos\Claude-3D\projects\BedLifter\macros\structural_check.py"
+python "D:\Proyectos\Claude-3D\projects\<Project>\macros\structural_check.py"
 ```
 
 Look for `[PASS]` / `[FAIL]` per check in the output, and an overall
@@ -281,10 +286,10 @@ while leaving clean regions untouched.
 import pymeshfix
 import pyvista as pv
 
-mesh = pv.read("projects/BedLifter/stl/MiddleLifter.stl")
+mesh = pv.read("projects/<Project>/stl/<Part>.stl")
 fixer = pymeshfix.MeshFix(mesh)
 fixer.repair(verbose=True)
-fixer.mesh.save("projects/BedLifter/stl/MiddleLifter_repaired.stl")
+fixer.mesh.save("projects/<Project>/stl/<Part>_repaired.stl")
 ```
 
 Use this for meshes that fail the watertight gate due to non-manifold edges
@@ -323,7 +328,7 @@ for debugging mesh issues before running the full verification gate.
 ```python
 import pyvista as pv
 
-mesh = pv.read("projects/BedLifter/stl/MiddleLifter.stl")
+mesh = pv.read("projects/<Project>/stl/<Part>.stl")
 print(f"Points: {mesh.n_points}, Faces: {mesh.n_faces}")
 print(f"Bounds: {mesh.bounds}")
 print(f"Volume: {mesh.volume:.2f} mm³")

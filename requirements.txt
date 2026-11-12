@@ -1,0 +1,27 @@
+# Pinned toolchain for the repo venv (docs/system.md, "Python environment").
+# Python 3.13:  py -3.13 -m venv .venv  then  .venv\Scripts\python.exe -m pip install -r requirements.txt
+# Then reapply the build123d FontManager patch described in docs/system.md.
+# Versions verified to import together on 2026-11-11 (pip check clean).
+build123d==0.11.1
+ezdxf==1.4.4
+manifold3d==3.5.2
+matplotlib==3.10.7
+networkx==3.6
+numpy==2.3.2
+ocp_vscode==3.4.0
+opencv-python==4.13.0.92
+pillow==12.2.0
+pydicom==3.0.2
+pymeshfix==0.18.1
+pymeshlab==2025.7.post1
+pyvista==0.48.4
+rtree==1.4.1
+scikit-image==0.26.0
+scikit-learn==1.7.1
+scipy==1.16.1
+shapely==2.1.2
+simpleitk==2.5.6
+svgpathtools==1.7.2
+svgwrite==1.4.3
+trimesh==4.12.2
+vtracer==0.6.15

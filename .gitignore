@@ -1,7 +1,9 @@
-# This repo preserves the SYSTEM: agents and skills (.claude/), tools/, docs/, CLAUDE.md, and a skeleton of
-# each project (its README.md and macros/**/*.py). Sources (photos, CT scans, sketches, downloaded meshes),
-# generated output (stl/, step/, renders/), vectors and working data stay on disk only (user decision
-# 2026-09-25). See docs/architecture.md, "What the repo tracks".
+# This repo preserves the SYSTEM: skills, hooks and settings (.claude/), tools/, docs/, CLAUDE.md, and for each
+# project what a rebuild and a review need: README.md, STATE.md, NEXT_SESSION.md, macros/**/*.py, the traced
+# vectors, its docs/ scripts and tables, and the audit records (regions, reports, baseline sweeps).
+# Sources (photos, CT scans, sketches, downloaded meshes) and generated output (stl/, step/, renders/) stay on
+# disk only (user decision 2026-09-25); sources/ needs its own backup. Widened 2026-11-11, after a disk format
+# lost every untracked input and gate. See docs/architecture.md, "What the repo tracks".
 
 # Python
 __pycache__/
@@ -14,12 +16,23 @@ __pycache__/
 /sources/
 /references/
 
-# Projects: allowlist. Everything is ignored except each README.md, each STATE.md and the macros' Python code.
+# Projects: allowlist. Everything is ignored except the entries below.
 /projects/**
 !/projects/**/
 !/projects/**/README.md
 !/projects/**/STATE.md
+!/projects/**/NEXT_SESSION.md
 !/projects/**/macros/**/*.py
+# traced outlines the macros import (small text files)
+!/projects/**/vectors/**/*.dxf
+!/projects/**/vectors/**/*.svg
+# check scripts and measurement tables (docs/mechanism_sizing.py, docs/MEASUREMENTS.md)
+!/projects/**/docs/*.py
+!/projects/**/docs/*.md
+# audit records: sweep regions, plans/registers/reports, the baseline sweep of each bake
+!/projects/**/audit/regions.json
+!/projects/**/audit/**/*.md
+!/projects/**/audit/**/sweep_*.json
 # ...but never rejected attempts (deleted on explicit user rejection, lesson recorded in the README;
 # see docs/attempts.md)
 /projects/**/attempts/

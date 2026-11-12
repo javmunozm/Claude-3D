@@ -23,9 +23,11 @@ filled, smoothed, remeshed or exported before the plan is written and shown.
 
 ## 1. PLAN (measure, change nothing)
 
-Read the project's README sections on rejected approaches first (for
-BrokeFeet, `projects/BrokeFeet/README.md`, `v0/README.md`, `v2/README.md`):
-most obvious ideas here were tested and failed for recorded reasons.
+Read the project's README sections on rejected approaches first: most
+obvious ideas here were tested and failed for recorded reasons. BrokeFeet,
+the project these rules come from, was removed on 2026-11-11; what it
+measured is in `reference/bone-repair.md` and `reference/blender.md`, and its
+READMEs are in git history (`git show 197a6a3:projects/BrokeFeet/README.md`).
 
 Measure the mesh as it is, then write the plan from `plan_template.md` (this
 folder) to `projects/<Project>/work/plan_mesh.md` and show it in chat:
@@ -115,5 +117,7 @@ the operator instructions, and on import the sculpted sites.
   the Bash tool (in PowerShell `timeout` is a different command). Anything over
   5 minutes is a defect to report, not something to wait out.
 - **Shell.** One command per call, absolute paths, no `cd`, no `python -c`, no
-  `sleep` loops; view files with Read / Glob / Grep. A hook denies the rest and
-  says how to rewrite it.
+  `sleep` loops; view files with Read / Glob / Grep. `python` in any command
+  here means the repo venv, `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`,
+  never the one on PATH. A hook (`.claude/hooks/shell_guard.py`) denies the
+  rest and says how to rewrite it.

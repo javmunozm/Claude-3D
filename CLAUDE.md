@@ -14,7 +14,9 @@ object, with its own README.
    Once the user approves a build or rebuild, its stages run without further prompts:
    measurements, vectors, macros, exports, renders, and that project's own docs.
    Still ask before: starting a new build, changing repo-wide files (`CLAUDE.md`, `docs/`,
-   `.claude/agents/`, skills, memory), deleting anything, or committing.
+   `.claude/` (skills, hooks, settings), memory), deleting anything, or committing.
+   **An approved commit is pushed to `origin` in the same step.** A commit that exists only
+   on this disk is not saved.
 3. **No claims without testing.** Do not assert a result, a mechanism, or a null from reasoning
    alone. Measure it, or say you have not measured it.
 4. **Do not fabricate tests to support a claim.** No test built to reach a conclusion already
@@ -27,11 +29,15 @@ user's decisions behind conditions of your own.
 
 Geometry that runs and exports without error can still be physically wrong —
 every defect found in this repo so far passed both of those tests. After any
-geometry change run `python tools\render_check.py projects\<Project>\stl\<Part>.stl
---views front` (the topology gate; its images are flat silhouettes), then
+geometry change run `python tools\render_check.py <stl> --views front` (the
+topology gate; its images are flat silhouettes), then
 `python tools\render_views.py <same stl> --views front back` and **look at the
 lit render**; before trusting any structural verdict, read its
 `tools/reconcile.py` block.
+
+**`python` always means the repo venv,** `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`
+(`requirements.txt`). The `python` on PATH has none of the packages; a hook
+(`.claude/hooks/shell_guard.py`, registered in `.claude/settings.json`) denies it.
 
 **A render is not a measurement.** Run the `form-audit` skill for a number
 before believing a picture, and the QUALIFY stage of `photo-to-vectors` before
@@ -57,11 +63,21 @@ plan with numeric ceilings, shows it, runs it once and reports — see
 `docs/workflow.md`. The nine subagents were archived on 2026-10-27
 (`.claude/agents-archive/`); skills are tested with `.claude/evals/skills_eval.md`.
 
-## Two rules that cost this repo the most
+## The rules that cost this repo the most
 
 - **A version is never a sibling folder.** Nest it as `projects/<Project>/v2/`.
-  Never delete an old version as "the old one" — v2 here imports from
-  `v0/macros/`. See [docs/versioning.md](docs/versioning.md).
+  Never delete an old version as "the old one" — a v2 can import from
+  `v0/macros/` (BrokeFeet's did). See [docs/versioning.md](docs/versioning.md).
 - **Never delete an attempt on your own judgment.** Only an explicit rejection
   from the user triggers cleanup, and the lesson gets recorded in the project
   README before the folder goes. See [docs/attempts.md](docs/attempts.md).
+- **A commit is not saved until it is pushed.** On 2026-11-11 the disk was formatted
+  and two weeks of commits that had never been pushed were lost, together with
+  every untracked source, export and audit record. Push with every approved
+  commit; `/session-end` reports anything still local. `sources/` is not in
+  git: it needs its own copy off this disk.
+- **No disk tools without a warning and a backup.** Never recommend, install or
+  run a partitioning, boot or firmware tool, or anything that needs a reboot to
+  apply, before saying plainly that it can make the machine unbootable and
+  checking that the work is pushed and `sources/` is copied elsewhere. The
+  2026-11-11 format followed a partition tool suggested in a session here.

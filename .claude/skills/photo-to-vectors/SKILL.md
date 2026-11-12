@@ -142,7 +142,9 @@ runs on that photo first, and the comparison is judged on form, by looking at
   the Bash tool (in PowerShell `timeout` is a different command). Anything over
   5 minutes is a defect to report, not something to wait out.
 - **Shell.** One command per call, absolute paths, no `cd`, no `python -c`, no
-  `sleep` loops; view files with Read / Glob / Grep. A hook denies the rest and
-  says how to rewrite it.
+  `sleep` loops; view files with Read / Glob / Grep. `python` in any command
+  here means the repo venv, `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`,
+  never the one on PATH. A hook (`.claude/hooks/shell_guard.py`) denies the
+  rest and says how to rewrite it.
 - **Tools.** Installed packages and the DXF/SVG import pipeline are in `docs/system.md`
   and `docs/commands.md`: Grep them for what you need.

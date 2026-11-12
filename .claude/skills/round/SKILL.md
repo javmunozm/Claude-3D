@@ -79,5 +79,10 @@ that `sweep_r<NN>.json` as the baseline in STATE.md.
   - starting a new round;
   - baking into `stl/`;
   - deleting anything;
-  - committing;
+  - committing (an approved commit is pushed to `origin` in the same step);
   - editing `CLAUDE.md`, `docs/`, `.claude/` or memory.
+- `python` in any command means the repo venv,
+  `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`.
+- Plans, registers, reports and the baseline sweep under `audit/` are tracked
+  (`.gitignore` allowlist): they go into the round's commit. Previews and
+  renders are not.

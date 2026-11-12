@@ -105,5 +105,7 @@ In `work/sizing_report.md`, then in chat, at most 25 lines:
   the Bash tool (in PowerShell `timeout` is a different command). Anything over
   5 minutes is a defect to report, not something to wait out.
 - **Shell.** One command per call, absolute paths, no `cd`, no `python -c`, no
-  `sleep` loops; view files with Read / Glob / Grep. A hook denies the rest and
-  says how to rewrite it.
+  `sleep` loops; view files with Read / Glob / Grep. `python` in any command
+  here means the repo venv, `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`,
+  never the one on PATH. A hook (`.claude/hooks/shell_guard.py`) denies the
+  rest and says how to rewrite it.

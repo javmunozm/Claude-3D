@@ -2,7 +2,7 @@
 
 Updated: <date>, by <session / round>.
 
-Keep this file under about 150 lines. Agents read it instead of the README. History, rejected approaches and narrative stay in the README.
+Keep this file under about 150 lines. Skills read it instead of the README. History, rejected approaches and narrative stay in the README.
 
 ## Current
 - **Bake:** `stl/<file>` (SHA-256 `<...>`), copied from `audit/r<NN>/case_preview_r<NN>.stl`.
@@ -38,7 +38,7 @@ One line each.
 ## Rounds
 One line each.
 
-| Round | Date | Agents (tool calls) | Peak context | List price | Result |
+| Round | Date | Steps (tool calls) | Peak context | List price | Result |
 |-------|------|---------------------|--------------|------------|--------|
 
 ## Decisions pending for the user

@@ -3,10 +3,19 @@
 Updated: 2026-10-08 by `/session-end` (session f77b040d: round topface rejected; earlier header: session 49ca6a61, system improvement,
 then the v2 B-rep spike and passes 1–1d).
 
-Keep this file under about 150 lines. Agents read it instead of the README. History, rejected approaches and narrative stay in the README.
+Keep this file under about 150 lines. Skills read it instead of the README. History, rejected approaches and narrative stay in the README.
+
+## Lost on 2026-11-11 (disk format): read this first
+Only what git tracked survived: this file, the READMEs and `macros/` (r16 and `v2/`).
+- **No bake and no preview on disk.** `stl/` (the r16 and r13 cases, the socket grip, `console_solid.stl`), `v2/stl/`, `derived/` and every `audit/` folder are gone; the SHA-256 values below describe files that no longer exist.
+- **Neither macro can build.** r16 (`macros/build_case_ext.py`) needs the DualSense scan and the Vita mesh from `sources/` and the files in `derived/`; v2 lofts from `stl/VitaGripPS5_case_r16.stl` (`vgps5_v2/constants.py`, `R16_STL`). All are gone. Not run on 2026-11-11: stated from the paths the code reads.
+- **The gates and the sweep inputs are gone:** `audit/r15/scripts/check15.py` (the hard gate), `audit/regions.json` (regenerate with `macros/export_sweep_regions.py` once a mesh exists), the baseline `audit/r16/sweep/sweep_r16.json`, `audit/r9/closeup.py`, and every register and review.
+- Still valid, because it is knowledge and not a file: the locks, the gate thresholds, the surface bar, the review cameras, the open entries, the accepted artifacts and the "do not retry" notes below.
+- **First decision for the user:** re-source the DualSense scan and the Vita mesh and rebuild r16 to feed v2, or restart v2 from new sections.
+- Tracked from now on: gate scripts in `macros/`, `audit/regions.json`, audit reports, baseline sweeps (`.gitignore`).
 
 ## Current
-- **Bake:** `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
+- **Bake:** NONE ON DISK (see above). Was: `stl/VitaGripPS5_case_r16.stl` (SHA-256 `4AAF87F76AA7D209BA65E94D897353BE9EDAB277F8B6BDF9FD2477FDEFAE12EF`), a byte copy of `audit/r16/case_preview_r16.stl`. Review: `audit/r16/review/review_r16.md`, **ACCEPT WITH LISTED ARTIFACTS**.
 - **Kept on purpose:** `stl/VitaGripPS5_case_r13.stl` (the previous bake, SHA-256 `56141B26...`) and `stl/VitaGripPS5.stl` (the 2026-09-14 socket grip, not this case).
 - **Working preview:** none for r16. **v2 (B-rep) work in progress:** `v2/stl/VitaGripPS5_v2_latch.stl` (pass "latch" on top of plate `79c753a`; SHA-256 `DAA382EE…`, re-hashed after the 2026-10-06 power outage; reviewed ACCEPT WITH LISTED ARTIFACTS, committed 2026-10-06). **The top face stays flat:** pass top was rejected 2026-10-06, and round topface (option 2 and the crown) on 2026-10-08. Code restored to `817c403`, and the restored build is byte-identical to the latch STL. Next: the pocket contour ("Decisions pending" item 5). See "v2" below.
 - **Macro:** `macros/build_case_ext.py`, one file of 216.9 KB, docstring "round 16". Switches `FINISH_ON`, `RIM_CUT_ON = False`, `BAR_CUT_ON`, `D19_ON = False`; flag `--no-bar`. Over 60 KB: split it into stage modules before its next change (`docs/architecture.md`).

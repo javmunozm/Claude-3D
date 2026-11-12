@@ -219,21 +219,38 @@ script that sends geometry are separate processes — see [commands.md](commands
 
 ## What the repo tracks
 
-The repo preserves the **system**, not the data (user decision 2026-09-25).
-The system is the agents and skills that capture sketches, photos and scans
-and turn them into parts, together with the tools, the docs and the project
-conventions.
+The repo preserves the **system**, and for each project **everything a
+rebuild and a review need except the sources** (user decision 2026-09-25,
+widened 2026-11-11). The system is the skills that capture sketches, photos
+and scans and turn them into parts, together with the hooks, the tools, the
+docs and the project conventions.
 
 | Tracked | Not tracked (stays on disk) |
 |---|---|
-| `.claude/` (agents, skills, hooks), `tools/`, `docs/`, `CLAUDE.md`, `.gitignore` | `sources/`, including raw CT panes and multi-GB downloaded meshes |
-| each project's `README.md` and `STATE.md` (any depth) | `stl/`, `step/`, `renders/`, `vectors/`, `derived/`, `work/`, `blender/`, `docs/` data |
-| each project's `macros/**/*.py`, as the skeleton and reference layout | `attempts/`, `__pycache__/`, `*.npy`, `*.blend` |
+| `.claude/` (skills, hooks, `settings.json`, archived agents), `tools/`, `docs/`, `CLAUDE.md`, `requirements.txt`, `.gitignore` | `sources/`, including raw CT panes and multi-GB downloaded meshes: **back it up off this disk** |
+| each project's `README.md`, `STATE.md`, `NEXT_SESSION.md` (any depth) | `stl/`, `step/`, `renders/`, `derived/`, `work/`, `blender/` |
+| each project's `macros/**/*.py`, **including its gate scripts** | `attempts/`, `__pycache__/`, `*.npy`, `*.blend` |
+| `vectors/**/*.dxf`, `vectors/**/*.svg` (the outlines the macros import) | preview STLs, logs and per-defect scratch scripts under `audit/` |
+| `docs/*.py`, `docs/*.md` (check scripts, `MEASUREMENTS.md`) | |
+| `audit/regions.json`, `audit/**/*.md` (plans, registers, reports), `audit/**/sweep_*.json` (baselines) | |
 
 `.gitignore` enforces this with an allowlist for `projects/`. Never
-`git add -f` a source, an output or a render. A fresh clone holds the
-system and the project skeletons only. A macro that reads `sources/` or its
-project's `vectors/` runs only on a machine that still has those folders.
+`git add -f` a source, an output or a render.
+
+**Why it was widened.** Until 2026-11-11 only README, STATE and the macros
+were tracked. A disk format then showed what that left out: SurgicalDrillGuide
+could not build (its macro imports `vectors/import/*.dxf`), its structural
+check `docs/mechanism_sizing.py` was gone, VitaGripPS5's hard gate
+(`audit/r15/scripts/check15.py`), its `audit/regions.json` and its baseline
+sweep were gone, and no register or review survived. Two rules follow:
+
+- **A gate script is code and lives in `macros/`,** never in a round's
+  `audit/r<NN>/scripts/`.
+- **A commit is pushed in the step that makes it.** Two weeks of local-only
+  commits went with the same disk.
+
+A macro that reads `sources/` still runs only on a machine that has that
+folder.
 
 ## Project conventions
 
@@ -267,11 +284,11 @@ project's `vectors/` runs only on a machine that still has those folders.
 projects/<Project>/audit/
 ├── regions.json            region rules, thresholds and fixed geometry for tools/form_sweep.py
 ├── r<NN>/
-│   ├── brief_register.md   register.md        (summary block first)
-│   ├── brief_fix.md        fix_report.md      handoff.md (if a pass stopped early)
-│   ├── brief_review.md     review.md          (summary block first)
+│   ├── plan_audit.md       register.md        (summary block first)
+│   ├── plan_build.md       fix_report.md      handoff.md (if a pass stopped early)
+│   ├── review.md                              (summary block first)
 │   ├── sweep/              sweep_r<NN>.json + its fields (the baseline for the next round, after a bake)
-│   ├── scripts/            checks specific to one defect only
+│   ├── scripts/            scratch checks for one defect only; a gate goes to macros/
 │   └── case_preview_r<NN>.stl, logs/
 └── archive/                rounds before the last bake, moved here with the user's approval
 ```

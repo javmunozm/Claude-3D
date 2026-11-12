@@ -87,17 +87,39 @@ D:\Proyectos\Claude-3D\.venv\Scripts\python.exe <script>.py
 - **Why:** on 2026-10-17 the system `python` on PATH was Python 3.14.7 with none
   of the packages above installed. Agents fell back to numpy-only scripts, and
   `tools/reconcile.py` skipped every pair because build123d could not be imported.
-- **Built 2026-10-17:** Python 3.13.15 (`winget install Python.Python.3.13`),
-  then `py -3.13 -m venv .venv`, then the pinned versions in the tables above
-  (`build123d==0.11.1 trimesh==4.12.2 manifold3d==3.5.2 shapely==2.1.2
-  scipy==1.16.1 numpy==2.3.2 ezdxf==1.4.4 matplotlib==3.10.7 pyvista==0.48.4
-  Pillow==12.2.0 rtree==1.4.1 networkx==3.6 opencv-python==4.13.0.92
-  svgpathtools==1.7.2`). pymeshfix, pymeshlab, pydicom, SimpleITK,
-  scikit-image, vtracer and ocp-vscode are **not** installed in it yet.
-- **Checked:** the SurgicalDrillGuide round-5 build run in this venv wrote all
-  7 STLs byte-identical to the previous exports.
+- **Rebuilt 2026-11-11** after a Windows reinstall wiped the drive (first built
+  2026-10-17 on Python 3.13.15): Python 3.13.17 (`winget install
+  Python.Python.3.13`), then `py -3.13 -m venv .venv`, then every pinned version
+  in the tables above:
+
+  ```
+  pip install build123d==0.11.1 trimesh==4.12.2 manifold3d==3.5.2 shapely==2.1.2
+    scipy==1.16.1 numpy==2.3.2 ezdxf==1.4.4 matplotlib==3.10.7 pyvista==0.48.4
+    Pillow==12.2.0 rtree==1.4.1 networkx==3.6 opencv-python==4.13.0.92
+    svgpathtools==1.7.2
+  pip install pymeshfix==0.18.1 pymeshlab==2025.7.post1 pydicom==3.0.2
+    SimpleITK==2.5.6 scikit-image==0.26.0 vtracer==0.6.15 ocp-vscode==3.4.0
+    svgwrite==1.4.3 scikit-learn==1.7.1
+  ```
+
+  VTK 9.6.2 comes in with pyvista. The full toolchain is now installed.
+- **Checked 2026-11-11:** all 24 packages import at the pinned versions and
+  `pip check` is clean. A scratchpad part (box minus a hole, r2 fillets) exported
+  STEP and STL with build123d volume 10834.69 mm³ against 10834.7 by hand; the STL
+  was watertight and single-body; text extrusion ran through the patched
+  FontManager; pyvista rendered it offscreen; pymeshfix repaired it with volume
+  unchanged; vtracer traced the render; pymeshlab loaded it. The 2026-10-17 check
+  (SurgicalDrillGuide round-5 STLs byte-identical) could not be repeated: the old
+  exports were lost with the drive.
 - The FontManager patch below is applied to `.venv\Lib\site-packages\build123d\text.py`.
-- `.venv/` is gitignored. To rebuild it, repeat the three steps and reapply the patch.
+  `C:\Windows\Fonts\mstmc.ttf` was absent after the reinstall; the patch was
+  reapplied anyway.
+- `.venv/` is gitignored. To rebuild it: `py -3.13 -m venv .venv`, then
+  `.venv\Scripts\python.exe -m pip install -r requirements.txt` (the same pins as
+  above, tracked at the repo root since 2026-11-11), then reapply the patch.
+- **The hook enforces it.** `.claude/hooks/shell_guard.py` (registered in the
+  tracked `.claude/settings.json`) denies a bare `python` / `py` in Bash and
+  PowerShell and names the venv path. `py -3.13 -m venv ...` is let through.
 
 ### Install
 

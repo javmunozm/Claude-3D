@@ -30,6 +30,14 @@ A skill is a folder, `.claude/skills/<name>/SKILL.md`. A bare
 moved (2026-09-24). Long material lives in the skill's `reference/` files and
 is read by section, only when needed.
 
+**The shell rules are enforced, not only written.** `.claude/settings.json`
+(tracked) registers `.claude/hooks/shell_guard.py` on every Bash and
+PowerShell call: one command per call, no `cd`, no `python -c`, no file
+viewing in the shell, and `python` must be the repo venv. Test it with
+`.claude/hooks/test_hooks.py`. Until 2026-11-11 the registration lived in an
+untracked `settings.local.json`; when that file was lost, five skills went on
+saying "a hook denies the rest" while nothing did.
+
 ## Plan → run → report
 
 Every working skill has the same three phases, in this order:
@@ -113,7 +121,8 @@ the handle's depth from the drawing's side view, then **invented** its width as
 gate. The front view had the real taper (13.5 → 39.9 mm) the whole time. A
 traced contour for one axis does not license a guessed number for another.
 
-`projects/VitaGrip1000/v0/macros/trace_console.py` (also in `v2/`) is the worked example: it traces
+VitaGrip1000's `trace_console.py` is the worked example (project removed
+2026-11-11; `git show 197a6a3:projects/VitaGrip1000/v0/macros/trace_console.py`): it traces
 four orthographic views, gates each against its annotated dimension, checks the
 rings are simple, and reports the protrusions the silhouette cannot show.
 `vita_grip.py` then imports its DXF in `console_profile()`.
@@ -232,9 +241,12 @@ form-audit  REVIEW (fresh session): re-measures every entry + repeats the full s
 
 ## Testing the skills
 
-`.claude/evals/skills_eval.md` holds 14 past incidents as requests, with the
-inputs still on disk and objective pass lines. Run each case twice in a fresh
-session, and after any edit to a skill. If a skill scores worse than the agent
+`.claude/evals/skills_eval.md` holds 14 past incidents as requests, with
+objective pass lines. **Their inputs were lost on 2026-11-11** (sources,
+exports and five projects); the file says which cases can still run. Until
+new cases replace them, an edit to a skill is checked by reading its plan on a
+real task. When inputs exist: run each case twice in a fresh session, and
+after any edit to a skill. If a skill scores worse than the agent
 it replaced, restore the agent from `.claude/agents-archive/`.
 
 The subagent-era sections of this document (briefing fields, ceilings by role,

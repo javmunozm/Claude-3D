@@ -62,8 +62,11 @@ The plan must contain:
   back up only the files the bake replaces, not the whole folder.
 - Check each new solid with `is_valid` and a 2D section before any export.
   Booleans fuse only where solids overlap (`reference/modeling.md`).
-- At the end, run the **five gates** once (`reference/gates.md`, or `/verify`).
-  Do not edit the script after the final export.
+- At the end, run the **five gates** once (`reference/gates.md`, or `/verify
+  <path of the preview STL>`). Do not edit the script after the final export.
+- **A gate script is code:** it lives in `macros/` (tracked), never in a
+  round's `audit/r<NN>/scripts/`. VitaGripPS5's hard gate was
+  `audit/r15/scripts/check15.py`, untracked, and was lost on 2026-11-11.
 
 ## 3. REPORT
 
@@ -124,5 +127,7 @@ from the plan plus the handoff.
   "A stage cache"), not waited out: in the VitaGripPS5 r10 run the re-billing
   after 10-minute builds was 40 % of the cost.
 - **Shell.** One command per call, absolute paths, no `cd`, no `python -c`, no
-  `sleep` loops; view files with Read / Glob / Grep. A hook denies the rest and
-  says how to rewrite it.
+  `sleep` loops; view files with Read / Glob / Grep. `python` in any command
+  here means the repo venv, `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`,
+  never the one on PATH. A hook (`.claude/hooks/shell_guard.py`) denies the
+  rest and says how to rewrite it.

@@ -16,7 +16,7 @@ The user approves:
 - a method change;
 - a bake;
 - deleting anything;
-- commits;
+- commits (each approved commit is pushed to `origin` in the same step);
 - edits to `CLAUDE.md`, `docs/`, `.claude/`, skills, settings or memory.
 
 The main session's rules are `CLAUDE.md`, this document, `docs/agents.md`, the
@@ -35,8 +35,8 @@ skills in `.claude/skills/` (each with its plan template) and the memory.
    - Images only when a number cannot answer, as one region sheet per question
      (`tools/render_roi.py`).
 3. **End.** Run `/session-end <Project>`. It updates `STATE.md` and
-   `NEXT_SESSION.md`, records the cost, lists the uncommitted system files, and
-   proposes memory edits for approval.
+   `NEXT_SESSION.md`, records the cost, lists the uncommitted files and the
+   commits not yet on `origin`, and proposes memory edits for approval.
 4. **A usage limit stops a run.** The plan, the report written so far and
    `handoff.md` on disk let a fresh session continue from where it stopped.
 
@@ -59,7 +59,7 @@ context makes both cheap.
    (`docs/architecture.md`) with a stage cache (`tools/stage_cache.py`), so a
    change rebuilds only the parts it touches and a build stays under 5 minutes.
 5. **Verify.**
-   - The hard gates (`/verify` a–b) and one region render.
+   - The hard gates (`/verify <preview stl>`, gates a–b) and one region render.
    - A `form-audit` REGISTER of the whole part.
    - Review renders for the user (`tools/render_views.py`, at the cameras in `STATE.md`).
 6. **Fix rounds.** The bounded cycle below, until the user accepts.
@@ -121,9 +121,17 @@ Rules:
 
 ## Commits
 
-The repo tracks the system and each project's skeleton:
-- `.claude/`, `tools/`, `docs/`, `CLAUDE.md`;
-- each project's `README.md`, `macros/**/*.py`, and the proposed `STATE.md`.
+The repo tracks the system and what each project needs to be rebuilt and
+reviewed:
+- `.claude/` (skills, hooks, `settings.json`), `tools/`, `docs/`, `CLAUDE.md`,
+  `requirements.txt`;
+- each project's `README.md`, `STATE.md`, `NEXT_SESSION.md`, `macros/**/*.py`,
+  `vectors/` (DXF, SVG), `docs/*.py` and `docs/*.md`, `audit/regions.json`,
+  the audit plans and reports (`audit/**/*.md`) and the baseline sweeps
+  (`audit/**/sweep_*.json`).
 
-It never tracks outputs (`docs/architecture.md`, "What the repo tracks"). Ask
-before every commit.
+It never tracks sources or generated output (`docs/architecture.md`, "What the
+repo tracks"). Ask before every commit, and **push every approved commit in
+the same step**: on 2026-11-11 a disk format took two weeks of commits that
+had never been pushed. `sources/` is outside git and needs its own copy off
+this disk.

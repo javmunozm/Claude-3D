@@ -17,6 +17,10 @@ the coverage check of 2026-10-27 found every number, path and rule present excep
 **To restore an agent** (for example if `.claude/evals/skills_eval.md` shows a skill doing worse than the agent it
 replaced): move its file back to `.claude/agents/`. The budget hook and `budgets.json` still know every agent by name.
 
-**The hooks are inactive.** `.claude/hooks/budget_nudge.py`, `shell_guard.py` and `budgets.json` only act on subagent
-calls, and no `settings.json` (user or project) registers them (checked 2026-11-11). Restoring an agent with its turn
-budget also means adding them back under `hooks` in `.claude/settings.json`.
+**The budget hook is archived here** (`hooks/budget_nudge.py`, `hooks/budgets.json`, moved 2026-11-11). It acts only
+on subagent calls: it returns nothing for the main thread, where the work has run since 2026-10-27. Restoring an
+agent with its turn budget means moving both files back to `.claude/hooks/`, registering `budget_nudge.py` as a
+`PostToolUse` hook in `.claude/settings.json`, and restoring its tests from git (`git show 197a6a3:.claude/hooks/test_hooks.py`).
+
+`shell_guard.py` is **not** archived: it stays in `.claude/hooks/`, registered in `.claude/settings.json`, and applies
+to the main thread.

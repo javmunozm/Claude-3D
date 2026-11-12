@@ -2,6 +2,9 @@
 
 A relative-cost proxy only: claude.ai plans are not billed per token.
 Usage: python cost.py [session-prefix ...]
+
+A model with no row in PRICES is counted as $0 and the totals are then wrong: the
+script says UNPRICED on the line of every session it affects and exits with code 2.
 """
 import collections
 import os
@@ -12,6 +15,9 @@ import token_audit as ta  # noqa: E402
 
 # $/MTok: input, output, cache read, 5m write (1.25x input), 1h write (2x input)
 PRICES = {
+    # added 2026-11-11: $8 / $40, cache read $0.20 (Claude Code's bundled claude-api reference, cached
+    # 2026-11-03); the two cache-write prices are derived with the multipliers in the comment above
+    "claude-fable-5-2": (8.0, 40.0, 0.20, 10.0, 16.0),
     "claude-opus-5-5": (4.0, 20.0, 0.20, 5.0, 8.0),
     "claude-sonnet-5-5": (2.0, 10.0, 0.20, 2.5, 4.0),
     "claude-opus-5": (5.0, 25.0, 0.50, 6.25, 10.0),
@@ -39,14 +45,18 @@ ta.ONLY = sys.argv[1:]
 grand = 0.0
 for sid in ta.sessions_list():
     main_t, subs = ta.load_session(sid)
+    before = sum(seen_unknown.values())
     m = tr_usd(main_t)
     s = sum(tr_usd(x) for x in subs)
     grand += m + s
     models = collections.Counter(c["model"] for c in main_t.calls.values())
-    print(f"{sid[:8]} {(main_t.first_ts or '')[:10]} main ${m:7.2f}  subagents ${s:7.2f}  total ${m + s:7.2f}   main model {dict(models.most_common(2))}")
+    missed = sum(seen_unknown.values()) - before
+    flag = f"   UNPRICED: {missed} calls counted as $0, total is too low" if missed else ""
+    print(f"{sid[:8]} {(main_t.first_ts or '')[:10]} main ${m:7.2f}  subagents ${s:7.2f}  total ${m + s:7.2f}   main model {dict(models.most_common(2))}{flag}")
     for x in subs:
         t = x.totals()
         print(f"           {x.agent_type[:22]:22} {getattr(x, 'description', '')[:38]:38} calls={t['n']:4} ${tr_usd(x):7.2f}")
 print(f"ALL ${grand:.2f}")
 if seen_unknown:
-    print("unpriced calls by model:", dict(seen_unknown))
+    print("UNPRICED calls by model (add a row to PRICES; the totals above leave them out):", dict(seen_unknown))
+    sys.exit(2)

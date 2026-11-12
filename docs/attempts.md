@@ -40,7 +40,8 @@ lesson first, in this order:
 
 ## The lesson outlives the bytes
 
-`projects/VitaGrip-hori/README.md` ("Rejected approaches") keeps its rejected
+VitaGrip-hori's README ("Rejected approaches"; project removed 2026-11-11,
+`git show 197a6a3:projects/VitaGrip-hori/README.md`) keeps its rejected
 attempts as rows, with no folders left behind. Its `parametric-clamshell` row
 is the target state: 172.8 cm³ against the real part's 47.1, median wall 6.20
 against 2.13 mm, genus 2 against 48. The record of a *measured* negative

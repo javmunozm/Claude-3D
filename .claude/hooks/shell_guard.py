@@ -1,7 +1,9 @@
 """PreToolUse hook: enforce the repo's shell rules before a command can stall on a
-permission prompt. Described in docs/agents.md, "Briefing agents".
+permission prompt. Registered in .claude/settings.json (tracked).
 
-Rules (every agent's "Shell commands" section, docs/agents.md, user memory):
+Rules (every skill's "Shell." session rule, CLAUDE.md "Verification"):
+  - Python is the repo venv, never the bare `python` / `py` on PATH (the system
+    interpreter has none of the packages; measured 2026-11-11: `import numpy` fails)
   - never `cd`; every path absolute
   - one command per call: no `;`, `&&`, `||` and no multi-line command lists
   - never `python -c`; no heredoc code fed to an interpreter
@@ -19,19 +21,25 @@ import sys
 
 # Measured on the transcripts after the rules were committed (2026-09-24): the main
 # thread broke them on 50 % of its commands, subagents on 16 %. Set the environment
-# variable SHELL_GUARD_MAIN=0 to apply the guard to subagents only.
+# variable SHELL_GUARD_MAIN=0 to apply the guard to subagents only. Since 2026-10-27 the work
+# runs in the main thread (skills), so the default must stay on.
 APPLY_TO_MAIN = os.environ.get("SHELL_GUARD_MAIN", "1") != "0"
 
 VIEW = re.compile(r"^\s*(cat|head|tail|less|more|type|ls|Get-Content|gc)(\s|$)", re.I)
 CD = re.compile(r"^\s*(cd|chdir|Set-Location|sl|pushd)(\s|$)", re.I)
-PY_C = re.compile(r"(^|\s)(python3?|py)(\.exe)?(\s+-[A-Za-z]+(\s+\S+)?)*?\s+-c(\s|$)", re.I)
+PY_C = re.compile(r"(^|[\s/\\\"'])(python3?|py)(\.exe)?[\"']?(\s+-[A-Za-z]+(\s+\S+)?)*?\s+-c(\s|$)", re.I)
 HEREDOC_CODE = re.compile(r"(python3?|py|bash|sh|node|pwsh)(\.exe)?\b[^|\n]*<<-?\s*['\"]?\w+", re.I)
-PY_STDIN = re.compile(r"(^|\s)(python3?|py)(\.exe)?\s+-(\s|$)", re.I)
+PY_STDIN = re.compile(r"(^|[\s/\\\"'])(python3?|py)(\.exe)?[\"']?\s+-(\s|$)", re.I)
+VENV_PY = "D:/Proyectos/Claude-3D/.venv/Scripts/python.exe"
+BARE_PY = re.compile(r"(^|[\s|&;(])(python3?|py)(\.exe)?(?=\s|$)", re.I)
+QUOTED = re.compile(r"\"[^\"]*\"|'[^']*'")
+MAKE_VENV = re.compile(r"\s-m\s+venv(\s|$)", re.I)
+ANY_PY = re.compile(r"^\s*(&\s*)?[\"']?[^\s\"']*python(\.exe)?[\"']?(\s|$)", re.I)
 ENV_ASSIGN = re.compile(r"^\s*\$env:[A-Za-z_][A-Za-z0-9_]*\s*=\s*.+$", re.I)
 
 FIX = ("Rewrite it as ONE command with absolute paths. For Python, Write the code to a .py file "
-       "and run `python \"<absolute path>.py\"`. View files with Read, find them with Glob, search "
-       "them with Grep.")
+       "and run `\"" + VENV_PY + "\" \"<absolute path>.py\"` (in PowerShell prefix it with `& `). "
+       "View files with Read, find them with Glob, search them with Grep.")
 
 
 def split_top_level(cmd):
@@ -75,7 +83,7 @@ def decide(command, tool="Bash"):
         segs = split_top_level(cmd)
     if len(segs) > 1:
         # explicitly allowed by .claude/settings.local.json: `$env:X = ...; python ...`
-        if not (len(segs) == 2 and ENV_ASSIGN.match(segs[0]) and re.match(r"^\s*python", segs[1], re.I)):
+        if not (len(segs) == 2 and ENV_ASSIGN.match(segs[0]) and ANY_PY.match(segs[1])):
             rules.append("chained commands")
     for s in segs:
         if CD.match(s):
@@ -84,6 +92,9 @@ def decide(command, tool="Bash"):
             rules.append("viewing files in the shell")
     if PY_C.search(cmd) or PY_STDIN.search(cmd):
         rules.append("python -c / stdin code")
+    unquoted = QUOTED.sub('""', cmd)
+    if BARE_PY.search(unquoted) and not MAKE_VENV.search(unquoted):
+        rules.append("bare python (use the repo venv)")
     return sorted(set(rules))
 
 

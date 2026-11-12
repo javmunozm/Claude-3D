@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Run the five-gate geometry verification for a project part. Usage: /verify <Project>/stl/<Part>.stl [--reference <path>]
+description: Run the five-gate geometry verification for an STL, a bake or a preview. Usage: /verify <path to .stl> [--reference <path>] [--regen]
 user-invocable: true
 ---
 
@@ -9,12 +9,18 @@ user-invocable: true
 Run all five gates in order for the specified STL. Do not skip gates or report
 the part as verified until every applicable gate has passed.
 
+`python` below is the repo venv, `D:\Proyectos\Claude-3D\.venv\Scripts\python.exe`.
+Below, `<stl>` is the absolute path of the file being verified.
+
 ## Parse the argument
 
-The user passes `<Project>/stl/<Part>.stl` — resolve it relative to `projects/`.
-If the user passes just a project name, glob `projects/<Project>/stl/*.stl` (and
-`projects/<Project>/v*/stl/*.stl` for versioned projects) and list the
-available STLs; ask which one to verify. Renders go to the sibling `renders/`.
+The argument is the path of **any** STL: a bake (`<Project>/stl/<Part>.stl`,
+resolved under `projects/`) or a preview (`projects/<Project>/audit/r<NN>/…`,
+`work/…`, a scratch folder). Verify the file that was given; never substitute
+the one in `stl/`. If the user passes just a project name, glob
+`projects/<Project>/stl/*.stl` (and `projects/<Project>/v*/stl/*.stl` for
+versioned projects) and list the available STLs; ask which one to verify.
+Renders go next to the STL for a preview, to the sibling `renders/` for a bake.
 
 If `--reference <path>` is passed, use it for gate (e). Otherwise check
 `sources/` for a directory matching the project subject and offer any
@@ -22,22 +28,30 @@ images found there.
 
 ## Gate sequence
 
-### (a) Regenerate
+### (a) Regenerate (never into `stl/`)
 
-Find the geometry script in `projects/<Project>/macros/` and run it:
+This gate proves the file comes from the current macro. It must not overwrite
+a bake: `stl/VitaGripPS5.stl` was an older design that a rebuild would have
+replaced.
 
-```
-python projects/<Project>/macros/<script>.py
-```
+- **A preview** that the current pass just built: the build is the
+  regeneration. Report its command and its `rebuilt / from cache / written`
+  line, and go on.
+- **A bake**, or with `--regen`: run the macro with its output redirected to a
+  preview folder (the command in `STATE.md`, Commands: `--out <path>` or
+  `SDG_OUT_DIR=<folder>`), then compare the SHA-256 of the regenerated file
+  with the one given. Different bytes are a finding: report both hashes.
+- **A macro that can only write into `stl/`:** do not run it. Report gate (a)
+  as NOT RUN with that reason, and propose adding an output switch
+  (`cad-build`).
 
-Confirm the STL was written without error. If the script has no
-`if __name__ == "__main__":` guard, warn — module-level exports fire on
-import and silently overwrite files.
+If the script has no `if __name__ == "__main__":` guard, warn — module-level
+exports fire on import and silently overwrite files.
 
 ### (b) Topology gate
 
 ```
-python tools/render_check.py projects/<Project>/stl/<Part>.stl
+python tools/render_check.py <stl>
 ```
 
 **Hard gates:** `body_count == 1` and `is_watertight`. If either fails, stop
@@ -47,7 +61,7 @@ legitimately multi-piece, the user must pass `--expect-bodies N`.
 ### (c) Form render
 
 ```
-python tools/render_views.py projects/<Project>/stl/<Part>.stl --views front back
+python tools/render_views.py <stl> --views front back
 ```
 
 `render_check.py`'s own images are flat, unlit silhouettes: they show the
@@ -89,7 +103,7 @@ constraint — not a constant in the script or a claim in the README.
 ### (e) Whole-form comparison (when a reference exists)
 
 ```
-python tools/render_check.py projects/<Project>/stl/<Part>.stl --views front --reference <reference_path>
+python tools/render_check.py <stl> --views front --reference <reference_path>
 ```
 
 Read the `_vs_reference.png` and answer one question:
@@ -118,8 +132,8 @@ variant as the model before treating a difference as a defect.
 After all gates, report:
 
 ```
-Verification: projects/<Project>/stl/<Part>.stl
-  (a) Regenerate:   PASS / FAIL
+Verification: <stl>
+  (a) Regenerate:   PASS / FAIL / NOT RUN  [how: this pass's build | regenerated to <folder>, SHA equal/different]
   (b) Topology:     PASS / FAIL  [body_count, watertight, volume]
   (c) Shaded render: PASS / FAIL  [what you observed]
   (d) Mating check:  PASS / FAIL / SKIPPED  [reason]

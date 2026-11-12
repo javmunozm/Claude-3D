@@ -6,7 +6,7 @@ Moved from the print-tolerance-expert agent (2026-10-27). Read the section you n
 
 A structural check is only worth what its inputs are worth. `docs/architecture.md` deliberately keeps these checks decoupled from the geometry scripts (pure math, no build123d import) so they run without a CAD environment — and states they are "kept in sync by hand."
 
-**Hand-sync has already failed in this repo, silently.** `projects/BedLifter/macros/structural_check.py` was found validating a design that no longer existed: tilt angle 9.332° against the geometry's 8.850°, top rod Ø10 against the built Ø12.5, collar Ø50 against the built Ø22.5, and two more. Both scripts ran fine. The check printed `ALL CHECKS PASS`, and the README cited that verdict as evidence the design was safe.
+**Hand-sync has already failed in this repo, silently.** BedLifter's `structural_check.py` (project removed 2026-11-11; `git show 197a6a3:projects/BedLifter/macros/structural_check.py`) was found validating a design that no longer existed: tilt angle 9.332° against the geometry's 8.850°, top rod Ø10 against the built Ø12.5, collar Ø50 against the built Ø22.5, and two more. Both scripts ran fine. The check printed `ALL CHECKS PASS`, and the README cited that verdict as evidence the design was safe.
 
 The collar error is the instructive one: overstating the diameter more than doubled the assumed bearing area, so the check passed a joint it should have interrogated. **A check with stale inputs is more dangerous than no check**, because it manufactures confidence. Treat reconciling inputs as part of running the check, not as an optional tidiness step.
 
@@ -46,7 +46,7 @@ When you find drift, fix the check's inputs to match the geometry, re-run, and r
 - **Photo-derived dimensions cannot anchor a tight-tolerance mating feature.** Measurements pixel-derived from reference images carry scale error from the anchor dimension, lens perspective, and edge ambiguity — easily several percent. They are fine for proportions and shape language; for anything that must *fit* a real object, require a physical measurement or a test print, and record the requirement in the README's verification checklist.
 
 **Structural sizing**
-- Follow the pattern in `projects/BedLifter/macros/structural_check.py`: pure-math, no CAD dependency, checks against material allowables at an explicit safety factor (that project uses 3× for load-bearing PETG). Add the `reconcile` call above at the top of any such script.
+- Follow the pattern of BedLifter's `structural_check.py` (in git history, as above): pure-math, no CAD dependency, checks against material allowables at an explicit safety factor (that project uses 3× for load-bearing PETG). Add the `reconcile` call above at the top of any such script.
 - Standard checks per load-bearing feature: axial compression, bending, shear, Euler buckling for slender columns, bearing stress at socket/pin interfaces. Report each as `[PASS]`/`[FAIL]` against `material_strength / safety_factor`.
 - Use conservative, **named** assumptions for load paths (e.g. "worst case: all weight on 2 of 4 legs") and state them — don't silently average loads across parts unless the geometry guarantees even distribution.
 - Keep the docstring's design revision in step with reality. The stale check described itself as "v7 … 9.33°" long after the geometry had moved on, which helped the drift hide. If you change inputs, update the docstring in the same edit.
