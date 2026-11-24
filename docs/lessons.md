@@ -1,9 +1,15 @@
 # Lessons
 
-One entry per incident, with the numbers that make it checkable. Agents read
-the sections relevant to them rather than carrying their own copy of the story
-— a lesson refined here reaches every agent at once, and a lesson duplicated
-into five prompts gets updated in four of them.
+One entry per incident, with the numbers that make it checkable. The skills
+point to the sections relevant to them rather than carrying their own copy of
+the story — a lesson refined here reaches every skill at once, and a lesson
+duplicated into five prompts gets updated in four of them.
+
+The entries are records of their date and are not rewritten. Where one names
+an agent (`reference-analyst`, `cad-designer`, `form-auditor`), read the skill
+that replaced it (`docs/skills.md`). Files and projects an entry names may be
+gone: `sources/`, every `stl/` and `audit/` folder were lost on 2026-11-11
+(last entry), and BrokeFeet was removed the same day.
 
 Each entry states **what happened**, **why nothing caught it**, and **how to
 apply it**. An entry without a measured number is not an entry.

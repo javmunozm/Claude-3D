@@ -3,6 +3,12 @@
 How to add a second (or third) generation to an existing project without
 cluttering `projects/` — and how to consolidate one that has already sprawled.
 
+**BrokeFeet is the worked example throughout, and it is no longer in the
+repo:** it was removed on 2026-11-11 (commit `c431556`) with BedLifter and
+VitaGrip-hori, which the test notes below also name. Its READMEs and macros
+are in git at `197a6a3`. The one nested project today is VitaGripPS5
+(`projects/VitaGripPS5/v2/`, with the r16 generation at the project root).
+
 ## The rule
 
 **One project = one physical object = one folder under `projects/`.** Versions
@@ -15,8 +21,8 @@ projects/<Project>/
 └── v2/           ← README.md, macros/, its own stl/, step/, renders/
 ```
 
-(BrokeFeet, the first nested project, predates the `stl/`/`step/`/`renders/`
-convention and is finished. It is exempt: see architecture.md.)
+(BrokeFeet, the first nested project, predated the `stl/`/`step/`/`renders/`
+convention and kept its own layout until it was removed.)
 
 ### Why
 
@@ -35,7 +41,7 @@ folders. That cost:
 ### Retiring a version
 
 **Never delete an old version as "the old one" without checking imports.**
-BrokeFeet's `v2/` imports directly from `v0/macros/` and does not run without
+BrokeFeet's `v2/` imported directly from `v0/macros/` and did not run without
 it. Run the dependency check in step 1 below before removing anything.
 
 For discarding a single attempt rather than a whole version, see
@@ -44,7 +50,7 @@ For discarding a single attempt rather than a whole version, see
 ### Naming
 
 Version folders are named for **what they ship**, not when they started. Gaps
-are correct: BrokeFeet has `v0/` and `v2/` and no `v1/`, because the V1 rebuild
+are correct: BrokeFeet had `v0/` and `v2/` and no `v1/`, because the V1 rebuild
 and the V2 sculpt/pin work happened in one folder and ship as V2. Inventing a
 `v1/` to fill the gap would re-create the original problem.
 
@@ -75,9 +81,12 @@ grep <Project> .gitignore
 
 Also read `.gitattributes` if it exists (LFS?).
 
-Only each project's `README.md` and `macros/**/*.py` are tracked (see
-architecture.md, "What the repo tracks"); everything else in a project is a
-plain filesystem move. Use `git mv` for the tracked files so history follows.
+Git tracks, at any depth in a project: `README.md`, `STATE.md`,
+`NEXT_SESSION.md`, `macros/**/*.py`, `vectors/**/*.dxf|svg`, `docs/*.py|md`,
+`audit/regions.json`, `audit/**/*.md` and `audit/**/sweep_*.json` (widened
+2026-11-11; see architecture.md, "What the repo tracks"). Everything else in a
+project is a plain filesystem move. Use `git mv` for the tracked files so
+history follows.
 
 ### 3. Move
 
@@ -124,7 +133,8 @@ repo root in one file and the project folder in another (e.g.
 `SurgicalDrillGuide/macros/sdg_model/constants.py` uses `parents[2]` for the
 project folder). Anchors also come in other forms (`HERE.parents[2]` with
 `HERE` = the macros folder, `.parent.parent`, nested `os.path.dirname`), and
-they live outside `macros/` too (e.g. `SurgicalDrillGuide/docs/mechanism_sizing.py`).
+they live outside `macros/` too (a project's `docs/*.py`; SurgicalDrillGuide's
+`docs/mechanism_sizing.py` was one, lost 2026-11-11).
 Edit each repo-root anchor by hand. Then list every anchor in the project:
 save this as a `.py` in the scratchpad and run it with
 `python "<abs path>" "<abs path to projects/<Project>>"`:
@@ -163,7 +173,8 @@ yourself, and don't treat it as a pass. Many are harmless (a script adding
 its own folder to `sys.path`). The last line always gives the count. "NO
 anchor lines found" means the path argument is wrong, not that the project
 is clean. Tested 2026-09-25 on VitaGripPS5, BedLifter, SurgicalDrillGuide
-and VitaGrip-hori: every anchor form in them was listed.
+and VitaGrip-hori: every anchor form in them was listed. Not re-run since two
+of those four were removed.
 
 **b. Sibling references become nested ones.** `HERE.parent.parent / "BrokeFeet"
 / "macros"` must become `HERE.parent.parent / "v0" / "macros"`. Catch every
@@ -183,10 +194,11 @@ grep -rln "<OldFolderName>" --include=*.md --include=*.py --include=*.json .
 ```
 
 - `.gitignore` — the `projects/` allowlist uses `**`, so it needs no edit for a
-  new version level. Check with `git status` that nothing outside
-  `README.md` / `macros/**/*.py` shows up.
+  new version level. Check with `git status` that nothing outside the tracked
+  set of step 2 shows up.
 - `docs/projects.md` — collapse the version rows into **one project row**.
-- `CLAUDE.md` and `.claude/agents/*.md` — fix *path* references. Leave
+- `CLAUDE.md`, `.claude/skills/**/*.md` and `.claude/evals/skills_eval.md` —
+  fix *path* references. Leave
   historical narrative alone: "the first BrokeFeetV1 handoff scaled to metres"
   is a true statement about the past and should not be rewritten.
 - Data files (e.g. `TRANSFORM.json`) — a `"source"` naming a **file** that still
@@ -218,8 +230,8 @@ The project root `README.md` is a **navigation layer, not a summary**. It carrie
 - **Which file to slice** — one filename, unambiguous.
 - **A version table** — what each holds, which ships, which is still an upstream
   dependency.
-- **Scope/safety statements** that apply to every version (for BrokeFeet, the
-  clinical-scope warning).
+- **Scope/safety statements** that apply to every version (for BrokeFeet it
+  was the clinical-scope warning).
 - **Pointers into each version's README** by topic.
 
 It must **not** condense the version READMEs. In this repo those documents are

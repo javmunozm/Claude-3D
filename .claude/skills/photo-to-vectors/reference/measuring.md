@@ -94,7 +94,7 @@ When the outline carries information:
 - **Say so, in the table**, with a row whose Value is a pointer, not a number:
   "see `vectors/psvita_front.dxf` — outline, not a rectangle."
 - **Go on to the TRACE stage** rather than trying to encode the curve as
-  constants. That is what the pipeline order in `docs/agents.md` is for, and it
+  constants. That is what the pipeline order in `docs/skills.md` is for, and it
   is the stage most often skipped because a table *feels* like enough.
 - **Quantify the error the primitive would introduce** — area difference, or
   maximum deviation in mm — so the cost of skipping the vector stage is a number

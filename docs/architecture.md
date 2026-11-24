@@ -5,8 +5,8 @@ How a CAD project in this index is put together, from geometry code to printable
 ## Repository structure
 
 ```
-Claude-Projects/
-├── CLAUDE.md          ← project index, CORE DIRECTIVE, doc pointers
+Claude-3D/
+├── CLAUDE.md          ← CORE DIRECTIVE, verification rules, doc pointers
 ├── docs/              ← index-wide documentation
 ├── tools/             ← shared tooling (render_check, render_views, reconcile, mesh_to_step, …; full list in system.md)
 ├── sources/           ← input material per subject: photos, specs, scans, SOURCES.md
@@ -154,13 +154,18 @@ Rules:
   builders still import some constants and call `ring_face()` directly.
   Moving those into arguments is still to do.
 
-Splitting a part for printing (e.g. `HeadLifter_Lower` / `HeadLifter_Upper`)
-is handled as a boolean cut into two halves plus a tenon/pocket joint,
+Splitting a part for printing (as BedLifter's `HeadLifter_Lower` /
+`HeadLifter_Upper` were; project removed 2026-11-11) is handled as a boolean cut into two halves plus a tenon/pocket joint,
 rather than as two independently authored parts — this keeps the joint
 geometry (tenon dimensions, clearance) derived from one shared definition
 instead of duplicated across files.
 
 ## Verification layer
+
+*No project has a structural check on disk today (2026-11-15): BedLifter's
+`structural_check.py` was removed with the project and SurgicalDrillGuide's
+`docs/mechanism_sizing.py` was lost on 2026-11-11. This section is the
+pattern the next one follows.*
 
 Structural sanity checks (e.g. `structural_check.py`) are standalone —
 no build123d or CAD dependency, just `math`. They take the same dimensions
@@ -171,7 +176,8 @@ environment installed.
 
 The cost of that decoupling is **drift**: copied values fall out of step with
 the geometry silently, since both scripts keep running perfectly on their own.
-This has happened here — BedLifter's check validated a 9.332° design while the
+This has happened here — BedLifter's check (project removed 2026-11-11)
+validated a 9.332° design while the
 geometry built 8.850°, alongside a collar diameter overstated more than 2×,
 and still printed `ALL CHECKS PASS`.
 
@@ -196,7 +202,7 @@ workflow that catches them.
 ## Mesh repair layer
 
 When a mesh fails the topology gate (non-manifold edges, non-watertight),
-two repair tools are available before re-running the gate:
+three repair tools are available before re-running the gate:
 
 - **pymeshfix** — targeted repair that fixes singularities and
   self-intersections without modifying clean regions. Preferred for meshes
@@ -206,7 +212,7 @@ two repair tools are available before re-running the gate:
   decimation, curvature-aware smoothing) for meshes needing more
   intervention.
 - **manifold3d** — re-booleans a mesh into a guaranteed-manifold solid.
-  Already used in BrokeFeet for STEP export.
+  BrokeFeet (removed 2026-11-11) used it for STEP export.
 
 See [commands.md](commands.md#repair-non-manifold-meshes) for usage.
 
@@ -216,6 +222,8 @@ See [commands.md](commands.md#repair-non-manifold-meshes) for usage.
 geometry script (so the viewer never has stale geometry) and push shapes
 to a running `ocp-vscode` server over its `show()` API. The server and the
 script that sends geometry are separate processes — see [commands.md](commands.md).
+No project has one today; BedLifter's was the only one
+(`git show 197a6a3:projects/BedLifter/macros/view_parts.py`).
 
 ## What the repo tracks
 
@@ -262,10 +270,8 @@ folder.
   writing, because none of these folders is tracked and a fresh clone does
   not have them. Workflow folders keep their own contents (`blender/`,
   `derived/`, `holes/`, `work/`, `vectors/`).
-- **BrokeFeet is exempt.** It is one of the earliest projects, it is
-  finished, and it keeps its own structure: for example
-  `v2/BrokeFeetV2_pinned2.3mf` sits at the version root. Do not restructure
-  it, and do not report its layout as a defect.
+- *(The exemption for BrokeFeet, which kept its own older layout, ended when
+  the project was removed on 2026-11-11. No project is exempt today.)*
 - Geometry is authored as Python scripts under `projects/<Project>/macros/`
   using build123d, and run to regenerate `.step` / `.stl` output — there are no
   `.FCStd` files.
@@ -299,7 +305,8 @@ projects/<Project>/audit/
   first run overwrote two r10 logs. The tool reproduced the r13 and r16
   reviews' sweep logs line for line (2026-10-04).
 - **No macro snapshot per round.** Git history, or one snapshot at a bake, is
-  enough; VitaGripPS5's `audit/r9`..`r16` each hold a 69–216 KB copy.
+  enough; VitaGripPS5's `audit/r9`..`r16` each held a 69–216 KB copy (lost
+  2026-11-11).
 - **At a bake:** record the SHA-256 in `STATE.md`, sweep the baked mesh into
   `audit/r<NN>/sweep/` and name it the baseline, prune the macro's unused
   stages and switches, and move older rounds to `audit/archive/` (with the

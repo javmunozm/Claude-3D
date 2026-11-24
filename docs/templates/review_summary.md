@@ -1,5 +1,5 @@
 <!-- Summary block: at most 30 lines. It is the first thing in every register and every review.
-     The orchestrator reads this block, not the whole file. -->
+     The main session reads this block, not the whole file. -->
 ## Summary
 
 - **Verdict:** <FORM MATCHES INTENT | ACCEPT WITH LISTED ARTIFACTS | DEFECTS FOUND | METHOD REVIEW | CANNOT ESTABLISH ORIENTATION>

@@ -186,7 +186,7 @@ the tracing stage happened, so nobody checks, while the geometry is quietly
 built from `Rectangle()` and `Circle()`.
 
 That is exactly what happened in VitaGrip1000's first pass. The pipeline in
-`docs/agents.md` was skipped entirely: pixel measurements went straight into
+`docs/skills.md` was skipped entirely: pixel measurements went straight into
 build123d primitives, the console's curved face was modelled as
 `Rectangle(182, 83.55)`, and the resulting pocket cut **1232 mm² (8.8 %) more
 than the console's face actually occupies** — the material that should have

@@ -1,4 +1,7 @@
-# Skills (formerly agents)
+# Skills
+
+*This file was `docs/agents.md` until 2026-11-15; the archived agent
+definitions in `.claude/agents-archive/` still cite it under that name.*
 
 Since 2026-10-27 the work runs in the **main session through skills** in
 `.claude/skills/`, not through subagents. The nine subagents were archived in
@@ -10,6 +13,13 @@ this repo, subagents iterated out of sight instead of planning first.
 Each skill's `description:` is loaded automatically and says when to use it.
 This document covers what the descriptions cannot: the shape every skill
 shares, the order they run in, and the lessons behind them.
+
+**Several lessons below come from projects that were removed on 2026-11-11**
+(commit `c431556`): VitaGrip-hori, VitaGrip1000, BrokeFeet, BedLifter and
+BoxTest. Their READMEs and macros are in git at `197a6a3`
+(`git show 197a6a3:projects/<Project>/README.md`); their vectors, exports and
+workflow folders were never tracked and are gone. The lessons stay because the
+rules came from them.
 
 ## The skills
 
@@ -89,10 +99,11 @@ Each stage consumes the previous stage's files (`docs/MEASUREMENTS.md`,
 
 TRACE and REVIEW are easy to walk past: a measurement table *feels* like enough
 to start modelling, and build123d's primitives are right there. Both VitaGrip
-projects skipped them.
+projects (removed 2026-11-11) skipped them.
 
 - `VitaGrip-hori` traced a full `vectors/` set, then abandoned it when the
-  approach changed. The files are still there, and its README has to explain why.
+  approach changed. The files stayed in the project, and its README had to
+  explain why.
 - `VitaGrip1000`'s first pass went straight from pixel measurements to
   `Rectangle(182, 83.55)` for a console whose outline is **not** a rectangle —
   it tapers ~40 mm at each end. The pocket cut 1232 mm² (8.8 %) more than the
@@ -132,11 +143,18 @@ rings are simple, and reports the protrusions the silhouette cannot show.
 **For a scan-derived part**, `scan-mesh` (REPAIR) runs before `cad-build`: it
 repairs the reconstructed mesh, then the builder turns it into a printable
 model. Its plan starts from the parameters already swept and the approaches
-already rejected — see BrokeFeet's README — or it re-walks them.
+already rejected, or it re-walks them. BrokeFeet's README was the example
+(`git show 197a6a3:projects/BrokeFeet/v2/README.md`).
 
 **When a mesh needs hand-sculpting**, `scan-mesh` (BLENDER) sits between the
 pipeline and the human sculptor: it prepares the mesh, writes the `.blend`
-file, and gates what comes back. See BrokeFeet's `v2/blender/` directory.
+file, and gates what comes back. BrokeFeet's `v2/blender/` folder was the
+worked example; it was untracked and is gone. Its scripts survive in git
+(`197a6a3:projects/BrokeFeet/v2/macros/prep_for_blender.py`,
+`import_from_blender.py`).
+
+No project in the repo today is scan-derived, so neither mode has a live
+example.
 
 ## A render is not a measurement
 
@@ -179,18 +197,23 @@ behind, the corner views the user marks).
 
 In this repo the most useful output has been a measured "this does not work,
 and here is why", plus corrections to the task premise. Work aimed only at
-success hands back a better metric attached to a worse model — see BrokeFeet's
-`area/volume` vs `genus` history. Every skill's report has room for both.
+success hands back a better metric attached to a worse model — BrokeFeet's
+`area/volume` vs `genus` history is the case
+(`git show 197a6a3:projects/BrokeFeet/v0/README.md`). Every skill's report has
+room for both.
 
 ## Rebuild only what changed
 
 Since 2026-10-27, `tools/stage_cache.py` keys each part on its builder's
 arguments, the source and constants of the modules it uses, and its input
 files. An unchanged part loads from a cache and its files are not rewritten.
-SurgicalDrillGuide is the reference: a one-constant change to the slider
-rebuilt the slider only and wrote 5 of 16 files (it used to write all 16).
-Previews go to a preview folder, never `stl/`. See
-`projects/SurgicalDrillGuide/work/build_report.md`.
+SurgicalDrillGuide's `macros/surgical_drill_guide.py` is the reference use: a
+one-constant change to the slider rebuilt the slider only and wrote 5 of 16
+files (it used to write all 16). Previews go to a preview
+folder, never `stl/`. The report of that test
+(`projects/SurgicalDrillGuide/work/build_report.md`) was untracked and was lost
+on 2026-11-11, and the macro cannot build until its DXF traces are redone
+(the project's `STATE.md`), so the figure cannot be re-measured today.
 
 ## Fix rounds: one register, one pass, one review
 
@@ -238,8 +261,8 @@ form-audit  REVIEW (fresh session): re-measures every entry + repeats the full s
   r9 to r16 met the first condition, and nothing stopped the cycle.
 - **A bake is a byte-identical copy of a checked preview into `stl/`,** made
   with the user's approval. Never overwrite an existing STL without asking:
-  `stl/VitaGripPS5.stl` was an older design. Back up only the files the bake
-  replaces.
+  in VitaGripPS5, `stl/VitaGripPS5.stl` was an older design kept on purpose.
+  Back up only the files the bake replaces.
 
 ## Testing the skills
 
@@ -252,4 +275,5 @@ after any edit to a skill. If a skill scores worse than the agent
 it replaced, restore the agent from `.claude/agents-archive/`.
 
 The subagent-era sections of this document (briefing fields, ceilings by role,
-handoff and resume) are in git history before 2026-10-27.
+turn limits, handoff and resume) are in the git history of `docs/agents.md`
+before 2026-10-27.

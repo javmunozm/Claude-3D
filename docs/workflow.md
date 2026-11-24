@@ -1,7 +1,7 @@
 # Workflow
 
 *In force from 2026-10-04; agents replaced by skills on 2026-10-27
-(`docs/agents.md`). Numbers come from the transcripts of 29 sessions and 60
+(`docs/skills.md`). Numbers come from the transcripts of 29 sessions and 60
 agent runs, measured 2026-10-03 (`tools/token_audit/`).*
 
 ## Roles
@@ -19,7 +19,7 @@ The user approves:
 - commits (each approved commit is pushed to `origin` in the same step);
 - edits to `CLAUDE.md`, `docs/`, `.claude/`, skills, settings or memory.
 
-The main session's rules are `CLAUDE.md`, this document, `docs/agents.md`, the
+The main session's rules are `CLAUDE.md`, this document, `docs/skills.md`, the
 skills in `.claude/skills/` (each with its plan template) and the memory.
 
 ## A session
@@ -54,7 +54,8 @@ context makes both cheap.
 3. **Method gate (new).** Choose the representation before any geometry, and
    record the choice in the README (`docs/cad_method.md`):
    - B-rep in build123d by default;
-   - a mesh pipeline only when the part *is* a scan or a sculpt (BrokeFeet).
+   - a mesh pipeline only when the part *is* a scan or a sculpt (as BrokeFeet
+     was; project removed 2026-11-11).
 4. **Build.** `cad-build`, from its plan with ceilings. Stage modules
    (`docs/architecture.md`) with a stage cache (`tools/stage_cache.py`), so a
    change rebuilds only the parts it touches and a build stays under 5 minutes.

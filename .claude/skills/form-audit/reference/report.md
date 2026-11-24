@@ -59,7 +59,7 @@ listed with its size against the layer and the nozzle.
 **METHOD REVIEW** overrides the others when the method-change trigger is met:
 the fix pass created 3 or more regression IDs, or a region is in its third
 consecutive register. Say which condition, with the IDs. The next step is then
-a method decision for the user, not another fix pass (`docs/agents.md`, "Fix
+a method decision for the user, not another fix pass (`docs/skills.md`, "Fix
 rounds").
 
 Paste-ready tables only for open entries. Fixed and carried entries get one

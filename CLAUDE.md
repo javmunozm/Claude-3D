@@ -1,4 +1,4 @@
-# Claude-Projects — CAD Project Index
+# Claude-3D — CAD Project Index
 
 CAD projects built with [build123d](https://github.com/gumyr/build123d) (Python
 CAD) rather than FreeCAD. Each subfolder under `projects/` is one physical
@@ -42,14 +42,14 @@ lit render**; before trusting any structural verdict, read its
 
 **A render is not a measurement.** Run the `form-audit` skill for a number
 before believing a picture, and the QUALIFY stage of `photo-to-vectors` before
-comparing a picture to a photo — see [docs/agents.md](docs/agents.md).
+comparing a picture to a photo — see [docs/skills.md](docs/skills.md).
 
 ## Documentation
 
 | Doc | Covers |
 |-----|--------|
 | [docs/architecture.md](docs/architecture.md) | Repo structure, `sources/` vs `projects/`, geometry code → exports → verification → viewer, project conventions |
-| [docs/agents.md](docs/agents.md) | The skills (plan → run → report), the reference chain, the fix-round cycle, the eval set; the subagents they replaced |
+| [docs/skills.md](docs/skills.md) | The skills (plan → run → report), the reference chain, the fix-round cycle, the eval set; the subagents they replaced |
 | [docs/commands.md](docs/commands.md) | Standard commands: generate, view, verify, DXF/SVG import, mesh repair, Blender rendering, pyvista inspection, DICOM reading |
 | [docs/system.md](docs/system.md) | Full toolchain — packages with versions, Blender setup, import capabilities, rendering, disk constraints, known issues |
 | [docs/versioning.md](docs/versioning.md) | Nesting a second generation inside a project, the move procedure, the path constants it breaks, retiring a version |

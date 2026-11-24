@@ -5,6 +5,13 @@ answers "the system can't do fillets because it uses meshes; which CAD tool
 could work with it?", and gives the method for bringing a scanned shape into
 B-rep. Measured 2026-10-03 unless marked.*
 
+*Read as a dated record. On 2026-11-11 a disk format took the scans, the r16
+mesh and every `audit/` and `work/` folder this document points to, and four
+projects it names were removed (BoxTest, BrokeFeet, BedLifter, VitaGrip1000).
+The method and the measured numbers still stand; the files behind them are
+gone, so none of it was re-measured. VitaGripPS5's `STATE.md` has the present
+state.*
+
 ## What VitaGripPS5 actually uses
 
 - **Not Blender, and not build123d.**
@@ -14,7 +21,8 @@ B-rep. Measured 2026-10-03 unless marked.*
     `derived/dualsense_watertight_200k.stl`.
   - Every operation after that is a mesh or height-field edit: stretch, cut,
     warp, refill, vertex moves, smoothing, locks.
-- **Blender, in this repo,** is the BrokeFeet sculpt handoff and a renderer.
+- **Blender, in this repo,** is the sculpt handoff (the `scan-mesh` skill,
+  first used on BrokeFeet) and a renderer.
 - **build123d** was used for VitaGripPS5 only in the swept-tube attempt that was
   rejected on 2026-09-08.
 
@@ -36,8 +44,9 @@ Measured on this machine, 2026-10-03:
     a B-spline surface to a grid of points (the route from a scan to a smooth
     surface);
   - `import_stl`, `export_step`, `export_stl` and `export_brep` / `import_brep`.
-- **Four projects already use real fillets:** BoxTest, nespressoDispenserExtension,
-  NespressoPodDispenser and the BrokeFeet v0 base.
+- **Four projects already used real fillets** on 2026-10-03: BoxTest,
+  nespressoDispenserExtension, NespressoPodDispenser and the BrokeFeet v0
+  base. The two Nespresso projects are the ones still in the repo.
 - **Synthetic probe** (2026-10-03, scratchpad only, 0.8 s; the probe scripts
   were not kept):
 
@@ -71,7 +80,7 @@ Measured on this machine, 2026-10-03:
 | Typical failure | a fillet refused at a complex junction; an invalid solid from coincident faces | seams on stage boundaries, slivers, folds |
 
 **Use B-rep by default.** Use a mesh pipeline only when the part *is* the scan
-(BrokeFeet bones, a hand-sculpted surface).
+(bones from a CT, as in BrokeFeet; a hand-sculpted surface).
 
 ## Bringing a scanned shape into B-rep
 
@@ -106,12 +115,12 @@ Measured on this machine, 2026-10-03:
 ## CAD tools that could work with this system
 
 What "work with this system" requires:
-- Claude Code agents drive the tool with Python scripts;
+- Claude Code drives the tool with Python scripts;
 - it runs on this Windows machine without a person at the GUI;
 - it exports STEP and STL;
 - it keeps the repo code-first.
 
-| Tool | Kernel / representation | Fillets and organic form | Driven by agents (headless Python) | Licence | Verdict |
+| Tool | Kernel / representation | Fillets and organic form | Driven by Claude Code (headless Python) | Licence | Verdict |
 |---|---|---|---|---|---|
 | **build123d** (installed) | OpenCascade B-rep | fillets: yes (measured); freeform: yes, lofts and surface fits (measured); large rounds at sharp junctions: no (measured) | yes; already the repo standard | free | **Use it** |
 | CadQuery | OpenCascade (same kernel) | same as build123d | yes | free | no gain |
@@ -139,7 +148,9 @@ What "work with this system" requires:
 
 ## VitaGripPS5 v2 spike
 
-This is a new build, so it needs your approval (CORE DIRECTIVE 2).
+*The proposal as written on 2026-10-04, under the subagents (hence the
+cad-designer and form-auditor ceilings). It was approved and run that day, and
+v2 went on through pass "latch" (the project's `STATE.md`).*
 
 - **Scope.** The right handle, its junction to a simplified body, one lip and the
   flat top cut.
@@ -158,12 +169,16 @@ This is a new build, so it needs your approval (CORE DIRECTIVE 2).
   - the build takes under 5 minutes.
 - **Deliverable.** A spike report: what was built, the measured gates, the
   largest fillet radius at the junction, and a go / no-go for a full v2.
-- **Run 2026-10-04:** `projects/VitaGripPS5/v2/audit/spike/spike_report.md`.
+- **Run 2026-10-04:** go, ACCEPT WITH LISTED ARTIFACTS (commit `bcdb801`). The
+  report, `projects/VitaGripPS5/v2/audit/spike/spike_report.md`, was untracked
+  and was lost on 2026-11-11.
 
 ## A stage cache (for builds over 5 minutes)
 
-A subagent's prompt cache lasts 5 minutes; in the VitaGripPS5 r10 designer run
-the re-billing after its 10-minute builds was 40 % of the cost. Cache each
+A subagent's prompt cache lasted 5 minutes; in the VitaGripPS5 r10 designer run
+the re-billing after its 10-minute builds was 40 % of the cost. (The work now
+runs in the main session; the reason that still holds is that a change should
+rebuild only what it touches.) Cache each
 stage's output under a key, and restart a run from the first stage whose key
 changed, so a one-region fix rebuilds only the stages after it:
 
@@ -184,4 +199,6 @@ else:
 builder's arguments, the source and UPPERCASE constants of the modules it uses,
 the input files, the build123d version), with an export manifest so unchanged
 files are not rewritten. Reference use: SurgicalDrillGuide's
-`surgical_drill_guide.py`; tests in its `work/build_report.md`.
+`surgical_drill_guide.py`. Its test report, `work/build_report.md`, was
+untracked and was lost on 2026-11-11; `python tools\selftest.py` exercises the
+cache now.

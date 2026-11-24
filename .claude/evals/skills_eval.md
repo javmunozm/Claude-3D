@@ -75,7 +75,7 @@ Cases that change files (E10, E12) are marked **writes**: run them on a scratch 
   1. The plan traces the console outline (not a rectangle) and the handles themselves, in every view that shows them.
   2. Every authored width/depth comes from a traced curve; none is a formula without a source.
   3. The vectors are checked against annotated dimensions before any geometry.
-- **Source:** `docs/agents.md`, "The vector stage is the one that gets skipped".
+- **Source:** `docs/skills.md`, "The vector stage is the one that gets skipped".
 
 ---
 
@@ -155,7 +155,7 @@ Cases that change files (E10, E12) are marked **writes**: run them on a scratch 
   1. The value comes with its basis (printer, material, orientation of the mating faces) and a test coupon or measurement to confirm it.
   2. It lists what the change touches (`parameters.py` pocket → slider and shoe rebuild) and re-runs the sizing reconcile.
   3. It asks before editing the constant.
-- **Source:** `constants.py:141`; `docs/agents.md`, roles of print-tolerance-expert.
+- **Source:** `constants.py:141`; the `fdm-tolerance` skill (the "roles of print-tolerance-expert" section this line used to cite is in the git history of `docs/agents.md` before 2026-10-27).
 
 ---
 

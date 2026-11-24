@@ -25,7 +25,7 @@ Environment, dependencies, and conventions shared by every project in this index
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| [Blender](https://www.blender.org/) | 5.2.0 LTS | Headless rendering with correct occlusion and lighting; also used for BrokeFeet sculpt handoff |
+| [Blender](https://www.blender.org/) | 5.2.0 LTS | Headless rendering with correct occlusion and lighting; also the sculpt handoff of the `scan-mesh` skill (first used on BrokeFeet, removed 2026-11-11) |
 | [pyvista](https://pyvista.org/) + [VTK](https://vtk.org/) | 0.48.4 / 9.6.2 | Offscreen rendering and interactive mesh inspection |
 | matplotlib | 3.10.7 | Fallback renderer for `render_check.py` (painter-sorted, no z-buffer — see note below) |
 
@@ -37,7 +37,7 @@ Environment, dependencies, and conventions shared by every project in this index
 | Pillow | 12.2.0 | Image I/O for reference comparison and render output |
 | numpy | 2.3.2 | Array operations throughout the pipeline |
 | scipy | 1.16.1 | Morphological operations, interpolation, signal processing |
-| scikit-image | 0.26.0 | Segmentation, labeling, connected components (BrokeFeet pipeline) |
+| scikit-image | 0.26.0 | Segmentation, labeling, connected components (scan pipelines; first used on BrokeFeet) |
 
 ### Vectorization
 
@@ -54,7 +54,10 @@ Environment, dependencies, and conventions shared by every project in this index
 | svgwrite | 1.4.3 | SVG file creation — programmatic SVG generation |
 | shapely | 2.1.2 | 2D computational geometry (polygon operations, offset curves) |
 
-### Medical imaging (BrokeFeet project)
+### Medical imaging
+
+No project in the repo uses these today: BrokeFeet, which did, was removed on
+2026-11-11. They stay pinned for the `scan-mesh` skill.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -73,8 +76,15 @@ Environment, dependencies, and conventions shared by every project in this index
 
 | Tool | Location | Purpose |
 |------|----------|---------|
-| Blender | `E:\Blender\blender.exe` (on user PATH) | Headless STL rendering and sculpt handoff |
-| OrcaSlicer | `C:\Program Files\OrcaSlicer` | STL → G-code for FDM printing |
+| Blender | `E:\Blender\blender.exe` | Headless STL rendering and sculpt handoff |
+| OrcaSlicer | `C:\Program Files\OrcaSlicer\orca-slicer.exe` | STL → G-code for FDM printing |
+
+Checked 2026-11-15: `E:\Blender\blender.exe --version` prints 5.2.0 LTS.
+**Neither tool is on PATH** (no Blender or Orca entry in the user or machine
+`Path`; this table recorded Blender "on user PATH" before the 2026-11-11
+reinstall), so call both by full path.
+OrcaSlicer was reinstalled on 2026-11-15; its version was not read (the
+executable carries no version field) and it has not been run from this repo.
 
 ### Python environment
 
@@ -127,17 +137,15 @@ D:\Proyectos\Claude-3D\.venv\Scripts\python.exe <script>.py
 
 ### Install
 
-Core packages:
+One command, with the pinned versions (never an unpinned `pip install`):
 
 ```
-pip install build123d ocp-vscode
+py -3.13 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Full toolchain (mesh processing + rendering + medical imaging):
-
-```
-pip install pymeshfix pyvista pydicom SimpleITK pymeshlab
-```
+Then reapply the FontManager patch (Known issues) and run
+`python tools\selftest.py`.
 
 There is no FreeCAD dependency anywhere in this index — projects were
 originally scaffolded assuming FreeCAD but the actual workflow is pure
@@ -212,7 +220,9 @@ it produces flat single-color silhouettes with no shading. On concave or
 organic geometry it can show incorrect occlusion.
 
 Blender 5.2 headless renders the same STL in ~12 seconds with correct
-occlusion, directional lighting, and depth. It is installed and on PATH.
+occlusion, directional lighting, and depth. It is installed at
+`E:\Blender\blender.exe` (not on PATH since the reinstall). For lit views
+without Blender, `tools/render_views.py` (pyvista) is the everyday tool.
 
 When the Blender renderer is integrated into `render_check.py`, keep
 matplotlib as an automatic fallback and **record which renderer produced
@@ -226,7 +236,7 @@ each image** — a weak render must not be mistaken for a strong one.
 - Lighting: two sun lights (a single front-on sun renders nearly flat)
 
 ```
-blender --background --factory-startup --python render.py -- input.stl output.png
+& "E:\Blender\blender.exe" --background --factory-startup --python render.py -- input.stl output.png
 ```
 
 ## File types
@@ -253,42 +263,62 @@ output — safe to delete and rebuild from the `.py` source at any time.
 ## Directory layout
 
 ```
-Claude-Projects/
-├── CLAUDE.md              Root index — projects table + links to docs/
+Claude-3D/
+├── CLAUDE.md              CORE DIRECTIVE, verification rules, links to docs/
+├── requirements.txt       Pinned packages of the repo venv
+├── .claude/
+│   ├── skills/            The eight skills (docs/skills.md)
+│   ├── hooks/             shell_guard.py, git_state.py, test_hooks.py
+│   ├── settings.json      Registers the hooks (tracked)
+│   ├── evals/             skills_eval.md
+│   └── agents-archive/    The nine subagents retired on 2026-10-27
 ├── docs/                  Index-wide documentation (this folder)
-│   ├── agents.md          The skills, the fix-round cycle, the eval set; archived subagents
 │   ├── architecture.md    How a project's geometry/build pipeline fits together
 │   ├── attempts.md        attempts/ folders and the record-then-delete procedure
+│   ├── cad_method.md      B-rep by default, scan → B-rep, CAD tools compared
 │   ├── commands.md        Standard commands for building/viewing/checking
 │   ├── lessons.md         Post-mortems with their numbers
 │   ├── projects.md        Index of all projects with description and status
+│   ├── skills.md          The skills, the fix-round cycle, the eval set (was agents.md)
 │   ├── system.md          This file — environment, deps, conventions
-│   └── versioning.md      Adding a version to a project without cluttering projects/
+│   ├── versioning.md      Adding a version to a project without cluttering projects/
+│   ├── workflow.md        Roles, a session, a project from intake to print
+│   └── templates/         STATE.md, handoff.md, review_summary.md
 ├── tools/                 Shared tooling
+│   ├── selftest.py        Checks the whole toolchain, the hooks and the skills' frontmatter
 │   ├── render_check.py    Topology gate + flat (unlit) renders + reference comparison
 │   ├── render_views.py    Lit perimeter views with depth, for judging FORM
-│   ├── render_overlay.py  Draws a boolean's operands in pose, before it runs
-│   ├── place_cutter.py    Pose a boolean's cutter by eye, then print the numbers
-│   ├── watch_model.py     Window that repaints when the model changes
+│   ├── render_roi.py      One small sheet of a clipped region, optionally beside a reference
+│   ├── render_review.py   Smooth and zebra renders for surface continuity
+│   ├── form_sweep.py      Whole-part sweep by region, and comparison with a baseline
+│   ├── stage_cache.py     Per-part build cache and export manifest
 │   ├── reconcile.py       Detects drift between structural checks and geometry
 │   ├── validate_envelope.py  Gates a downloaded mesh against a known spec envelope
-│   ├── extract_profile.py Measures a grip's lobe profile from a rear-view photo
 │   ├── mesh_to_step.py    Triangle mesh -> STEP solid from the mesh's own topology
-│   └── read_3mf.py        Streaming reader for large 3MF archives
-├── sources/               Input images/specs/scans per subject, with SOURCES.md
+│   ├── read_3mf.py        Streaming reader for large 3MF archives
+│   ├── extract_profile.py Measures a grip's lobe profile from a rear-view photo
+│   ├── render_overlay.py  Draws a boolean's operands in pose, before it runs (VitaGripPS5 preset)
+│   ├── place_cutter.py    Pose a boolean's cutter by eye, then print the numbers (VitaGripPS5 preset)
+│   ├── watch_model.py     Window that repaints when the model changes (VitaGripPS5 socket grip, historical)
+│   └── token_audit/       Session and agent-run cost from the transcripts (mostly subagent-era)
+├── sources/               Input images/specs/scans per subject, with SOURCES.md (untracked; empty since 2026-11-11)
 │   └── <subject>/         One folder per reference subject
 └── projects/              All CAD projects live here
     └── <ProjectName>/
         ├── README.md      Project-specific goal, status, dimensions
+        ├── STATE.md       The present: bake, open entries, locks, gates, commands
         ├── macros/        Main script(s); stage files in a project-named package
-        ├── stl/  step/    Generated meshes / STEP solids
-        └── renders/       Generated PNGs
+        ├── vectors/       Traced DXF / SVG the macros import (tracked)
+        ├── stl/  step/    Generated meshes / STEP solids (untracked)
+        └── renders/       Generated PNGs (untracked)
 ```
 
 ## Disk constraints
 
-C: drive is nearly full (93%). Install large packages or external tools to
-D: or E: where possible. Blender is on E:.
+Measured 2026-11-15, after the reinstall: `C:` 83.9 GB used / 136.6 GB free,
+`D:` (this repo) 74.9 / 169.2, `E:` (`RespaldoD`, where Blender is) 375.8 /
+101.2. The "C: is 93 % full" constraint recorded before 2026-11-11 no longer
+holds. `E:` is a second internal disk, not a backup (`CLAUDE.md`).
 
 ## Adding a project
 

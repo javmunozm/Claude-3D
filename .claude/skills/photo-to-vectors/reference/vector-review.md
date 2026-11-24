@@ -132,4 +132,4 @@ The first full review of SurgicalDrillGuide v2 wrote 25 scripts in 94 calls,
 several of which re-measured the photos. The narrow re-review that followed used
 17 calls. Re-checking every ring with one scripted pass keeps a full re-review
 near that cost. Checking only the named findings misses regressions
-(VitaGripPS5, rounds 7-8: see `docs/agents.md`, *Fix rounds*).
+(VitaGripPS5, rounds 7-8: see `docs/skills.md`, *Fix rounds*).

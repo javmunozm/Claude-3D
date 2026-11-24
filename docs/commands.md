@@ -11,11 +11,13 @@ shell hook denies it.
 ## Setup (once per environment)
 
 ```
-pip install build123d ocp-vscode
-pip install pymeshfix pyvista pydicom SimpleITK pymeshlab
+py -3.13 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+python tools\selftest.py
 ```
 
-See [system.md](system.md) for the full package list and versions.
+`requirements.txt` pins every version. See [system.md](system.md) for the
+package list and for the FontManager patch to reapply after the install.
 
 ## Generate / regenerate CAD output
 
@@ -46,6 +48,12 @@ python "D:\Proyectos\Claude-3D\projects\<Project>\macros\view_parts.py"
 
 Re-run the Terminal 2 script after any geometry change to refresh the view;
 the server in Terminal 1 does not need to be restarted.
+
+**No project has a `view_parts.py` today.** The only one was BedLifter's
+(project removed 2026-11-11;
+`git show 197a6a3:projects/BedLifter/macros/view_parts.py`). A project that
+wants the viewer writes its own, importing its builders and calling
+`ocp_vscode.show()`.
 
 ## Verify geometry (required after every geometry change)
 
@@ -79,7 +87,7 @@ same. To judge **form** (depth, cross-section, channels), use the lit
 renderer:
 
 ```
-python tools\render_views.py projects\VitaGripPS5\stl\VitaGripPS5.stl
+python tools\render_views.py projects\<Project>\stl\<Part>.stl
 python tools\render_views.py projects\<Project>\stl\<Part>.stl --views front back left right
 ```
 
@@ -92,7 +100,7 @@ It renders the full turntable by default, one PNG per view plus a
 
 ```
 python tools\render_check.py projects\<Project>\stl\<Part>.stl --views front ^
-    --reference sources\psvitaGrip\054-1.webp
+    --reference sources\<subject>\<photo>
 ```
 
 This writes `<Part>_vs_reference.png` — the render beside the photo. **Open it
@@ -181,8 +189,12 @@ Dollar figures are API list-price equivalents, used only to compare runs; a
 claude.ai plan is not billed that way. The other scripts in the folder
 (`cache_misses.py`, `composition.py`, `calibrate.py`, `thinking_share.py`,
 `agent_static_check.py`, `maxturns_review.py`) produced the measurements of
-the 2026-10-04 system review; `maxturns_review.py` is the basis of the turn
-limits in `docs/agents.md`.
+the 2026-10-04 system review; `maxturns_review.py` was the basis of the
+subagents' turn limits, which left with the agents on 2026-10-27 (the git
+history of `docs/agents.md`, now `docs/skills.md`).
+`agent_static_check.py`, `agent_behavior_check.py` and `maxturns_review.py`
+read `.claude/agents/`, which no longer exists (`docs/system.md`, Known
+issues). Not re-run since the 2026-11-11 reinstall.
 Record each round's line in the project's `STATE.md` ("Rounds").
 
 ## Run structural / verification checks
@@ -196,6 +208,13 @@ python "D:\Proyectos\Claude-3D\projects\<Project>\macros\structural_check.py"
 
 Look for `[PASS]` / `[FAIL]` per check in the output, and an overall
 verdict line at the end.
+
+**No project has a structural check on disk today.** BedLifter's
+`structural_check.py` went with the project (removed 2026-11-11;
+`git show 197a6a3:projects/BedLifter/macros/structural_check.py`), and
+SurgicalDrillGuide's `docs/mechanism_sizing.py` was untracked and was lost in
+the disk format. New ones go in the project's `docs/*.py`, which is tracked
+now; the `fdm-tolerance` skill runs and reconciles them.
 
 **Read the reconciliation block first.** These checks are deliberately
 decoupled from the geometry scripts (see [architecture.md](architecture.md))
@@ -212,7 +231,8 @@ it errs conservatively:
 
 A `CRITICAL` row means the check may be validating a design that doesn't
 exist, in the unsafe direction — a PASS verdict below it means nothing until
-the inputs are corrected. This is not hypothetical: BedLifter's check ran for
+the inputs are corrected. This is not hypothetical: BedLifter's check (project
+removed 2026-11-11) ran for
 some time against a 9.332° design while the geometry built 8.850°, with a
 collar diameter overstated more than 2×, and reported `ALL CHECKS PASS`.
 
@@ -334,8 +354,11 @@ and depth — unlike `render_check.py`, whose only renderer is flat, unlit
 matplotlib.
 
 ```
-blender --background --factory-startup --python render_script.py -- input.stl output.png
+& "E:\Blender\blender.exe" --background --factory-startup --python render_script.py -- input.stl output.png
 ```
+
+Blender is not on PATH since the 2026-11-11 reinstall (checked 2026-11-15), so
+the full path is needed.
 
 See [system.md](system.md#rendering-blender-vs-matplotlib) for the Blender 5.2
 specifics (engine name, STL import API, camera/lighting setup).
@@ -373,7 +396,9 @@ plotter.screenshot("output.png")
 
 **Historical:** this is the superseded 2026-09-14 socket-grip workflow. The
 current VitaGripPS5 case is built by `macros/build_case_ext.py` (see the
-project's `STATE.md`); `watch_model.py` does not watch it.
+project's `STATE.md`); `watch_model.py` does not watch it. The two input
+meshes it loads were lost on 2026-11-11, so it cannot run until they are
+re-sourced (not run since).
 
 `tools/watch_model.py` holds a pyvista window open, polls the placement
 module and its input meshes for changes, and rebuilds + repaints
@@ -419,9 +444,10 @@ fired, leaving the window frozen on the startup pose through nine
 successive edits (see [docs/lessons.md](lessons.md), "a callback that never
 fires is indistinguishable from a scene that never changes").
 
-## Read DICOM studies (BrokeFeet project)
+## Read DICOM studies
 
-pydicom and SimpleITK replace the 8-bit brightness thresholds with real
+Written for BrokeFeet (project removed 2026-11-11); kept for the next
+scan-derived part. pydicom and SimpleITK replace the 8-bit brightness thresholds with real
 Hounsfield units (~200–300 HU for bone) and recover true voxel spacing
 from DICOM headers.
 
@@ -443,7 +469,7 @@ print(f"Voxel spacing: {spacing}")
 bone = sitk.BinaryThreshold(image, lowerThreshold=200, upperThreshold=3000)
 ```
 
-This directly addresses BrokeFeet's hardest problem: the void/joint
+This directly addressed BrokeFeet's hardest problem: the void/joint
 separation whose best brightness threshold scored Youden J = 0.002. HU is a
 physical quantity; screen grey is not.
 
