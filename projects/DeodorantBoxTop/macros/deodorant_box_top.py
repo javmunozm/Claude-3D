@@ -1,8 +1,8 @@
-"""DeodorantBoxTop: cover for a 3 x 4 deodorant box. 200 x 210 x 4 mm plate, 12 elliptical holes 46.5 x 44.5,
-four blind triangular sockets underneath for the base's corner pillars.
+"""DeodorantBoxTop: cover for a 3 x 4 deodorant box. 200 x 212 x 4 mm plate, 12 elliptical holes 46.5 x 44.5,
+four blind triangular sockets underneath for the separate posts (legs 18) that join it to the base.
 
 Stages (package dbt_model/):
-    dbt_model/constants.py     1  real-world values (all from the user, 2026-11-24)
+    dbt_model/constants.py     1  real-world values (user 2026-11-24; plate and post from the gcode 2026-11-25)
     dbt_model/parameters.py    2/4 derived values + build-time arithmetic checks
     dbt_model/parts/cover.py   5  the part builder
     deodorant_box_top.py       6  this file: build, validate, export. Holds no geometry.

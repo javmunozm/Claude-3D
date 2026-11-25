@@ -15,11 +15,49 @@ from shapely.geometry import Polygon
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from dbt_model.parameters import derive  # noqa: E402
+from dbt_model import constants as C  # noqa: E402
+from shapely import affinity  # noqa: E402
+from shapely.geometry import box  # noqa: E402
 
 TOL = 0.1      # section extents (mesh chord tolerance 0.01 mm, ellipse sampled by the tessellator)
 TOL_Z = 0.05   # ray-measured heights
+MATE_MIN = 0.18  # post-in-cavity min clearance: design 0.2 per face less 0.02 for mesh/fit noise
 
 results = []
+
+
+def post_section():
+    """The post's section as measured on its gcode: right-isosceles, sharp legs POST_LEG, right angle at (0, 0),
+    legs along +X/+Y, fillet POST_R_APEX at the right angle and POST_R_ACUTE at the two acute corners."""
+    L, ra, rc = C.POST_LEG, C.POST_R_APEX, C.POST_R_ACUTE
+    tri = Polygon([(0, 0), (L, 0), (0, L)])
+    acute = tri.buffer(-rc, join_style="mitre").buffer(rc, quad_segs=32)
+    apex = tri.buffer(-ra, join_style="mitre").buffer(ra, quad_segs=32)
+    zone = box(-1, -1, 3 * max(ra, rc), 3 * max(ra, rc))
+    return acute.difference(zone).union(apex.intersection(zone)).buffer(0)
+
+
+def post_clearance(cav, X, Y):
+    """Best-placement min clearance of the post section in cavity `cav` (the socket at plate corner X, Y).
+    The post is mirrored into that corner, then a translation grid (0.1 then 0.01 mm) maximises the min gap."""
+    sx = -1 if X > 0 else 1
+    sy = -1 if Y > 0 else 1
+    P0 = affinity.affine_transform(post_section(), [sx, 0, 0, sy, X, Y])
+    ib = cav.bounds
+    pb = P0.bounds
+    best = (-1e9, (ib[0] + ib[2] - pb[0] - pb[2]) / 2, (ib[1] + ib[3] - pb[1] - pb[3]) / 2)
+    for step, span in ((0.1, 1.5), (0.01, 0.1)):
+        bx, by = best[1], best[2]
+        for dx in np.arange(-span, span + 1e-9, step):
+            for dy in np.arange(-span, span + 1e-9, step):
+                P = affinity.translate(P0, bx + dx, by + dy)
+                if cav.contains(P):
+                    s = cav.exterior.distance(P)
+                else:
+                    s = -P.difference(cav).area   # area outside, as a penalty (any value < 0 fails)
+                if s > best[0]:
+                    best = (s, bx + dx, by + dy)
+    return best[0]
 
 
 def report(name, value, ok, unit="mm"):
@@ -113,6 +151,9 @@ def main(stl):
         report(f"socket ({X:.0f},{Y:.0f}) wall edge x/y, min wall", f"{wall_edge[0]:.3f}/{wall_edge[1]:.3f}, "
                f"{wall_hyp:.3f} (target {p['wall']})",
                max(abs(w - p["wall"]) for w in (*wall_edge, wall_hyp)) <= TOL)
+        mc = post_clearance(Polygon(q.exterior), X, Y)
+        report(f"socket ({X:.0f},{Y:.0f}) mating: post (legs {C.POST_LEG}) min clearance", f"{mc:.3f} "
+               f"(>= {MATE_MIN}; negative = penetration)", mc >= MATE_MIN)
 
     # 4. heights by ray
     xw = p["cx"][0] + p["hole_x"] / 2 + p["gap_x"] / 2       # middle of the first X web, on a hole row
@@ -138,6 +179,11 @@ def main(stl):
     web_empty = not mesh.contains([[xw, p["cy"][1], zp]])[0]
     print(f"{'ok  ' if not web_empty else 'BAD '} control: hole probe moved onto a web reads empty={web_empty} (must be False)")
     ctrl_ok &= not web_empty
+    old = Polygon([(2.5, 2.5), (2.5 + 17.183, 2.5), (2.5, 2.5 + 17.183)])   # the first v0 cavity (16.5 pillar)
+    mc_old = post_clearance(old, 0, 0)
+    print(f"{'ok  ' if mc_old < MATE_MIN else 'BAD '} control: mating probe on the old 17.183 cavity reads {mc_old:.3f} "
+          f"(must be < {MATE_MIN})")
+    ctrl_ok &= mc_old < MATE_MIN
     try:
         derive(hole_y=52.0)
         print("BAD  control: derive(hole_y=52) did not raise")

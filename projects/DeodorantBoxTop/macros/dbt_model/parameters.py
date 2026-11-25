@@ -8,14 +8,14 @@ K_OFFSET = 2 + math.sqrt(2)   # leg growth of a right-isosceles triangle per uni
 
 
 def derive(plate_x=C.PLATE_X, plate_y=C.PLATE_Y, plate_t=C.PLATE_T, hole_x=C.HOLE_X, hole_y=C.HOLE_Y,
-           n_x=C.N_X, n_y=C.N_Y, margin_x=C.MARGIN_X, margin_y=C.MARGIN_Y, pillar_leg=C.PILLAR_LEG,
+           n_x=C.N_X, n_y=C.N_Y, margin_x=C.MARGIN_X, margin_y=C.MARGIN_Y, post_leg=C.POST_LEG,
            clear=C.SOCKET_CLEAR, wall=C.SOCKET_WALL, depth=C.SOCKET_DEPTH):
     gap_x = (plate_x - 2 * margin_x - n_x * hole_x) / (n_x - 1)
     gap_y = (plate_y - 2 * margin_y - n_y * hole_y) / (n_y - 1)
     pitch_x, pitch_y = hole_x + gap_x, hole_y + gap_y
     cx = [margin_x + hole_x / 2 + i * pitch_x for i in range(n_x)]
     cy = [margin_y + hole_y / 2 + j * pitch_y for j in range(n_y)]
-    cavity_leg = pillar_leg + clear * K_OFFSET
+    cavity_leg = post_leg + clear * K_OFFSET
     outer_leg = cavity_leg + wall * K_OFFSET
     # plan-view clearance: corner hole (nearest the origin corner) vs the socket hypotenuse x + y = outer_leg
     a, b = hole_x / 2, hole_y / 2
@@ -23,7 +23,7 @@ def derive(plate_x=C.PLATE_X, plate_y=C.PLATE_Y, plate_t=C.PLATE_T, hole_x=C.HOL
     corner_clear = (min_sum - outer_leg) / math.sqrt(2)
     p = dict(plate_x=plate_x, plate_y=plate_y, plate_t=plate_t, hole_x=hole_x, hole_y=hole_y,
              margin_x=margin_x, margin_y=margin_y, gap_x=gap_x, gap_y=gap_y, pitch_x=pitch_x, pitch_y=pitch_y,
-             cx=cx, cy=cy, pillar_leg=pillar_leg, clear=clear, wall=wall, depth=depth,
+             cx=cx, cy=cy, post_leg=post_leg, clear=clear, wall=wall, depth=depth,
              cavity_leg=cavity_leg, outer_leg=outer_leg, corner_clear=corner_clear)
     check(p)
     return p
